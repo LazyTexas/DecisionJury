@@ -127,6 +127,26 @@
 
 ## 6. 各角色交付清单
 
+### 6.1 目录责任分工
+
+| 成员 | 主要负责目录 | 配合目录 | 说明 |
+|---|---|---|---|
+| A 项目负责人 | `docs/` | `README.md`、`AGENTS.md` | 负责范围控制、文档一致性、答辩材料和进度同步 |
+| B Agent 后端开发 | `backend/` | `tests/`、`docs/04_API.md` | 负责 API、LLM 接入、Agent 编排、多轮状态和判决书生成 |
+| C RAG 与数据开发 | `rag/`、`data/` | `tests/`、`docs/05_TestPlan.md` | 负责样例数据、历史记录库、检索逻辑和 RAG 评测 |
+| D MCP 工具开发 | `mcp_tools/` | `backend/`、`tests/` | 负责 cost_analyzer、cooling_reminder 和工具调用日志 |
+| E 前端 / 测试 / 部署 | `frontend/`、`tests/` | `backend/`、部署文件 | 负责页面、接口联调、端到端验收、部署和演示视频 |
+
+开发要求：
+
+- 每个成员优先在自己的负责目录内开发。
+- 跨目录修改必须在 PR 说明中写清楚原因。
+- 修改接口时，必须同步更新 `docs/04_API.md`。
+- 修改功能范围时，必须同步更新 `docs/01_MVP.md` 或 `docs/02_SPEC.md`。
+- 修改验收方式时，必须同步更新 `docs/05_TestPlan.md`。
+
+### 6.2 角色交付清单
+
 ### A 项目负责人
 
 - 维护所有文档。

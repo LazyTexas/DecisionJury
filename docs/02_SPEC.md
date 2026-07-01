@@ -425,6 +425,67 @@ Agent Orchestrator
 SQLite / Vector Store
 ```
 
+### 10.1 仓库目录结构
+
+项目仓库采用前后端、Agent、RAG、MCP 工具和文档分层的结构。所有成员开发时必须按照目录职责提交代码，避免把不同模块混在一起。
+
+```text
+DecisionJury/
+  backend/
+    后端 API、Agent 编排、LLM 调用、多轮状态管理、判决书生成。
+  frontend/
+    Web 前端页面、用户输入表单、对话界面、证据展示、判决书展示。
+  mcp_tools/
+    MCP 工具实现，包括 cost_analyzer、cooling_reminder，以及可选 decision_score。
+  rag/
+    历史记录数据处理、文本切分、向量化、检索逻辑、RAG 评测脚本。
+  data/
+    演示数据、历史决策样例、规则知识样例。禁止提交真实隐私数据。
+  tests/
+    后端测试、RAG 测试、MCP 工具测试、端到端验收测试。
+  docs/
+    MVP、SPEC、Milestones、API、测试计划、AI 协作规则等项目文档。
+  README.md
+    项目总览、启动说明、协作入口。
+  AGENTS.md
+    AI 辅助开发和 Git 协作规矩。
+```
+
+### 10.2 模块职责边界
+
+| 模块 | 主要职责 | 不负责 |
+|---|---|---|
+| frontend | 收集用户输入、展示多轮对话、展示 RAG 证据、展示工具调用结果和判决书 | 直接调用 LLM、直接读写向量库 |
+| backend | 提供 API、管理案件状态、编排 Agent 工作流、统一调用 LLM/RAG/MCP | 前端样式、离线数据标注 |
+| rag | 构建历史记录库、执行 BM25/向量/混合检索、返回可引用证据 | 生成最终建议、直接修改案件状态 |
+| mcp_tools | 提供成本计算、冷静期提醒、观察清单等可调用工具 | 负责完整对话流程、决定最终裁决 |
+| data | 保存演示样例、测试样例和规则知识 | 保存密钥、真实隐私数据、大型运行产物 |
+| tests | 验证核心流程、接口、RAG、MCP 工具和演示链路 | 替代人工 Review |
+| docs | 记录范围、接口、计划、验收标准和协作规则 | 记录虚假的完成情况 |
+
+### 10.3 核心调用关系
+
+```text
+frontend
+  -> backend API
+    -> Agent Orchestrator
+      -> LLM Provider
+      -> rag search
+      -> mcp_tools/cost_analyzer
+      -> mcp_tools/cooling_reminder
+    -> SQLite state store
+    -> decision report
+```
+
+调用约束：
+
+- 前端只调用后端 API，不直接调用 LLM、RAG 或 MCP 工具。
+- Agent 编排层负责决定何时调用 RAG 和 MCP 工具。
+- RAG 返回的是证据，不直接给最终裁决。
+- MCP 工具返回结构化计算结果，不直接生成长文本建议。
+- 判决书必须同时整合用户输入、Agent 辩论、RAG 证据和 MCP 工具结果。
+- 所有关键调用需要记录 trace，方便答辩展示工作流和问题排查。
+
 ## 11. 数据存储设计
 
 建议使用：
