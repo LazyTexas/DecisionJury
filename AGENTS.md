@@ -25,7 +25,7 @@
 ## Git 协作规矩
 
 - `main` 分支只保留稳定版本。
-- 每个成员从 `main` 创建自己的功能分支，命名格式为 `feature/<module-name>`。
+- 每个成员从 `dev` 创建自己的功能分支，命名格式为 `feature/<module-name>`。
 - 合并代码必须通过 Pull Request。
 - PR 描述必须包含：改动内容、验证方式、影响范围、未完成事项。
 - 不使用 `git reset --hard`、强推或删除他人分支，除非全组明确同意。
