@@ -530,13 +530,30 @@ PATCH /api/cases/{case_id}
 {
   "success": true,
   "data": {
-    "case": {}
+    "case": {
+      "case_id": "case_001",
+      "user_id": "u001",
+      "case_type": "shopping",
+      "title": "是否购买降噪耳机",
+      "description": "我想买一副 1299 元的降噪耳机。",
+      "status": "ready_for_debate",
+      "collected_fields": {
+        "price": 1299,
+        "monthly_budget_left": 2000,
+        "owned_alternatives": "普通耳机"
+      },
+      "missing_fields": [],
+      "final_decision": null,
+      "report_id": null,
+      "created_at": "2026-07-01T10:00:00+08:00",
+      "updated_at": "2026-07-01T10:05:00+08:00"
+    }
   },
   "message": "case updated"
 }
 ```
 
-`case` 使用公共结构 `Case`。
+`case` 必须使用完整公共结构 `Case`，不能返回空对象。
 
 ### 8.4 多轮补充信息
 
@@ -646,9 +663,82 @@ POST /api/cases/{case_id}/debate
         "error": null
       }
     ],
-    "rag_evidence": [],
-    "tool_results": [],
-    "report": {}
+    "rag_evidence": [
+      {
+        "id": "history_001",
+        "title": "历史闲置记录",
+        "content": "用户曾购买蓝牙键盘后使用频率较低。",
+        "score": 0.82,
+        "source": "decision_history",
+        "case_type": "shopping",
+        "tags": ["electronics", "idle"],
+        "created_at": "2026-06-20T12:00:00+08:00"
+      }
+    ],
+    "tool_results": [
+      {
+        "tool_name": "cost_analyzer",
+        "status": "success",
+        "summary": "该商品占剩余预算约 65%，预算压力中等。",
+        "risk_level": "medium",
+        "metrics": {
+          "budget_ratio": 0.65,
+          "budget_left_after_purchase": 701
+        },
+        "error": null
+      },
+      {
+        "tool_name": "cooling_reminder",
+        "status": "success",
+        "summary": "已创建 3 天冷静期提醒。",
+        "risk_level": null,
+        "metrics": {
+          "reminder_id": "reminder_001",
+          "cooling_days": 3,
+          "due_at": "2026-07-04T20:00:00+08:00",
+          "watch_items": ["是否仍然需要", "是否有低价替代品"]
+        },
+        "error": null
+      }
+    ],
+    "report": {
+      "report_id": "report_001",
+      "case_id": "case_001",
+      "case_type": "shopping",
+      "final_decision": "delay",
+      "confidence": 0.75,
+      "summary": "本案建议暂缓购买 3 天。",
+      "case_summary": "用户想购买 1299 元降噪耳机用于学习。",
+      "pro_points": ["存在学习降噪场景，可能提高专注度。"],
+      "con_points": ["价格占剩余预算较高，且已有普通耳机。"],
+      "rag_evidence": [
+        {
+          "id": "history_001",
+          "title": "历史闲置记录",
+          "content": "用户曾购买蓝牙键盘后使用频率较低。",
+          "score": 0.82,
+          "source": "decision_history",
+          "case_type": "shopping",
+          "tags": ["electronics", "idle"],
+          "created_at": "2026-06-20T12:00:00+08:00"
+        }
+      ],
+      "tool_results": [
+        {
+          "tool_name": "cost_analyzer",
+          "status": "success",
+          "summary": "该商品占剩余预算约 65%，预算压力中等。",
+          "risk_level": "medium",
+          "metrics": {
+            "budget_ratio": 0.65,
+            "budget_left_after_purchase": 701
+          },
+          "error": null
+        }
+      ],
+      "next_actions": ["加入观察清单，3 天后复盘。"],
+      "created_at": "2026-07-01T10:10:00+08:00"
+    }
   },
   "message": "debate completed"
 }
@@ -664,6 +754,12 @@ POST /api/cases/{case_id}/debate
 | rag_evidence | RagEvidence[] | 是 | 本次使用的证据 |
 | tool_results | ToolResult[] | 是 | 本次工具调用结果 |
 | report | DecisionReport | 是 | 生成的判决书 |
+
+说明：
+
+- `rag_evidence` 和 `tool_results` 是顶层字段，便于前端快速展示本次使用的证据和工具结果。
+- `report.rag_evidence` 和 `report.tool_results` 是判决书内部引用，必须与顶层对应字段保持一致。
+- `report` 必须使用完整公共结构 `DecisionReport`，不能返回空对象。
 
 ### 9.2 高风险输入返回示例
 

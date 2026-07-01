@@ -289,8 +289,8 @@ POST /api/report/generate
 
 - 字段统一使用 `snake_case`。
 - `RagEvidence` 必须包含 `id`、`title`、`content`、`score`、`source`。
-- `ToolResult` 必须包含 `tool_name`、`status`、`summary`、`metrics`、`error`。
-- `AgentStep` 必须包含 `agent`、`status`、`summary`、`confidence`。
+- `ToolResult` 必须包含 `tool_name`、`status`、`summary`、`risk_level`、`metrics`、`error`。
+- `AgentStep` 必须包含 `agent`、`status`、`summary`、`confidence`、`arguments`、`used_rag_ids`、`used_tool_names`、`error`。
 - `DecisionReport` 必须包含最终裁决、正方观点、反方观点、RAG 证据、工具结果和后续动作。
 - `TraceItem` 必须能展示 Agent、RAG、工具调用的执行顺序。
 
