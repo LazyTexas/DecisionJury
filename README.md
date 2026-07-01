@@ -37,10 +37,10 @@ DecisionJury/
 
 ## 协作流程
 
-1. 从 `main` 创建自己的功能分支，例如 `feature/backend-agent-flow`。
+1. 从 `dev` 创建自己的功能分支，例如 `feature/backend-agent-flow`。
 2. 每次只做一个清晰功能，提交前本地自测。
-3. 提交 Pull Request，由至少一名组员 Review。
-4. Review 通过后合并，避免直接向 `main` 推送未检查代码。
+3. 提交 Pull Request 合并到 `dev`，由至少一名组员 Review。
+4. 阶段测试通过后再由负责人将 `dev` 合并到 `main`，避免直接向 `main` 推送未检查代码。
 
 ## 当前阶段
 
