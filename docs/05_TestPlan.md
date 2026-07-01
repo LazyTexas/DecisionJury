@@ -245,7 +245,66 @@ MVP 至少记录：
 - 页面能展示最终裁决和后续动作。
 - 页面不能出现明显布局错乱。
 
-## 9. 课程要求验收
+## 9. API 契约验收
+
+所有模块联调前，必须确认实现符合 `docs/04_API.md` v0.2。
+
+### 9.1 接口路径验收
+
+必须使用以下接口路径：
+
+| 功能 | 接口 |
+|---|---|
+| 创建案件 | `POST /api/cases` |
+| 多轮补充信息 | `POST /api/cases/{case_id}/messages` |
+| 启动 Agent 分析 | `POST /api/cases/{case_id}/debate` |
+| 查询判决书 | `GET /api/cases/{case_id}/report` |
+| 查询执行轨迹 | `GET /api/cases/{case_id}/trace` |
+| RAG 检索 | `POST /api/rag/search` |
+| 成本计算工具 | `POST /api/tools/cost-analyzer` |
+| 冷静期提醒工具 | `POST /api/tools/cooling-reminder` |
+
+不得继续使用旧接口名，例如：
+
+```text
+POST /api/cases/create
+POST /api/chat
+POST /api/tools/cost
+POST /api/tools/reminder
+POST /api/report/generate
+```
+
+### 9.2 公共结构验收
+
+联调返回结果必须符合以下公共结构：
+
+- `Case`
+- `AgentStep`
+- `RagEvidence`
+- `ToolResult`
+- `DecisionReport`
+- `TraceItem`
+
+重点检查：
+
+- 字段统一使用 `snake_case`。
+- `RagEvidence` 必须包含 `id`、`title`、`content`、`score`、`source`。
+- `ToolResult` 必须包含 `tool_name`、`status`、`summary`、`metrics`、`error`。
+- `AgentStep` 必须包含 `agent`、`status`、`summary`、`confidence`。
+- `DecisionReport` 必须包含最终裁决、正方观点、反方观点、RAG 证据、工具结果和后续动作。
+- `TraceItem` 必须能展示 Agent、RAG、工具调用的执行顺序。
+
+### 9.3 错误场景验收
+
+| 场景 | 预期 |
+|---|---|
+| 高风险输入 | 返回 `HIGH_RISK_DECISION`，状态为 `rejected` |
+| RAG 无结果 | 返回空数组，不编造历史记录 |
+| MCP 工具失败 | 返回 `status: failed` 和 `error`，Agent 主流程不中断 |
+| LLM 输出无法解析 | 返回 `LLM_JSON_PARSE_ERROR` 或保留原始输出供排查 |
+| 请求字段缺失 | 返回 `VALIDATION_ERROR` |
+
+## 10. 课程要求验收
 
 | 要求 | 验收方式 |
 |---|---|
@@ -254,9 +313,9 @@ MVP 至少记录：
 | 至少两个 MCP 工具 | 展示成本计算和冷静期提醒调用 |
 | 多轮对话和状态管理 | 演示用户补充和修改案件信息 |
 
-## 10. 最终演示脚本
+## 11. 最终演示脚本
 
-### 10.1 购物决策演示
+### 11.1 购物决策演示
 
 ```text
 1. 创建案件：想买 1299 元降噪耳机。
@@ -270,7 +329,7 @@ MVP 至少记录：
 9. 展示观察清单和提醒。
 ```
 
-### 10.2 时间决策演示
+### 11.2 时间决策演示
 
 ```text
 1. 创建案件：是否参加占用周末两天的社团活动。
@@ -284,7 +343,7 @@ MVP 至少记录：
 9. 展示后续待办。
 ```
 
-## 11. 最终通过标准
+## 12. 最终通过标准
 
 - 两条演示流程均能完整完成。
 - 所有必做功能均可运行。
