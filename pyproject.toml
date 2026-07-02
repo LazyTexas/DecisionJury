@@ -1,0 +1,10 @@
+[project]
+name = "decisionjury"
+version = "0.1.0"
+description = "DecisionJury MVP backend agent orchestration skeleton"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []
+
+[tool.uv]
+package = false
