@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.orchestrator.decision_flow import run_decision_flow
-from backend.app.schemas.decision import to_dict
+from backend.app.schemas.decision import ToolResult, to_dict
 
 
 SHOPPING_FINAL_DECISIONS = {"buy", "delay", "reject", "alternative"}
@@ -190,3 +190,66 @@ def test_tool_results_include_cost_analyzer(monkeypatch: Any) -> None:
     result = run_complete_shopping_case()
 
     assert any(item["tool_name"] == "cost_analyzer" for item in result["tool_results"])
+
+
+def test_rag_exception_does_not_interrupt_main_flow(monkeypatch: Any) -> None:
+    def raise_rag_error(*args: Any, **kwargs: Any) -> list[Any]:
+        raise RuntimeError("mock rag unavailable")
+
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.orchestrator.decision_flow.search_mock_rag", raise_rag_error)
+
+    result = run_complete_shopping_case()
+    rag_trace = next(item for item in result["trace"] if item["name"] == "rag_search")
+
+    assert result["success"] is True
+    assert result["case_status"] == "completed"
+    assert result["rag_evidence"] == []
+    assert result["report"]["rag_evidence"] == []
+    assert rag_trace["status"] == "failed"
+    assert [step["agent"] for step in result["steps"]] == EXPECTED_AGENT_ORDER
+
+
+def test_cooling_reminder_is_available_to_judge_before_judge_runs(monkeypatch: Any) -> None:
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+
+    result = run_complete_shopping_case()
+    tool_names = [item["tool_name"] for item in result["tool_results"]]
+    report_tool_names = [item["tool_name"] for item in result["report"]["tool_results"]]
+    judge_step = next(step for step in result["steps"] if step["agent"] == "judge_agent")
+    trace_names = [item["name"] for item in result["trace"]]
+
+    assert "cost_analyzer" in tool_names
+    assert "cooling_reminder" in tool_names
+    assert "cooling_reminder" in report_tool_names
+    assert "cooling_reminder" in judge_step["used_tool_names"]
+    assert trace_names.index("cooling_reminder") < trace_names.index("judge_agent")
+
+
+def test_cooling_reminder_failure_does_not_interrupt_main_flow(monkeypatch: Any) -> None:
+    def failed_cooling_reminder(*args: Any, **kwargs: Any) -> ToolResult:
+        return ToolResult(
+            tool_name="cooling_reminder",
+            status="failed",
+            summary="cooling reminder failed; user should set a manual review reminder",
+            risk_level=None,
+            metrics={},
+            error="REMINDER_CREATE_FAILED",
+        )
+
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.orchestrator.decision_flow.cooling_reminder", failed_cooling_reminder)
+
+    result = run_complete_shopping_case()
+    report_cooling_result = next(
+        item for item in result["report"]["tool_results"] if item["tool_name"] == "cooling_reminder"
+    )
+
+    assert result["success"] is True
+    assert result["case_status"] == "completed"
+    assert result["report"] is not None
+    assert report_cooling_result["status"] == "failed"
+    assert any("手动" in action or "manual" in action.lower() for action in result["report"]["next_actions"])

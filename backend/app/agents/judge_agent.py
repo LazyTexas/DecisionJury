@@ -21,7 +21,8 @@ def run_judge_agent(
     purpose = collected_fields.get("purpose", "未说明用途")
 
     summary = _summary(final_decision, product, rag_evidence)
-    next_actions = _next_actions(final_decision, rag_evidence, cost_result)
+    cooling_result = next((item for item in tool_results if item.tool_name == "cooling_reminder"), None)
+    next_actions = _next_actions(final_decision, rag_evidence, cost_result, cooling_result)
     report = DecisionReport(
         report_id=f"report_{case_id}",
         case_id=case_id,
@@ -92,7 +93,12 @@ def _summary(final_decision: str, product: str, rag_evidence: list[RagEvidence])
     return f"本案对{product}的辅助建议是：{labels[final_decision]}。{suffix}"
 
 
-def _next_actions(final_decision: str, rag_evidence: list[RagEvidence], cost_result: ToolResult | None) -> list[str]:
+def _next_actions(
+    final_decision: str,
+    rag_evidence: list[RagEvidence],
+    cost_result: ToolResult | None,
+    cooling_result: ToolResult | None,
+) -> list[str]:
     actions: list[str] = []
     if final_decision in {"delay", "alternative"}:
         actions.append("加入观察清单，3 天后复盘真实需求。")
@@ -105,6 +111,10 @@ def _next_actions(final_decision: str, rag_evidence: list[RagEvidence], cost_res
         actions.append("未找到相关历史证据，建议后续补充购买复盘记录。")
     if cost_result and cost_result.status == "failed":
         actions.append("预算工具不可用，建议手动核对本月剩余预算。")
+    if cooling_result and cooling_result.status == "success":
+        actions.append("冷静期提醒已创建，可按期复盘。")
+    if cooling_result and cooling_result.status == "failed":
+        actions.append("提醒创建失败，建议手动设置 3 天后复盘。")
     return actions
 
 

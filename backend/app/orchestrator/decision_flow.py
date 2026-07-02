@@ -7,7 +7,7 @@ from backend.app.agents.con_agent import run_con_agent
 from backend.app.agents.input_parser import parse_input
 from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
-from backend.app.schemas.decision import AgentStep, DebateResult, TraceItem
+from backend.app.schemas.decision import AgentStep, DebateResult, ToolResult, TraceItem
 from backend.app.services.mock_mcp import cooling_reminder, cost_analyzer
 from backend.app.services.mock_rag import search_mock_rag
 
@@ -66,6 +66,7 @@ def run_decision_flow(
         input_summary=query,
         func=lambda: search_mock_rag(user_id, case_id, "shopping", query, top_k=3),
         output_summary_builder=lambda result: f"返回 {len(result)} 条历史证据。",
+        fallback=[],
     )
 
     tool_results = [
@@ -76,6 +77,7 @@ def run_decision_flow(
             input_summary=f"price={fields.get('price')}, monthly_budget_left={fields.get('monthly_budget_left')}",
             func=lambda: cost_analyzer(case_id, "shopping", fields),
             output_summary_builder=lambda result: result.summary,
+            fallback=_failed_tool_result("cost_analyzer", "成本计算工具调用失败，主流程继续。", "TOOL_ERROR"),
         )
     ]
 
@@ -95,16 +97,7 @@ def run_decision_flow(
     )
     steps.append(con_step)
 
-    judge_step, report = _record_agent_trace(
-        trace,
-        "judge_agent",
-        fields.get("product_name", "shopping case"),
-        lambda: run_judge_agent(case_id, fields, pro_step, con_step, rag_evidence, tool_results),
-        output_summary_builder=lambda result: f"final_decision={result[1].final_decision}, confidence={result[1].confidence}",
-    )
-    steps.append(judge_step)
-
-    if _should_create_reminder(report.final_decision, tool_results, fields):
+    if _should_create_reminder(tool_results, fields):
         reminder = _record_trace(
             trace,
             trace_type="tool_call",
@@ -115,18 +108,26 @@ def run_decision_flow(
                 case_id=case_id,
                 title=f"{fields.get('product_name', '商品')}冷静期复盘",
                 cooling_days=3,
-                reason=report.summary,
+                reason=_cooling_reason(fields, tool_results),
                 watch_items=["是否仍然需要", "是否已有低价替代品", "是否影响本月必要支出"],
             ),
             output_summary_builder=lambda result: result.summary,
+            fallback=_failed_tool_result(
+                "cooling_reminder",
+                "冷静期提醒创建失败，建议用户手动设置复盘提醒。",
+                "REMINDER_CREATE_FAILED",
+            ),
         )
         tool_results.append(reminder)
-        report.tool_results = tool_results
-        if reminder.status == "success":
-            report.next_actions.append("冷静期提醒已创建，可按期复盘。")
-        else:
-            report.next_actions.append("提醒创建失败，建议手动设置 3 天后复盘。")
-        judge_step.used_tool_names.append("cooling_reminder")
+
+    judge_step, report = _record_agent_trace(
+        trace,
+        "judge_agent",
+        fields.get("product_name", "shopping case"),
+        lambda: run_judge_agent(case_id, fields, pro_step, con_step, rag_evidence, tool_results),
+        output_summary_builder=lambda result: f"final_decision={result[1].final_decision}, confidence={result[1].confidence}",
+    )
+    steps.append(judge_step)
 
     return DebateResult(
         success=True,
@@ -161,12 +162,28 @@ def _build_rag_query(fields: dict[str, Any]) -> str:
     return " ".join(part for part in parts if part.strip())
 
 
-def _should_create_reminder(report_decision: str, tool_results: list[Any], fields: dict[str, Any]) -> bool:
-    if report_decision in {"delay", "alternative"}:
-        return True
+def _should_create_reminder(tool_results: list[Any], fields: dict[str, Any]) -> bool:
     cost_result = next((item for item in tool_results if item.tool_name == "cost_analyzer"), None)
     trigger = fields.get("trigger_reason")
     return bool(cost_result and cost_result.risk_level in {"medium", "high"} or trigger in {"促销", "种草", "情绪"})
+
+
+def _cooling_reason(fields: dict[str, Any], tool_results: list[Any]) -> str:
+    cost_result = next((item for item in tool_results if item.tool_name == "cost_analyzer"), None)
+    if cost_result and cost_result.status == "success":
+        return cost_result.summary
+    return f"{fields.get('product_name', '该商品')}存在冲动购买或预算不确定性，建议冷静 3 天后复盘。"
+
+
+def _failed_tool_result(tool_name: str, summary: str, error: str) -> ToolResult:
+    return ToolResult(
+        tool_name=tool_name,
+        status="failed",
+        summary=summary,
+        risk_level=None,
+        metrics={},
+        error=error,
+    )
 
 
 def _record_agent_trace(
@@ -193,6 +210,7 @@ def _record_trace(
     input_summary: str,
     func: Callable[[], Any],
     output_summary_builder: Callable[[Any], str],
+    fallback: Any = None,
 ) -> Any:
     start = time.perf_counter()
     try:
@@ -227,6 +245,8 @@ def _record_trace(
                 error=str(exc),
             )
         )
+        if fallback is not None:
+            return fallback
         raise
 
 
