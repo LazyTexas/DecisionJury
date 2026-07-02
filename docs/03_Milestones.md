@@ -215,3 +215,53 @@
 当前卡点：
 需要谁配合：
 ```
+
+## 9. 当前进度同步
+
+### 9.1 C 模块购物法庭进度
+
+截至当前 `dev` 分支，C 模块已完成购物法庭 Agent 编排 mock 流程，并已合并到 `dev`。
+
+已完成内容：
+
+- 完成 `input_parser`、`pro_agent`、`con_agent`、`judge_agent` 四个 Agent 的基础实现。
+- 完成购物法庭多 Agent 编排流程。
+- 完成 mock LLM 调用入口。
+- 完成 mock RAG 接入位置。
+- 完成 mock MCP 工具接入，包括 `cost_analyzer` 和 `cooling_reminder`。
+- 完成结构化 `DecisionReport` 输出。
+- 完成 `AgentStep`、`ToolResult`、`RagEvidence`、`TraceItem` 输出。
+- 完成高风险输入拦截，高风险输入不会进入正反方辩论。
+- 完成 RAG 为空时不编造历史证据的处理。
+- 完成 RAG / MCP 异常兜底，异常不会直接中断 Agent 主流程。
+- 完成命令行 demo。
+- 完成 C 模块 Agent 编排测试。
+
+当前验证命令：
+
+```bash
+uv run python -m backend.app.orchestrator.demo
+uv run pytest tests/test_agent_flow.py
+uv run python -m compileall backend tests
+```
+
+下一步计划：
+
+- 与 B 后端对接 `/api/cases/{case_id}/debate` 接口。
+- 为 B 后端提供 C 模块调用 adapter。
+- 确认 `case_type`、`description`、`collected_fields` 等字段传入格式。
+- 确认 C 模块输出结果在数据库中的保存方式。
+- 与 A 前端联调 `steps`、`rag_evidence`、`tool_results`、`report`、`trace` 展示。
+
+### 9.2 C 模块当前完成度判断
+
+购物法庭 C 模块本体已基本跑通，当前完成度约为 75% - 80%。
+
+整体 C 模块仍需完成：
+
+- B 后端接口联调。
+- 真实 LLM 接入。
+- 真实 RAG 模块替换 mock RAG。
+- 真实 MCP 工具替换 mock MCP。
+- time 时间决策流程。
+- 前后端完整链路联调。

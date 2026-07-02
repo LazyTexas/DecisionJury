@@ -350,3 +350,61 @@ POST /api/report/generate
 - `main` 分支代码可启动。
 - 文档完整。
 - 答辩材料和演示视频准备完成。
+
+## 13. 当前测试进度记录
+
+### 13.1 C 模块购物法庭 Agent 编排测试
+
+当前 C 模块已新增购物法庭 Agent 编排测试。
+
+测试文件：
+
+```text
+tests/test_agent_flow.py
+```
+
+当前测试数量：
+
+```text
+12
+```
+
+验证命令：
+
+```bash
+uv run pytest tests/test_agent_flow.py
+uv run python -m backend.app.orchestrator.demo
+uv run python -m compileall backend tests
+```
+
+当前验证结果：
+
+```text
+12 passed
+demo 正常输出购物法庭判决 JSON
+backend 和 tests 编译检查通过
+```
+
+已覆盖场景：
+
+- 正常购物案件可以完成 Agent 辩论。
+- `steps` 按顺序包含 `input_parser`、`pro_agent`、`con_agent`、`judge_agent`。
+- 输出包含 `rag_evidence`、`tool_results`、`report`、`trace`。
+- `report.final_decision` 属于 `buy`、`delay`、`reject`、`alternative`。
+- 高风险输入返回 `HIGH_RISK_DECISION`，不进入正反方和法官流程。
+- 缺失字段返回 `MISSING_FIELDS`，并给出追问原因。
+- RAG 返回空数组时，不编造历史证据。
+- RAG 抛异常时，主流程不中断，trace 记录 `rag_search failed`。
+- `cost_analyzer` 工具结果进入 `tool_results`。
+- `cooling_reminder` 在 `judge_agent` 前进入工具结果。
+- `cooling_reminder` 失败时主流程不中断。
+- trace 能展示 Agent、RAG、MCP 工具调用顺序。
+
+尚未覆盖场景：
+
+- 后端 `/api/cases/{case_id}/debate` 接口级测试。
+- 真实 LLM API 调用测试。
+- 真实 RAG 检索模块联调测试。
+- 真实 MCP 工具联调测试。
+- time 时间决策 Agent 编排测试。
+- 前端端到端流程测试。
