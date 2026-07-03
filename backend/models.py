@@ -1,40 +1,41 @@
-from sqlalchemy import Column, String, DateTime, JSON, Float, Integer
-from sqlalchemy.dialects.sqlite import TEXT
-from database import Base
-from datetime import datetime
+# backend/models.py
+from sqlalchemy import Column, String, DateTime, JSON, Text
+from sqlalchemy.sql import func
+from .database import Base
 
 class Case(Base):
     __tablename__ = "cases"
 
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, index=True)
-    case_type = Column(String)  # "shopping" / "time"
+    case_type = Column(String)  # shopping / time
     title = Column(String)
-    description = Column(TEXT)
-    status = Column(String)  # "collecting" / "ready_for_debate" / "debating" / "completed" / "archived"
-    final_decision = Column(String, nullable=True)  # "buy" / "delay" / "reject" / "alternative"
+    description = Column(Text)
+    status = Column(String)  # collecting / ready_for_debate / debating / completed / rejected / archived
+    collected_fields = Column(JSON, default={})   # 多轮对话收集的字段
+    missing_fields = Column(JSON, default=[])     # 缺失的字段列表
+    final_decision = Column(String, nullable=True)  # buy / delay / reject / alternative
     report_id = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.now)
-    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-class ChatMessage(Base):
-    __tablename__ = "chat_messages"
+class Message(Base):
+    __tablename__ = "messages"
 
     id = Column(String, primary_key=True, index=True)
     case_id = Column(String, index=True)
-    user_id = Column(String, index=True)
-    role = Column(String)  # "user" / "system" / "assistant"
-    content = Column(TEXT)
-    message_type = Column(String)  # "text" / "argument" / "verdict" / "tool_call"
-    created_at = Column(DateTime, default=datetime.now)
+    role = Column(String)  # user / assistant / pro_agent / con_agent / judge
+    content = Column(Text)
+    message_type = Column(String, default="text")  # text / question / argument / verdict / system
+    created_at = Column(DateTime, server_default=func.now())
 
 class History(Base):
     __tablename__ = "histories"
 
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, index=True)
-    case_type = Column(String)
-    summary = Column(TEXT)
-    result = Column(String)  # "regret" / "satisfied" / "neutral"
+    case_type = Column(String)  # shopping / time
+    summary = Column(Text)
+    result = Column(String)  # worth / regret / neutral
     tags = Column(JSON, default=[])
-    created_at = Column(DateTime, default=datetime.now)
+    created_at = Column(DateTime, server_default=func.now())
