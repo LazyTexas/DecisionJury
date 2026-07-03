@@ -1,0 +1,53 @@
+[
+  {
+    "id": "h_shop_001",
+    "title": "购买机械键盘的复盘",
+    "content": "2026-06-05，购买机械键盘 399 元，实际使用频率较低，因为平时多在图书馆学习，声音太大不敢用，复盘结论为冲动购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["electronics", "idle", "regret"],
+    "created_at": "2026-06-05T10:00:00+08:00"
+  },
+  {
+    "id": "h_shop_002",
+    "title": "购买学习台灯的复盘",
+    "content": "2026-06-12，购买学习台灯 129 元，每天都在用，极大提升了宿舍夜间学习效率，复盘结论为值得购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["study", "useful", "worth"],
+    "created_at": "2026-06-12T10:00:00+08:00"
+  },
+  {
+    "id": "h_time_001",
+    "title": "周末社团活动复盘",
+    "content": "2026-06-10，参加社团换届筹备活动占用周末 8 小时，导致当周的计算机系统实验（MallocLab）作业严重延期，压力极大。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["club", "delay", "pressure"],
+    "created_at": "2026-06-10T10:00:00+08:00"
+  },
+  {
+    "id": "h_time_002",
+    "title": "参加技术分享会复盘",
+    "content": "2026-06-15，参加学长关于 AI 行业实习的技术分享会，占用 2 小时，对明确接下来的求职规划帮助很大，值得参加。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["tech", "career", "worth"],
+    "created_at": "2026-06-15T10:00:00+08:00"
+  }
+  ,
+  {
+    "id": "h_shop_003",
+    "title": "购买降噪耳机的复盘",
+    "content": "2026-06-20，购买降噪耳机 1299 元，在自习室看书时沉浸感极好，复盘结论为值得购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["electronics", "useful"],
+    "created_at": "2026-06-20T10:00:00+08:00"
+  }
+]
