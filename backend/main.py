@@ -1,15 +1,16 @@
-from fastapi import FastAPI, Depends
+# backend/main.py
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
-from database import engine, Base, get_db
-import models
+from .database import engine, Base
+from . import models
+from .routers import cases, chat, debate
 
 # 创建数据库表
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="DecisionJury API", version="1.0.0")
 
-# CORS 配置（允许前端调用）
+# CORS 配置
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -21,10 +22,13 @@ app.add_middleware(
 # ===== 健康检查 =====
 @app.get("/api/health")
 def health_check():
-    return {"status": "ok", "message": "DecisionJury API is running"}
+    return {
+        "success": True,
+        "data": {"status": "ok", "version": "1.0.0"},
+        "message": ""
+    }
 
-# ===== 导入路由 =====
-from routers import cases, chat
-
+# ===== 注册路由 =====
 app.include_router(cases.router)
 app.include_router(chat.router)
+app.include_router(debate.router)
