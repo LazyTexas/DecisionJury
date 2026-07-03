@@ -13,7 +13,6 @@ import {
   MessageRole,
   MessageType,
   PaginatedResponse,
-  Session,
   SessionStage,
   SessionState,
   Verdict,
@@ -24,13 +23,6 @@ import {
 
 const generateId = (): string => {
   return Math.random().toString(36).substring(2, 15);
-};
-
-const randomPastTime = (daysAgo: number): string => {
-  const d = new Date();
-  d.setDate(d.getDate() - Math.floor(Math.random() * daysAgo));
-  d.setHours(d.getHours() - Math.floor(Math.random() * 24));
-  return d.toISOString();
 };
 
 const delay = (ms = 500): Promise<void> =>

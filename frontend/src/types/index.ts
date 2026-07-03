@@ -310,3 +310,10 @@ export interface ApiResponse<T> {
   message: string;
   data: T;
 }
+
+/** 创建案件表单数据（前端用） */
+export interface CreateCaseFormData {
+  title: string;
+  category: DecisionCategory;
+  context?: string;
+}
