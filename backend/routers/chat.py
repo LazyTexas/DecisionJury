@@ -15,6 +15,10 @@ def send_message(req: SendMessageRequest, db: Session = Depends(get_db)):
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
+    # 加载现有的 collected_fields / missing_fields
+    collected = dict(case.collected_fields or {})
+    missing = list(case.missing_fields or [])
+
     # 保存用户消息
     user_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
@@ -25,11 +29,10 @@ def send_message(req: SendMessageRequest, db: Session = Depends(get_db)):
     )
     db.add(user_msg)
 
-    # 简单的信息收集逻辑（MVP 阶段）
-    collected = case.collected_fields or {}
-    missing = case.missing_fields or []
-
     # 解析用户消息中的关键信息
+    # 移除 description 这类非标准字段
+    collected.pop("description", None)
+
     if "预算" in req.message or "元" in req.message:
         import re
         numbers = re.findall(r'\d+', req.message)

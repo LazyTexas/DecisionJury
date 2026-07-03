@@ -39,7 +39,15 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
     if result.get("message") == "MISSING_FIELDS":
         case.status = CaseStatus.COLLECTING
         db.commit()
-        return ApiResponse(success=False, data=None, message="MISSING_FIELDS")
+        return ApiResponse(
+            success=False,
+            data={
+                "case_status": CaseStatus.COLLECTING,
+                "missing_fields": case.missing_fields,
+                "next_question": result.get("reason"),
+            },
+            message="MISSING_FIELDS"
+        )
 
     if result.get("message") == "HIGH_RISK_DECISION":
         case.status = CaseStatus.REJECTED
