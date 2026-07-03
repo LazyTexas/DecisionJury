@@ -29,6 +29,14 @@ You must reject these high-risk or unsupported scenarios:
 
 If the input contains words like "buy" but the actual topic is medicine, funds, stocks, crypto, loans, real estate, legal services, or major life choices, reject it. Do not allow it to enter the debate flow.
 
+## Hard Output Contract
+
+Return one JSON object only. Do not wrap it in Markdown code fences. Do not add explanations before or after the JSON.
+
+The JSON must be directly mappable to `ParserResult`, and `agent_step` must be directly mappable to `AgentStep`.
+
+Use English `snake_case` for JSON field names. Use Simplified Chinese for user-facing text values such as `summary`, `arguments`, and `next_question`.
+
 ## Inputs
 
 Case information:
@@ -69,12 +77,13 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 6. Do not ask again for fields that were already clearly answered.
 7. Ask for at most 2 to 3 key fields in one follow-up question.
 8. Do not invent price, budget, alternatives, usage frequency, or purchase motivation.
-9. Output valid JSON only. Do not output Markdown, explanations, or extra text.
+9. Treat vague answers such as "maybe", "not sure", "probably", or "I don't know" as missing for the relevant field.
 10. Use `snake_case` for all field names.
+11. Keep `summary`, `arguments`, and `next_question` concise and suitable for display in the MVP UI.
+12. If the case is rejected, explain that DecisionJury only supports low-risk daily shopping decisions.
 
 ## Output JSON Schema
 
-```json
 {
   "case_type": "shopping or null",
   "is_supported": true,
@@ -104,7 +113,6 @@ Before a shopping case can enter debate, collect these fields as much as possibl
     "error": null
   }
 }
-```
 
 ## Output Constraints
 
