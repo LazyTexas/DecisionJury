@@ -425,7 +425,43 @@ Agent Orchestrator
 SQLite / Vector Store
 ```
 
-### 10.1 仓库目录结构
+### 10.1 C 模块当前已用技术栈
+
+本节记录 C 模块“Agent 编排与 LLM 调用”当前已经实际使用到的技术栈，避免将后续计划中的真实 LLM、真实 RAG、真实 MCP 误写为已完成能力。
+
+| 类型 | 当前技术/实现 | 当前状态 | 说明 |
+|---|---|---|---|
+| 开发语言 | Python | 已使用 | C 模块后端编排、Agent、Schema、mock 服务和测试均使用 Python 实现。 |
+| Python 环境管理 | uv | 已使用 | 使用 `uv` 管理项目环境和命令运行。 |
+| Python 版本要求 | `>=3.11` | 已配置 | 以 `pyproject.toml` 中 `requires-python = ">=3.11"` 为准。 |
+| 测试框架 | pytest | 已使用 | C 模块测试文件为 `tests/test_agent_flow.py`，用于验证 Agent 主流程和异常兜底。 |
+| Agent 编排 | 本地 Python 编排函数 | 已实现 mock 流程 | 当前由 `backend/app/orchestrator/decision_flow.py` 串联输入解析、RAG、MCP 工具、正反方 Agent 和法官 Agent。 |
+| Agent 输出结构 | Python 数据类/Schema | 已使用 | 当前使用 `ParserResult`、`AgentStep`、`RagEvidence`、`ToolResult`、`DecisionReport`、`TraceItem`、`DebateResult` 等结构化对象。 |
+| Prompt 管理 | Markdown Prompt 文件 | 已使用 | Prompt 存放在 `backend/app/prompts/`，包括 `input_parser.md`、`pro_agent.md`、`con_agent.md`、`judge_agent.md`。 |
+| LLM 调用 | mock LLM 客户端 | 已实现 mock | 当前使用 `backend/app/services/llm_client.py` 模拟 LLM 输出；真实大模型 API 接入仍属于后续任务。 |
+| RAG 接入 | mock RAG 检索 | 已实现 mock | 当前使用 `backend/app/services/mock_rag.py` 返回模拟历史证据；真实 BM25/向量/混合检索由后续 D 模块接入。 |
+| MCP 工具调用 | mock MCP 工具 | 已实现 mock | 当前使用 `backend/app/services/mock_mcp.py` 模拟 `cost_analyzer` 和 `cooling_reminder`；真实 MCP 工具由后续 E 模块替换或封装。 |
+| 可观测性 | trace 执行轨迹 | 已实现 | 当前记录 Agent、RAG、工具调用的步骤、耗时、状态和错误信息，便于答辩展示与排查。 |
+| 本地演示 | Python module demo | 已使用 | 可通过 `uv run python -m backend.app.orchestrator.demo` 运行 C 模块购物法庭 demo。 |
+
+C 模块当前验证命令：
+
+```bash
+uv run pytest tests/test_agent_flow.py
+uv run python -m backend.app.orchestrator.demo
+uv run python -m compileall backend tests
+```
+
+C 模块当前边界：
+
+- 当前已跑通购物决策 `shopping` 的 mock Agent 主流程。
+- 当前尚未接入真实 LLM API。
+- 当前尚未接入真实 RAG 检索服务。
+- 当前尚未接入真实 MCP 工具服务。
+- 当前尚未完成与 B 后端 `/api/cases/{case_id}/debate` 的正式 adapter 联调。
+- 时间决策 `time` 不属于当前 C 模块已完成范围。
+
+### 10.2 仓库目录结构
 
 项目仓库采用前后端、Agent、RAG、MCP 工具和文档分层的结构。所有成员开发时必须按照目录职责提交代码，避免把不同模块混在一起。
 
@@ -451,7 +487,7 @@ DecisionJury/
     AI 辅助开发和 Git 协作规矩。
 ```
 
-### 10.2 模块职责边界
+### 10.3 模块职责边界
 
 | 模块 | 主要职责 | 不负责 |
 |---|---|---|
@@ -463,7 +499,7 @@ DecisionJury/
 | tests | 验证核心流程、接口、RAG、MCP 工具和演示链路 | 替代人工 Review |
 | docs | 记录范围、接口、计划、验收标准和协作规则 | 记录虚假的完成情况 |
 
-### 10.3 核心调用关系
+### 10.4 核心调用关系
 
 ```text
 frontend
