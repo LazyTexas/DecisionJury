@@ -18,8 +18,27 @@ def run_con_agent(
         "con_agent",
         {
             "collected_fields": collected_fields,
-            "rag_evidence": [item.id for item in rag_evidence],
-            "tool_results": [item.tool_name for item in tool_results],
+            # 传给真实 LLM 的上下文保留失败状态，便于模型说明工具结果的不确定性。
+            "rag_evidence": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "content": item.content,
+                    "tags": item.tags,
+                }
+                for item in rag_evidence
+            ],
+            "tool_results": [
+                {
+                    "tool_name": item.tool_name,
+                    "status": item.status,
+                    "summary": item.summary,
+                    "risk_level": item.risk_level,
+                    "metrics": item.metrics,
+                    "error": item.error,
+                }
+                for item in tool_results
+            ],
         },
     )
     risk_rag_ids = [

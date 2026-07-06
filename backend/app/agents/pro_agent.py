@@ -18,8 +18,27 @@ def run_pro_agent(
         "pro_agent",
         {
             "collected_fields": collected_fields,
-            "rag_evidence": [item.id for item in rag_evidence],
-            "tool_results": [item.tool_name for item in tool_results],
+            # 真实 LLM 需要看到证据内容和工具状态；对外 AgentStep 字段仍只记录 id/name。
+            "rag_evidence": [
+                {
+                    "id": item.id,
+                    "title": item.title,
+                    "content": item.content,
+                    "tags": item.tags,
+                }
+                for item in rag_evidence
+            ],
+            "tool_results": [
+                {
+                    "tool_name": item.tool_name,
+                    "status": item.status,
+                    "summary": item.summary,
+                    "risk_level": item.risk_level,
+                    "metrics": item.metrics,
+                    "error": item.error,
+                }
+                for item in tool_results
+            ],
         },
     )
     useful_rag_ids = [item.id for item in rag_evidence if "useful" in item.tags or "study" in item.tags]
