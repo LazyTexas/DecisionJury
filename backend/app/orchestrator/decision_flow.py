@@ -8,7 +8,7 @@ from backend.app.agents.input_parser import parse_input
 from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
 from backend.app.schemas.decision import AgentStep, DebateResult, ToolResult, TraceItem
-from backend.app.services.mock_mcp import cooling_reminder, cost_analyzer
+from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder
 from backend.app.services.mock_rag import search_mock_rag
 
 
@@ -75,7 +75,8 @@ def run_decision_flow(
             trace_type="tool_call",
             name="cost_analyzer",
             input_summary=f"price={fields.get('price')}, monthly_budget_left={fields.get('monthly_budget_left')}",
-            func=lambda: cost_analyzer(case_id, "shopping", fields),
+            # 编排层只调用 C 侧 adapter，避免 E 工具原始 dict 结构散落到流程里。
+            func=lambda: analyze_shopping_cost(case_id, "shopping", fields),
             output_summary_builder=lambda result: result.summary,
             fallback=_failed_tool_result("cost_analyzer", "成本计算工具调用失败，主流程继续。", "TOOL_ERROR"),
         )
@@ -103,7 +104,8 @@ def run_decision_flow(
             trace_type="tool_call",
             name="cooling_reminder",
             input_summary=f"case_id={case_id}, cooling_days=3",
-            func=lambda: cooling_reminder(
+            # reminder 必须在 judge 前进入 tool_results，法官才能综合工具结果。
+            func=lambda: create_cooling_reminder(
                 user_id=user_id,
                 case_id=case_id,
                 title=f"{fields.get('product_name', '商品')}冷静期复盘",
