@@ -2,298 +2,349 @@
 // DecisionJury 前端类型定义（接口契约）
 // 本文件定义了前后端通信的全部数据结构。
 // 后端（成员 B）应按此契约实现 API。
+// 字段名统一使用 snake_case，与后端 API 文档对齐。
 // ============================================================
 
 // ---- 枚举 ----
 
 /** 案件状态 */
 export enum CaseStatus {
-  /** 进行中（信息收集中） */
-  IN_PROGRESS = 'in_progress',
-  /** 等待辩论 */
-  PENDING_DEBATE = 'pending_debate',
-  /** 辩论中 */
+  COLLECTING = 'collecting',
+  READY_FOR_DEBATE = 'ready_for_debate',
   DEBATING = 'debating',
-  /** 已判决 */
-  VERDICTED = 'verdict',
-  /** 已关闭 */
-  CLOSED = 'closed',
+  COMPLETED = 'completed',
+  REJECTED = 'rejected',
+  ARCHIVED = 'archived',
 }
 
 /** 消息角色 */
 export enum MessageRole {
-  /** 用户 */
   USER = 'user',
-  /** 系统/助手 */
   ASSISTANT = 'assistant',
-  /** 正方 Agent */
-  PRO_AGENT = 'pro_agent',
-  /** 反方 Agent */
-  CON_AGENT = 'con_agent',
-  /** 法官 Agent */
-  JUDGE = 'judge',
-}
-
-/** 消息类型 */
-export enum MessageType {
-  /** 普通文本 */
-  TEXT = 'text',
-  /** 追问（系统需要用户补充信息） */
-  QUESTION = 'question',
-  /** 辩论陈述 */
-  ARGUMENT = 'argument',
-  /** 判决 */
-  VERDICT = 'verdict',
-  /** 系统提示 */
-  SYSTEM = 'system',
+  AGENT = 'agent',
 }
 
 /** 决策类别 */
-export enum DecisionCategory {
-  /** 购物决策 */
+export enum CaseType {
   SHOPPING = 'shopping',
-  /** 时间/日程决策 */
   TIME = 'time',
-  /** 职业决策 */
-  CAREER = 'career',
-  /** 关系决策 */
-  RELATIONSHIP = 'relationship',
-  /** 财务决策 */
-  FINANCE = 'finance',
-  /** 其他 */
-  OTHER = 'other',
 }
 
-/** 对话阶段 */
-export enum SessionStage {
-  /** 信息收集 */
-  INFO_COLLECTION = 'info_collection',
-  /** 正方辩论 */
-  PRO_DEBATE = 'pro_debate',
-  /** 反方辩论 */
-  CON_DEBATE = 'con_debate',
-  /** 法官裁决 */
-  JUDGE_RULING = 'judge_ruling',
-  /** 已完成 */
-  COMPLETED = 'completed',
+/** 购物决策最终裁决 */
+export enum ShoppingDecision {
+  BUY = 'buy',
+  DELAY = 'delay',
+  REJECT = 'reject',
+  ALTERNATIVE = 'alternative',
 }
 
-/** 判决倾向 */
-export enum VerdictTendency {
-  /** 支持 */
-  SUPPORT = 'support',
-  /** 反对 */
-  OPPOSE = 'oppose',
-  /** 中立/需更多信息 */
+/** 时间决策最终裁决 */
+export enum TimeDecision {
+  ACCEPT = 'accept',
+  PARTIAL_ACCEPT = 'partial_accept',
+  DELAY = 'delay',
+  REJECT = 'reject',
+}
+
+/** Agent 名称 */
+export enum AgentName {
+  INPUT_PARSER = 'input_parser',
+  PRO_AGENT = 'pro_agent',
+  CON_AGENT = 'con_agent',
+  JUDGE_AGENT = 'judge_agent',
+}
+
+/** 工具名称 */
+export enum ToolName {
+  COST_ANALYZER = 'cost_analyzer',
+  COOLING_REMINDER = 'cooling_reminder',
+  DECISION_SCORE = 'decision_score',
+}
+
+/** 风险等级 */
+export enum RiskLevel {
+  LOW = 'low',
+  MEDIUM = 'medium',
+  HIGH = 'high',
+}
+
+/** 历史记录结果 */
+export enum HistoryResult {
+  REGRET = 'regret',
+  SATISFIED = 'satisfied',
   NEUTRAL = 'neutral',
 }
 
-// ---- 核心实体 ----
+// ---- 公共数据结构 ----
 
 /** 案件 */
 export interface Case {
-  /** 案件唯一 ID */
-  id: string;
-  /** 案件标题（用户输入的决策问题） */
+  case_id: string;
+  user_id: string;
+  case_type: CaseType;
   title: string;
-  /** 决策类别 */
-  category: DecisionCategory;
-  /** 案件状态 */
-  status: CaseStatus;
-  /** 用户初始描述 */
   description: string;
-  /** 当前对话阶段 */
-  currentStage: SessionStage;
-  /** 关联会话 ID */
-  sessionId: string;
-  /** 创建时间（ISO 8601） */
-  createdAt: string;
-  /** 更新时间（ISO 8601） */
-  updatedAt: string;
-  /** 关联判决书 ID（判决后才有） */
-  verdictId?: string;
+  status: CaseStatus;
+  collected_fields: Record<string, unknown>;
+  missing_fields: string[];
+  final_decision: string | null;
+  report_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
+
+/** 消息 */
+export interface Message {
+  message_id: string;
+  case_id: string;
+  role: MessageRole;
+  content: string;
+  created_at: string;
+}
+
+/** Agent 执行步骤 */
+export interface AgentStep {
+  agent: AgentName;
+  status: 'completed' | 'failed';
+  summary: string;
+  confidence: number;
+  arguments: string[];
+  used_rag_ids: string[];
+  used_tool_names: string[];
+  error: string | null;
+}
+
+/** RAG 证据 */
+export interface RagEvidence {
+  id: string;
+  title: string;
+  content: string;
+  score: number;
+  source: string;
+  case_type: CaseType;
+  tags: string[];
+  created_at: string | null;
+}
+
+/** 工具调用结果 */
+export interface ToolResult {
+  tool_name: ToolName | string;
+  status: 'success' | 'failed';
+  summary: string;
+  risk_level: RiskLevel | null;
+  metrics: Record<string, unknown>;
+  error: string | null;
+}
+
+/** 判决书 */
+export interface DecisionReport {
+  report_id: string;
+  case_id: string;
+  case_type: CaseType;
+  final_decision: string;
+  confidence: number;
+  summary: string;
+  case_summary: string;
+  pro_points: string[];
+  con_points: string[];
+  rag_evidence: RagEvidence[];
+  tool_results: ToolResult[];
+  next_actions: string[];
+  created_at: string;
+}
+
+/** Agent 执行轨迹项 */
+export interface TraceItem {
+  trace_id: string;
+  step: number;
+  type: 'agent' | 'rag_search' | 'tool_call';
+  name: string;
+  input_summary: string;
+  output_summary: string;
+  duration_ms: number;
+  status: 'completed' | 'failed';
+  error: string | null;
+}
+
+/** 案件摘要（列表页用） */
+export interface CaseSummary {
+  case_id: string;
+  title: string;
+  case_type: CaseType;
+  status: CaseStatus;
+  description: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+  has_report: boolean;
+}
+
+/** 历史记录 */
+export interface HistoryItem {
+  history_id: string;
+  user_id: string;
+  case_type: CaseType;
+  summary: string;
+  result: HistoryResult;
+  tags: string[];
+  created_at: string;
+}
+
+/** 观察清单项 */
+export interface WatchlistItem {
+  case_id: string;
+  title: string;
+  reason: string;
+  due_at: string;
+  status: 'waiting' | 'completed' | 'expired';
+}
+
+// ---- 请求 / 响应 DTO ----
 
 /** 创建案件请求 */
 export interface CreateCaseRequest {
-  /** 决策问题标题 */
+  user_id: string;
+  case_type: CaseType;
   title: string;
-  /** 决策类别 */
-  category: DecisionCategory;
-  /** 初始描述 */
   description: string;
 }
 
 /** 创建案件响应 */
 export interface CreateCaseResponse {
-  /** 创建的案件 */
   case: Case;
-  /** 初始会话 ID */
-  sessionId: string;
-  /** 系统的首条回复消息 */
-  firstMessage: Message;
-}
-
-/** 会话 */
-export interface Session {
-  /** 会话唯一 ID */
-  id: string;
-  /** 所属案件 ID */
-  caseId: string;
-  /** 当前对话阶段 */
-  stage: SessionStage;
-  /** 会话状态快照 */
-  state: SessionState;
-  /** 消息列表 */
-  messages: Message[];
-  /** 创建时间 */
-  createdAt: string;
-  /** 更新时间 */
-  updatedAt: string;
-}
-
-/** 会话状态（记录收集到的决策信息） */
-export interface SessionState {
-  /** 用户目标 / 决策目标 */
-  goal?: string;
-  /** 预算范围（如适用） */
-  budget?: string;
-  /** 时间压力（紧迫程度 1-10） */
-  timePressure?: number;
-  /** 用户偏好 */
-  preferences?: string[];
-  /** 已收集的补充信息键值对 */
-  extraInfo: Record<string, string>;
-  /** 当前正在被追问的字段名 */
-  pendingQuestion?: string;
-  /** 正方法庭陈述 */
-  proArgument?: string;
-  /** 反方法庭陈述 */
-  conArgument?: string;
-}
-
-/** 消息 */
-export interface Message {
-  /** 消息唯一 ID */
-  id: string;
-  /** 所属会话 ID */
-  sessionId: string;
-  /** 发送角色 */
-  role: MessageRole;
-  /** 消息类型 */
-  type: MessageType;
-  /** 消息内容 */
-  content: string;
-  /** 发送时间 */
-  createdAt: string;
-  /** 元数据（Agent 调用链路、工具调用等） */
-  metadata?: MessageMetadata;
-}
-
-/** 消息元数据 */
-export interface MessageMetadata {
-  /** Agent 名称（Agent 消息时） */
-  agentName?: string;
-  /** 调用的工具列表 */
-  toolCalls?: ToolCall[];
-  /** 推理过程（对 Agent 可见） */
-  reasoning?: string;
-  /** 置信度 0-1 */
-  confidence?: number;
-}
-
-/** 工具调用记录 */
-export interface ToolCall {
-  /** 工具名称 */
-  toolName: string;
-  /** 输入参数 */
-  input: Record<string, unknown>;
-  /** 输出结果 */
-  output: string;
-  /** 调用状态 */
-  status: 'success' | 'error';
-  /** 耗时（ms） */
-  durationMs: number;
+  next_question: string;
 }
 
 /** 发送消息请求 */
 export interface SendMessageRequest {
-  /** 消息内容 */
-  content: string;
-  /** 会话 ID */
-  sessionId: string;
+  user_id: string;
+  message: string;
 }
 
 /** 发送消息响应 */
 export interface SendMessageResponse {
-  /** 用户消息 */
-  userMessage: Message;
-  /** 助手回复消息列表（可能多条，如多个 Agent 轮流发言） */
-  assistantMessages: Message[];
-  /** 更新后的会话状态 */
-  sessionState: SessionState;
-  /** 当前阶段 */
-  currentStage: SessionStage;
-  /** 是否已完成所有阶段 */
-  isCompleted: boolean;
+  reply: string;
+  case_status: CaseStatus;
+  collected_fields: Record<string, unknown>;
+  missing_fields: string[];
 }
 
-/** 判决书 */
-export interface Verdict {
-  /** 判决书唯一 ID */
-  id: string;
-  /** 所属案件 ID */
-  caseId: string;
-  /** 判决标题 */
+/** 启动辩论请求 */
+export interface DebateRequest {
+  user_id: string;
+}
+
+/** 启动辩论响应 */
+export interface DebateResponse {
+  case_id: string;
+  case_status: CaseStatus;
+  steps: AgentStep[];
+  rag_evidence: RagEvidence[];
+  tool_results: ToolResult[];
+  report: DecisionReport;
+}
+
+/** 查询案件详情响应 */
+export interface CaseDetailResponse {
+  case: Case;
+}
+
+/** 查询判决书响应 */
+export interface ReportResponse {
+  report: DecisionReport;
+}
+
+/** 查询轨迹响应 */
+export interface TraceResponse {
+  case_id: string;
+  trace: TraceItem[];
+}
+
+/** 查询历史记录响应 */
+export interface HistoryResponse {
+  items: HistoryItem[];
+}
+
+/** 添加历史记录请求 */
+export interface CreateHistoryRequest {
+  user_id: string;
+  case_type: CaseType;
+  summary: string;
+  result: HistoryResult;
+  tags: string[];
+}
+
+/** 提交决策复盘请求 */
+export interface FeedbackRequest {
+  user_id: string;
+  actual_action: string;
+  satisfaction: number;
+  review: string;
+}
+
+/** 查询观察清单响应 */
+export interface WatchlistResponse {
+  items: WatchlistItem[];
+}
+
+/** RAG 检索请求 */
+export interface RAGSearchRequest {
+  user_id: string;
+  case_id: string;
+  case_type: CaseType;
+  query: string;
+  top_k: number;
+}
+
+/** RAG 检索响应 */
+export interface RAGSearchResponse {
+  results: RagEvidence[];
+}
+
+/** 成本计算请求（购物场景） */
+export interface CostAnalyzerShoppingRequest {
+  case_id: string;
+  case_type: CaseType.SHOPPING;
+  price: number;
+  monthly_budget_left: number;
+}
+
+/** 成本计算请求（时间场景） */
+export interface CostAnalyzerTimeRequest {
+  case_id: string;
+  case_type: CaseType.TIME;
+  hours_required: number;
+  free_hours_this_week: number;
+  urgent_tasks: number;
+}
+
+/** 冷静期提醒请求 */
+export interface CoolingReminderRequest {
+  user_id: string;
+  case_id: string;
   title: string;
-  /** 最终倾向 */
-  tendency: VerdictTendency;
-  /** 判决结论摘要 */
-  conclusion: string;
-  /** 详细分析 */
-  analysis: string;
-  /** 正反双方论点总结 */
-  arguments: VerdictArguments;
-  /** 判决理由 */
-  reasons: string[];
-  /** 给用户的建议 */
-  suggestion: string;
-  /** 置信度评分 0-100 */
-  confidenceScore: number;
-  /** 相关历史案例参考 */
-  relatedCases?: string[];
-  /** 生成时间 */
-  createdAt: string;
+  cooling_days: number;
+  reason: string;
+  watch_items: string[];
 }
 
-/** 判决书中的论点总结 */
-export interface VerdictArguments {
-  /** 正方论点 */
-  pro: string[];
-  /** 反方论点 */
-  con: string[];
+// ---- 工具类型 ----
+
+/** 通用成功响应 */
+export interface ApiSuccessResponse<T> {
+  success: true;
+  data: T;
+  message: string;
 }
 
-/** 案件摘要（列表页用） */
-export interface CaseSummary {
-  id: string;
-  title: string;
-  category: DecisionCategory;
-  status: CaseStatus;
-  stage: SessionStage;
-  createdAt: string;
-  updatedAt: string;
-  /** 消息总数 */
-  messageCount: number;
-  /** 是否有判决书 */
-  hasVerdict: boolean;
+/** 通用错误响应 */
+export interface ApiErrorResponse {
+  success: false;
+  data: null;
+  message: string;
 }
 
-/** 分页请求 */
-export interface PaginationRequest {
-  page: number;
-  pageSize: number;
-}
+export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
 /** 分页响应 */
 export interface PaginatedResponse<T> {
@@ -302,18 +353,4 @@ export interface PaginatedResponse<T> {
   page: number;
   pageSize: number;
   totalPages: number;
-}
-
-/** API 通用响应包装 */
-export interface ApiResponse<T> {
-  code: number;
-  message: string;
-  data: T;
-}
-
-/** 创建案件表单数据（前端用） */
-export interface CreateCaseFormData {
-  title: string;
-  category: DecisionCategory;
-  context?: string;
 }

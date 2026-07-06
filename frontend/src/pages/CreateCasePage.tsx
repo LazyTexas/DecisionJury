@@ -1,36 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  Card,
-  Form,
-  Input,
-  Select,
-  Button,
-  Typography,
-  message,
-  Space,
-} from 'antd';
+import { Card, Form, Input, Select, Button, Typography, message, Space } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
-import { DecisionCategory, CreateCaseFormData } from '../types';
+import { CaseType } from '../types';
 import { createCase } from '../api';
-
-const { TextArea } = Input;
 
 export default function CreateCasePage() {
   const navigate = useNavigate();
-  const [form] = Form.useForm<CreateCaseFormData>();
+  const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (values: CreateCaseFormData) => {
+  const handleSubmit = async (values: { title: string; case_type: CaseType; description: string }) => {
     setSubmitting(true);
     try {
       const res = await createCase({
+        case_type: values.case_type,
         title: values.title,
-        category: values.category,
-        description: values.context || values.title,
+        description: values.description,
       });
       message.success('案件创建成功！');
-      navigate(`/chat/${res.case.id}`);
+      navigate(`/chat/${res.case.case_id}`);
     } catch (err: any) {
       message.error(err.message || '创建失败，请重试');
     } finally {
@@ -56,39 +45,35 @@ export default function CreateCasePage() {
           layout="vertical"
           onFinish={handleSubmit}
           requiredMark={false}
-          initialValues={{ category: DecisionCategory.OTHER }}
+          initialValues={{ case_type: CaseType.SHOPPING }}
         >
           <Form.Item
             name="title"
             label="决策标题"
             rules={[{ required: true, message: '请输入决策标题' }]}
           >
-            <Input placeholder="例：要不要买这台 MacBook Pro M4？" maxLength={100} showCount />
+            <Input placeholder="例：是否购买降噪耳机" maxLength={100} showCount />
           </Form.Item>
 
           <Form.Item
-            name="category"
+            name="case_type"
             label="决策类别"
             rules={[{ required: true, message: '请选择决策类别' }]}
           >
             <Select>
-              <Select.Option value={DecisionCategory.SHOPPING}>🛒 购物决策</Select.Option>
-              <Select.Option value={DecisionCategory.TIME}>⏰ 时间/日程决策</Select.Option>
-              <Select.Option value={DecisionCategory.CAREER}>💼 职业决策</Select.Option>
-              <Select.Option value={DecisionCategory.RELATIONSHIP}>🤝 关系决策</Select.Option>
-              <Select.Option value={DecisionCategory.FINANCE}>💰 财务决策</Select.Option>
-              <Select.Option value={DecisionCategory.OTHER}>❓ 其他</Select.Option>
+              <Select.Option value={CaseType.SHOPPING}>🛒 购物决策</Select.Option>
+              <Select.Option value={CaseType.TIME}>⏰ 时间/日程决策</Select.Option>
             </Select>
           </Form.Item>
 
           <Form.Item
-            name="context"
+            name="description"
             label="详细描述"
             rules={[{ required: true, message: '请描述你的决策背景' }]}
           >
-            <TextArea
+            <Input.TextArea
               rows={5}
-              placeholder="说说你在纠结什么？有哪些选择？你的顾虑是什么？&#10;例：我现在用的是 2019 年的 Intel MacBook Pro，最近感觉有点卡了。看到新出的 M4 性能提升很大，但价格要 2 万多，有点犹豫。"
+              placeholder="说说你在纠结什么？有哪些选择？你的顾虑是什么？"
               maxLength={1000}
               showCount
             />
