@@ -12,6 +12,7 @@ import {
   Empty,
   Descriptions,
   List,
+  Collapse,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -20,22 +21,27 @@ import {
   MinusCircleOutlined,
   ThunderboltOutlined,
   SwapOutlined,
+  ToolOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
-import { Verdict, VerdictTendency, Case } from '../types';
-import { getVerdict, getCaseDetail } from '../api';
+import { DecisionReport, RagEvidence, ToolResult, TraceItem } from '../types';
+import { getReport, getTrace } from '../api';
 
-const tendencyConfig: Record<VerdictTendency, { label: string; color: string; icon: React.ReactNode }> = {
-  [VerdictTendency.SUPPORT]: { label: '支持', color: 'success', icon: <CheckCircleOutlined /> },
-  [VerdictTendency.OPPOSE]: { label: '反对', color: 'error', icon: <CloseCircleOutlined /> },
-  [VerdictTendency.NEUTRAL]: { label: '中立', color: 'default', icon: <MinusCircleOutlined /> },
+const finalDecisionMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+  buy: { label: '建议购买', color: 'success', icon: <CheckCircleOutlined /> },
+  accept: { label: '建议接受', color: 'success', icon: <CheckCircleOutlined /> },
+  partial_accept: { label: '建议部分接受', color: 'processing', icon: <CheckCircleOutlined /> },
+  delay: { label: '建议暂缓', color: 'warning', icon: <MinusCircleOutlined /> },
+  reject: { label: '建议不购买/拒绝', color: 'error', icon: <CloseCircleOutlined /> },
+  alternative: { label: '建议寻找替代方案', color: 'default', icon: <SwapOutlined /> },
 };
 
 export default function VerdictPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
 
-  const [verdict, setVerdict] = useState<Verdict | null>(null);
-  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [report, setReport] = useState<DecisionReport | null>(null);
+  const [steps, setSteps] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -43,12 +49,15 @@ export default function VerdictPage() {
     if (!caseId) return;
     let cancelled = false;
 
-    Promise.all([getVerdict(caseId), getCaseDetail(caseId)])
-      .then(([v, c]) => {
+    Promise.all([
+      getReport(caseId),
+      getTrace(caseId).catch(() => ({ case_id: caseId!, trace: [] })),
+    ])
+      .then(([r, t]) => {
         if (cancelled) return;
-        setVerdict(v);
-        setCaseData(c);
-        if (!v) setError('判决书尚未生成');
+        setReport(r);
+        setSteps(t.trace);
+        if (!r) setError('判决书尚未生成');
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || '加载失败');
@@ -76,28 +85,21 @@ export default function VerdictPage() {
         <br />
         <Space style={{ marginTop: 16 }}>
           <Button onClick={() => navigate('/')}>返回首页</Button>
-          <Button type="primary" onClick={() => navigate(`/chat/${caseId}`)}>
-            回到对话
-          </Button>
+          <Button type="primary" onClick={() => navigate(`/chat/${caseId}`)}>回到对话</Button>
         </Space>
       </div>
     );
   }
 
-  if (!verdict) {
+  if (!report) {
     return (
       <Empty description="暂无判决书" style={{ paddingTop: 120 }}>
-        <Space>
-          <Button onClick={() => navigate('/')}>返回首页</Button>
-          <Button type="primary" onClick={() => navigate(`/chat/${caseId}`)}>
-            继续对话
-          </Button>
-        </Space>
+        <Button onClick={() => navigate('/')}>返回首页</Button>
       </Empty>
     );
   }
 
-  const tendency = tendencyConfig[verdict.tendency];
+  const decision = finalDecisionMeta[report.final_decision] ?? { label: report.final_decision, color: 'default', icon: null };
 
   return (
     <div>
@@ -106,59 +108,46 @@ export default function VerdictPage() {
         <Typography.Text type="secondary">返回首页</Typography.Text>
       </Space>
 
-      {/* 判决书头部 */}
+      {/* 头部 */}
       <Card style={{ borderRadius: 8, marginBottom: 24 }}>
         <div style={{ textAlign: 'center' }}>
           <Tag
-            icon={tendency.icon}
-            color={tendency.color}
+            icon={decision.icon}
+            color={decision.color}
             style={{ padding: '4px 16px', fontSize: 16, borderRadius: 20, marginBottom: 16 }}
           >
-            {tendency.label}
+            {decision.label}
           </Tag>
           <Typography.Title level={3} style={{ marginBottom: 8 }}>
-            {verdict.title || caseData?.title}
+            {report.case_summary}
           </Typography.Title>
-          <Typography.Paragraph
-            style={{ fontSize: 16, color: '#555', maxWidth: 600, margin: '0 auto' }}
-          >
-            {verdict.conclusion}
+          <Typography.Paragraph style={{ fontSize: 16, color: '#555', maxWidth: 600, margin: '0 auto' }}>
+            {report.summary}
           </Typography.Paragraph>
-
-          {verdict.confidenceScore !== undefined && (
-            <div style={{ maxWidth: 300, margin: '16px auto 0' }}>
-              <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
-                置信度评分
-              </Typography.Text>
-              <Progress
-                percent={verdict.confidenceScore}
-                status={verdict.confidenceScore >= 80 ? 'success' : verdict.confidenceScore >= 60 ? 'active' : 'exception'}
-                strokeColor={verdict.confidenceScore >= 80 ? '#52c41a' : verdict.confidenceScore >= 60 ? '#faad14' : '#ff4d4f'}
-              />
-            </div>
-          )}
+          <div style={{ maxWidth: 300, margin: '16px auto 0' }}>
+            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 4 }}>
+              置信度
+            </Typography.Text>
+            <Progress
+              percent={Math.round(report.confidence * 100)}
+              status={report.confidence >= 0.8 ? 'success' : report.confidence >= 0.6 ? 'active' : 'exception'}
+            />
+          </div>
         </div>
       </Card>
 
-      {/* 详细分析 */}
-      <Card title="详细分析" style={{ borderRadius: 8, marginBottom: 24 }}>
-        <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8 }}>
-          {verdict.analysis}
-        </Typography.Paragraph>
-      </Card>
-
-      {/* 正反论点对比 */}
-      <Card title="正反方论点" style={{ borderRadius: 8, marginBottom: 24 }}>
+      {/* 正反方观点 */}
+      <Card title="正反方观点" style={{ borderRadius: 8, marginBottom: 24 }}>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 250 }}>
             <div style={{ marginBottom: 12 }}>
               <ThunderboltOutlined style={{ color: '#faad14', marginRight: 8 }} />
-              <Typography.Text strong>正方论点</Typography.Text>
+              <Typography.Text strong>正方观点</Typography.Text>
             </div>
             <List
-              dataSource={verdict.arguments.pro}
-              renderItem={(item, i) => (
-                <List.Item key={i} style={{ padding: '8px 0' }}>
+              dataSource={report.pro_points}
+              renderItem={(item) => (
+                <List.Item style={{ padding: '8px 0' }}>
                   <Typography.Text>✅ {item}</Typography.Text>
                 </List.Item>
               )}
@@ -168,12 +157,12 @@ export default function VerdictPage() {
           <div style={{ flex: 1, minWidth: 250 }}>
             <div style={{ marginBottom: 12 }}>
               <SwapOutlined style={{ color: '#ff4d4f', marginRight: 8 }} />
-              <Typography.Text strong>反方论点</Typography.Text>
+              <Typography.Text strong>反方观点</Typography.Text>
             </div>
             <List
-              dataSource={verdict.arguments.con}
-              renderItem={(item, i) => (
-                <List.Item key={i} style={{ padding: '8px 0' }}>
+              dataSource={report.con_points}
+              renderItem={(item) => (
+                <List.Item style={{ padding: '8px 0' }}>
                   <Typography.Text>❌ {item}</Typography.Text>
                 </List.Item>
               )}
@@ -182,41 +171,102 @@ export default function VerdictPage() {
         </div>
       </Card>
 
-      {/* 判决理由 */}
-      {verdict.reasons.length > 0 && (
-        <Card title="判决理由" style={{ borderRadius: 8, marginBottom: 24 }}>
-          <List
-            dataSource={verdict.reasons}
-            renderItem={(item, i) => (
-              <List.Item key={i} style={{ padding: '8px 0' }}>
-                <Typography.Text>
-                  <strong>{i + 1}.</strong> {item}
-                </Typography.Text>
-              </List.Item>
-            )}
-          />
-        </Card>
-      )}
-
-      {/* 建议 */}
-      <Card title="给用户的建议" style={{ borderRadius: 8, marginBottom: 24 }}>
-        <Typography.Paragraph style={{ whiteSpace: 'pre-wrap', lineHeight: 1.8, fontSize: 15 }}>
-          {verdict.suggestion}
-        </Typography.Paragraph>
+      {/* 后续动作 */}
+      <Card title="后续建议" style={{ borderRadius: 8, marginBottom: 24 }}>
+        <List
+          dataSource={report.next_actions}
+          renderItem={(item) => (
+            <List.Item style={{ padding: '8px 0' }}>
+              <Typography.Text>👉 {item}</Typography.Text>
+            </List.Item>
+          )}
+        />
       </Card>
+
+      {/* RAG 证据和工具结果（折叠） */}
+      <Collapse
+        style={{ marginBottom: 24, borderRadius: 8 }}
+        items={[
+          {
+            key: 'rag',
+            label: (
+              <span><HistoryOutlined style={{ marginRight: 8 }} />RAG 证据 ({report.rag_evidence.length})</span>
+            ),
+            children: report.rag_evidence.length === 0
+              ? <Typography.Text type="secondary">无引用证据</Typography.Text>
+              : report.rag_evidence.map((ev: RagEvidence) => (
+                  <Card key={ev.id} size="small" style={{ marginBottom: 8 }}>
+                    <Typography.Text strong>{ev.title}</Typography.Text>
+                    <Typography.Paragraph type="secondary" style={{ margin: '4px 0' }}>
+                      {ev.content}
+                    </Typography.Paragraph>
+                    <Tag>相关性: {ev.score}</Tag>
+                    <Tag color="blue">{ev.source}</Tag>
+                  </Card>
+                )),
+          },
+          {
+            key: 'tools',
+            label: (
+              <span><ToolOutlined style={{ marginRight: 8 }} />工具调用结果 ({report.tool_results.length})</span>
+            ),
+            children: report.tool_results.length === 0
+              ? <Typography.Text type="secondary">无工具调用</Typography.Text>
+              : report.tool_results.map((tr: ToolResult, i: number) => (
+                  <Card key={i} size="small" style={{ marginBottom: 8 }}>
+                    <Typography.Text strong>{tr.tool_name}</Typography.Text>
+                    <Tag color={tr.status === 'success' ? 'success' : 'error'} style={{ marginLeft: 8 }}>
+                      {tr.status}
+                    </Tag>
+                    <Typography.Paragraph type="secondary" style={{ margin: '4px 0' }}>
+                      {tr.summary}
+                    </Typography.Paragraph>
+                    {tr.risk_level && <Tag color="orange">风险: {tr.risk_level}</Tag>}
+                  </Card>
+                )),
+          },
+        ]}
+      />
+
+      {/* Agent 执行轨迹 */}
+      {steps.length > 0 && (
+        <Collapse
+          style={{ marginBottom: 24, borderRadius: 8 }}
+          items={[{
+            key: 'trace',
+            label: <span>Agent 执行轨迹</span>,
+            children: (
+              <List
+                dataSource={steps}
+                renderItem={(item: any) => (
+                  <List.Item style={{ padding: '8px 0' }}>
+                    <Space>
+                      <Tag color={item.status === 'completed' ? 'success' : 'error'}>
+                        {item.type}: {item.name}
+                      </Tag>
+                      <Typography.Text type="secondary">{item.duration_ms}ms</Typography.Text>
+                    </Space>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {item.input_summary} → {item.output_summary}
+                      </Typography.Text>
+                    </div>
+                  </List.Item>
+                )}
+              />
+            ),
+          }]}
+        />
+      )}
 
       {/* 元信息 */}
       <Card style={{ borderRadius: 8 }}>
         <Descriptions size="small" column={{ xs: 1, sm: 2 }}>
-          <Descriptions.Item label="判决书 ID">{verdict.id}</Descriptions.Item>
+          <Descriptions.Item label="判决书 ID">{report.report_id}</Descriptions.Item>
           <Descriptions.Item label="生成时间">
-            {new Date(verdict.createdAt).toLocaleString('zh-CN')}
+            {new Date(report.created_at).toLocaleString('zh-CN')}
           </Descriptions.Item>
-          {verdict.relatedCases && verdict.relatedCases.length > 0 && (
-            <Descriptions.Item label="参考案例">
-              {verdict.relatedCases.join('、')}
-            </Descriptions.Item>
-          )}
+          <Descriptions.Item label="案件类型">{report.case_type}</Descriptions.Item>
         </Descriptions>
       </Card>
     </div>

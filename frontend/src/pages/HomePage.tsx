@@ -4,47 +4,32 @@ import { Card, Tag, Typography, Empty, Spin, Row, Col } from 'antd';
 import {
   ShoppingCartOutlined,
   ClockCircleOutlined,
-  UserOutlined,
-  TeamOutlined,
-  DollarOutlined,
-  QuestionCircleOutlined,
   RightOutlined,
 } from '@ant-design/icons';
-import { CaseSummary, DecisionCategory, CaseStatus } from '../types';
+import { CaseSummary, CaseType, CaseStatus } from '../types';
 import { getCaseList } from '../api';
 
-const categoryIcon: Record<DecisionCategory, React.ReactNode> = {
-  [DecisionCategory.SHOPPING]: <ShoppingCartOutlined />,
-  [DecisionCategory.TIME]: <ClockCircleOutlined />,
-  [DecisionCategory.CAREER]: <UserOutlined />,
-  [DecisionCategory.RELATIONSHIP]: <TeamOutlined />,
-  [DecisionCategory.FINANCE]: <DollarOutlined />,
-  [DecisionCategory.OTHER]: <QuestionCircleOutlined />,
-};
-
-const categoryColor: Record<DecisionCategory, string> = {
-  [DecisionCategory.SHOPPING]: 'blue',
-  [DecisionCategory.TIME]: 'orange',
-  [DecisionCategory.CAREER]: 'purple',
-  [DecisionCategory.RELATIONSHIP]: 'pink',
-  [DecisionCategory.FINANCE]: 'green',
-  [DecisionCategory.OTHER]: 'default',
+const caseTypeConfig: Record<CaseType, { label: string; color: string; icon: React.ReactNode }> = {
+  [CaseType.SHOPPING]: { label: '购物', color: 'blue', icon: <ShoppingCartOutlined /> },
+  [CaseType.TIME]: { label: '时间决策', color: 'orange', icon: <ClockCircleOutlined /> },
 };
 
 const statusLabel: Record<CaseStatus, string> = {
-  [CaseStatus.IN_PROGRESS]: '信息收集中',
-  [CaseStatus.PENDING_DEBATE]: '待辩论',
+  [CaseStatus.COLLECTING]: '信息收集中',
+  [CaseStatus.READY_FOR_DEBATE]: '待辩论',
   [CaseStatus.DEBATING]: '辩论中',
-  [CaseStatus.VERDICTED]: '已判决',
-  [CaseStatus.CLOSED]: '已关闭',
+  [CaseStatus.COMPLETED]: '已判决',
+  [CaseStatus.REJECTED]: '已拒绝',
+  [CaseStatus.ARCHIVED]: '已归档',
 };
 
 const statusColor: Record<CaseStatus, string> = {
-  [CaseStatus.IN_PROGRESS]: 'processing',
-  [CaseStatus.PENDING_DEBATE]: 'default',
+  [CaseStatus.COLLECTING]: 'processing',
+  [CaseStatus.READY_FOR_DEBATE]: 'default',
   [CaseStatus.DEBATING]: 'warning',
-  [CaseStatus.VERDICTED]: 'success',
-  [CaseStatus.CLOSED]: 'default',
+  [CaseStatus.COMPLETED]: 'success',
+  [CaseStatus.REJECTED]: 'error',
+  [CaseStatus.ARCHIVED]: 'default',
 };
 
 export default function HomePage() {
@@ -56,8 +41,8 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     getCaseList()
-      .then((res) => {
-        if (!cancelled) setCases(res.data);
+      .then((data) => {
+        if (!cancelled) setCases(data);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || '加载失败');
@@ -101,39 +86,48 @@ export default function HomePage() {
         我的决策案件
       </Typography.Title>
       <Row gutter={[16, 16]}>
-        {cases.map((c) => (
-          <Col xs={24} sm={12} key={c.id}>
-            <Card
-              hoverable
-              onClick={() => {
-                if (c.status === CaseStatus.VERDICTED || c.hasVerdict) {
-                  navigate(`/verdict/${c.id}`);
-                } else {
-                  navigate(`/chat/${c.id}`);
-                }
-              }}
-              style={{ borderRadius: 8 }}
-            >
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <div>
-                  <Tag icon={categoryIcon[c.category]} color={categoryColor[c.category]}>
-                    {c.category}
-                  </Tag>
-                  <Tag color={statusColor[c.status]}>{statusLabel[c.status]}</Tag>
-                </div>
-                <Typography.Text strong style={{ fontSize: 16 }}>
-                  {c.title}
-                </Typography.Text>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {c.messageCount} 条消息 · {new Date(c.updatedAt).toLocaleDateString('zh-CN')}
+        {cases.map((c) => {
+          const cat = caseTypeConfig[c.case_type];
+          const st = statusColor[c.status];
+          return (
+            <Col xs={24} sm={12} key={c.case_id}>
+              <Card
+                hoverable
+                onClick={() => {
+                  if (c.status === CaseStatus.COMPLETED || c.has_report) {
+                    navigate(`/verdict/${c.case_id}`);
+                  } else {
+                    navigate(`/chat/${c.case_id}`);
+                  }
+                }}
+                style={{ borderRadius: 8 }}
+              >
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <div>
+                    <Tag icon={cat.icon} color={cat.color}>{cat.label}</Tag>
+                    <Tag color={st}>{statusLabel[c.status]}</Tag>
+                  </div>
+                  <Typography.Text strong style={{ fontSize: 16 }}>
+                    {c.title}
                   </Typography.Text>
-                  <RightOutlined style={{ color: '#ccc', fontSize: 12 }} />
+                  <Typography.Paragraph
+                    type="secondary"
+                    ellipsis={{ rows: 2 }}
+                    style={{ margin: 0, fontSize: 13 }}
+                  >
+                    {c.description}
+                  </Typography.Paragraph>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                      {c.message_count} 条消息 · {new Date(c.updated_at).toLocaleDateString('zh-CN')}
+                    </Typography.Text>
+                    <RightOutlined style={{ color: '#ccc', fontSize: 12 }} />
+                  </div>
                 </div>
-              </div>
-            </Card>
-          </Col>
-        ))}
+              </Card>
+            </Col>
+          );
+        })}
       </Row>
     </div>
   );
