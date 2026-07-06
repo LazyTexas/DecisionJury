@@ -1,0 +1,17 @@
+# Web 框架
+fastapi>=0.115.0
+
+# ASGI 服务器
+uvicorn>=0.34.0
+
+# ORM 数据库工具
+sqlalchemy>=2.0.0
+
+# 数据验证
+pydantic>=2.0.0
+
+# 环境变量管理
+python-dotenv>=1.0.0
+
+# HTTP 客户端（用于调用外部服务）
+httpx>=0.27.0

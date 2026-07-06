@@ -6,35 +6,45 @@ echo ============================================
 echo   DecisionJury 项目一键启动脚本
 echo   前端: http://127.0.0.1:5173
 echo   后端: http://127.0.0.1:8000
+echo   RAG:  http://127.0.0.1:8001
 echo   API文档: http://127.0.0.1:8000/docs
 echo ============================================
 echo.
 
 cd /d "%~dp0"
 
-:: ========== 后端启动 ==========
-echo [1/2] 启动后端服务...
+:: ========== 1. 启动后端（B 模块） ==========
+echo [1/3] 启动后端服务...
 
-:: 检查是否有虚拟环境，没有则创建
-if not exist backend\venv\Scripts\activate.bat (
-    echo [警告] 未找到虚拟环境，正在创建...
+if not exist "backend\venv\Scripts\activate.bat" (
+    echo [警告] 未找到后端虚拟环境，正在创建...
     cd backend
     python -m venv venv
-    call venv\Scripts\activate.bat
-    pip install fastapi uvicorn sqlalchemy pydantic python-dotenv
     cd ..
 )
 
-:: 启动后端（在项目根目录启动，使用 backend.main:app）
-start "DecisionJury Backend" cmd /k "cd /d %~dp0 && call backend\venv\Scripts\activate.bat && uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000"
+start "DecisionJury Backend" cmd /k "cd /d %~dp0 && call backend\venv\Scripts\activate.bat && echo [后端] 检查并安装依赖... && pip install -r backend\requirements.txt && echo [后端] 启动服务... && uvicorn backend.main:app --reload --host 127.0.0.1 --port 8000"
 
-:: 等待后端启动
 timeout /t 3 /nobreak >nul
 
-:: ========== 前端启动 ==========
-echo [2/2] 启动前端服务...
+:: ========== 2. 启动 RAG 服务（D 模块） ==========
+echo [2/3] 启动 RAG 检索服务...
 
-if not exist frontend\node_modules (
+if not exist "rag\venv\Scripts\activate.bat" (
+    echo [警告] 未找到 RAG 虚拟环境，正在创建...
+    cd rag
+    python -m venv venv
+    cd ..
+)
+
+start "DecisionJury RAG" cmd /k "cd /d %~dp0rag && call venv\Scripts\activate.bat && echo [RAG] 检查并安装依赖... && pip install -r requirements.txt && echo [RAG] 启动服务... && uvicorn retriever:app --reload --host 127.0.0.1 --port 8001"
+
+timeout /t 2 /nobreak >nul
+
+:: ========== 3. 启动前端（A 模块） ==========
+echo [3/3] 启动前端服务...
+
+if not exist "frontend\node_modules" (
     echo [警告] 前端依赖未安装，正在安装...
     cd frontend
     call npm install
@@ -48,10 +58,9 @@ echo ============================================
 echo   ✅ 项目启动完成！
 echo   前端: http://127.0.0.1:5173
 echo   后端: http://127.0.0.1:8000
+echo   RAG:  http://127.0.0.1:8001
 echo   API文档: http://127.0.0.1:8000/docs
 echo ============================================
 echo.
 echo [提示] 如需停止服务，请关闭对应的命令行窗口。
-echo.
-
 pause
