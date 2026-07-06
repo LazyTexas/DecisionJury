@@ -1,0 +1,202 @@
+[
+  {
+    "id": "h_shop_001",
+    "title": "机械键盘冲动消费复盘",
+    "content": "2026-05-10，花费 399 元购买了青轴机械键盘。本以为能提高写代码和论文的动力，但由于平时主要在图书馆和自习室学习，打字声音太大完全不敢用，最后扔在宿舍抽屉里吃灰。复盘结论为严重脱离真实使用场景的冲动购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["electronics", "idle", "regret", "keyboard"],
+    "created_at": "2026-05-10T14:30:00+08:00"
+  },
+  {
+    "id": "h_shop_002",
+    "title": "护眼学习台灯超值投资",
+    "content": "2026-05-15，花费 129 元购买了全光谱护眼台灯。宿舍晚上熄灯后备考期末非常需要，每天晚上均高频使用，大大减轻了眼睛疲劳，复盘结论为极高回报率的刚需值得消费。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["study", "useful", "worth", "lighting"],
+    "created_at": "2026-05-15T20:15:00+08:00"
+  },
+  {
+    "id": "h_shop_003",
+    "title": "头戴式降噪耳机使用复盘",
+    "content": "2026-05-20，花费 1299 元购买了头戴式降噪耳机。在考研/期末周复习时屏蔽周围噪音效果极好，专注力大幅提升；但夏天佩戴较为闷热。综合考虑由于每天自习都在用，属于高频刚需生产力工具，复盘结论为值得购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["electronics", "useful", "study", "headphones"],
+    "created_at": "2026-05-20T11:00:00+08:00"
+  },
+  {
+    "id": "h_shop_004",
+    "title": "冲动跟风办理健身房年卡",
+    "content": "2026-04-01，在开学季促销气氛下花费 1599 元办理了健身房年卡。结果课业繁重加上距离宿舍步行需 15 分钟，一学期下来只去了不到 5 次，平均每次成本超过 300 元，严重挤占了当月生活费预算，复盘结论为高溢价闲置翻车。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["fitness", "idle", "budget_overflow", "regret"],
+    "created_at": "2026-04-01T18:00:00+08:00"
+  },
+  {
+    "id": "h_shop_005",
+    "title": "大屏平板电脑生产力转爱奇艺",
+    "content": "2026-03-12，花 2899 元购买了最新款大屏平板及触控笔，初衷是用它代替纸质书做电子无纸化笔记。但由于已经拥有便携笔记本电脑，实际做笔记频率很低，绝大多数时间拿来在床上追剧看短视频，完全沦为娱乐工具，结论为伪需求溢价消费。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["electronics", "idle", "pseudo_demand", "tablet"],
+    "created_at": "2026-03-12T15:20:00+08:00"
+  },
+  {
+    "id": "h_shop_006",
+    "title": "二手机械腕表盲目跟风超支",
+    "content": "2026-04-18，在数码论坛被种草，花费 2100 元购买了一块二手复古机械腕表。购买导致当月剩余预算瞬间清零，连续吃半个月食堂泡面。且看时间主要还是掏手机，腕表戴了两周就觉得沉重繁琐，复盘为情绪化冲动购买。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["luxury", "budget_overflow", "regret", "impulse"],
+    "created_at": "2026-04-18T21:40:00+08:00"
+  },
+  {
+    "id": "h_shop_007",
+    "title": "付费英语口语训练营闲置复盘",
+    "content": "2026-05-01，看到打卡立返优惠，花费 499 元购买了 21 天口语纠音训练营。结果前五天热情很高，中间因为赶专业课大作业连续中断打卡，最终不仅没拿到返现，课也没听完，复盘为低估自身惰性与时间冲突的盲目付费。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["course", "idle", "procrastination"],
+    "created_at": "2026-05-01T09:30:00+08:00"
+  },
+  {
+    "id": "h_shop_008",
+    "title": "人体工学电脑座椅改善腰痛",
+    "content": "2026-03-25，花费 699 元给宿舍书桌配置了入门级人体工学椅。之前长期用宿舍木板椅写代码导致腰酸背痛，更换后每天久坐编程的舒适度大增，显著提升了项目专注时长，属于对健康的值得长期投资。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["health", "useful", "worth", "chair"],
+    "created_at": "2026-03-25T16:00:00+08:00"
+  },
+  {
+    "id": "h_shop_009",
+    "title": "囤积限量版联名手办模型",
+    "content": "2026-06-01，为收集喜爱的动漫 IP，冲动斥资 899 元预购了限量手办。到货后只拍照发了一条朋友圈，随后放回盒子里吃灰，不仅占据狭小宿舍空间，还不产生任何实际效用，典型的为短时多巴胺买单。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["hobby", "idle", "regret", "impulse"],
+    "created_at": "2026-06-01T12:10:00+08:00"
+  },
+  {
+    "id": "h_shop_010",
+    "title": "正版 AI 开发编程辅助软件订阅",
+    "content": "2026-05-28，花 140 元订阅了年度 GitHub Copilot 和 AI 代码工具包。在完成计算机专业课大作业及多 Agent 项目时节省了超过 30% 的查资料与 Debug 时间，性价比极大，属于绝佳的专业生产力工具支出。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": ["software", "useful", "worth", "programming"],
+    "created_at": "2026-05-28T10:00:00+08:00"
+  },
+  {
+    "id": "h_time_001",
+    "title": "社团换届晚会彩排挤占学业",
+    "content": "2026-05-12，作为社团骨干接下了周年庆晚会的总现场布置任务，连续周末两整天（约 16 小时）在会场搬道具和踩点。直接导致当周 CSAPP 系统实验（MallocLab）来不及 Debug，最后踩线压秒交差导致评分过低，复盘为严重没有守住学业底线的时间过载。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["club", "delay", "overload", "regret"],
+    "created_at": "2026-05-12T22:00:00+08:00"
+  },
+  {
+    "id": "h_time_002",
+    "title": "前沿 AI Agent 线上实战分享会",
+    "content": "2026-06-08，周六晚上抽出 2 小时参加了企业校友组织的 AI Agent 实战开发与低代码平台接入技术分享。学到了非常多的工程落地细节和面试技巧，并结识了正在大厂做 Agent 实习的学长，时间投资回报极高，值得参加。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["tech", "career", "worth", "networking"],
+    "created_at": "2026-06-08T21:00:00+08:00"
+  },
+  {
+    "id": "h_time_003",
+    "title": "期末突击承接两份兼职家教",
+    "content": "2026-06-15，在期末复习最关键的 2 周，为了赚零花钱同时接了周末两份家教（共 8 小时/周，外加往返通勤 4 小时）。结果精疲力竭，导致高等代数和数据结构复习时间严重不足，整周处于极度焦虑和精神耗竭状态，复盘为短视得不偿失。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["part_time", "exhaustion", "conflict", "regret"],
+    "created_at": "2026-06-15T19:30:00+08:00"
+  },
+  {
+    "id": "h_time_004",
+    "title": "学会拒绝无效学生会琐碎水会",
+    "content": "2026-04-20，期中考试周期间，主动拒绝了某学生会组织的一场耗时 3 小时却无实质议题的例会。利用省下来的完整晚上将算法导论的作业做完并提前复习了错题，确保了期中考试成绩稳居前列，复盘结论为学会理性拒绝时间黑洞是高效时间管理核心。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["study", "refusal", "worth", "time_management"],
+    "created_at": "2026-04-20T21:00:00+08:00"
+  },
+  {
+    "id": "h_time_005",
+    "title": "仓促组队参加黑客松大赛",
+    "content": "2026-05-22，临时被同学拉去参加 48 小时极限黑客马拉松开发比赛。虽然氛围很好，但因为前期团队磨合不够、题目方向发散，连续两天只睡 4 小时导致身体透支，且与周一的专业课展示时间严重冲突，导致双双表现不佳，结论为冲动接任务。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["competition", "overload", "exhaustion", "regret"],
+    "created_at": "2026-05-22T23:30:00+08:00"
+  },
+  {
+    "id": "h_time_006",
+    "title": "坚持每天半小时校园夜跑锻炼",
+    "content": "2026-04-10，在感到每天坐在电脑前敲代码精力下滑后，决定每天晚上 9 点抽出 30 分钟去操场夜跑。时间占用极少，但坚持两个月后，睡眠质量和白天课堂专注度显著上升，属于成本低微但收益巨大的优质时间习惯。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["health", "habit", "worth", "low_cost"],
+    "created_at": "2026-04-10T22:00:00+08:00"
+  },
+  {
+    "id": "h_time_007",
+    "title": "盲目答应帮同学代写排版文档",
+    "content": "2026-05-05，碍于面子不好意思拒绝，答应帮别系的同学整理并排版 50 页的活动申报材料。本以为 1 小时搞定，结果反复修改耗费了整整一个星期六下午（6小时），导致原本规划好的个人开源项目开发停滞，复盘为老好人心理导致时间被侵占。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["favor", "time_waste", "regret", "boundary"],
+    "created_at": "2026-05-05T18:00:00+08:00"
+  },
+  {
+    "id": "h_time_008",
+    "title": "参加优质校企合作企业开放日",
+    "content": "2026-05-18，向辅导员请假半天（耗时 4 小时）前往本地头部互联网人工智能公司参观。直观了解了企业级大模型团队的工作流程与工位日常，让接下来的暑期实习备战方向清晰了许多，属于高价值认知拓展活动。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["career", "company_visit", "worth"],
+    "created_at": "2026-05-18T17:00:00+08:00"
+  },
+  {
+    "id": "h_time_009",
+    "title": "过度投入游戏公会开荒活动",
+    "content": "2026-03-30，为了在网络游戏中抢首杀，连续三天每天晚上固定抽出 4 小时参加公会固定团队开荒。直接导致多门基础课程作业堆积到周日通宵赶工，不仅作息大乱，而且交上去的作业错误率极高，典型的缺乏节制消遣。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["gaming", "procrastination", "regret"],
+    "created_at": "2026-03-30T02:00:00+08:00"
+  },
+  {
+    "id": "h_time_010",
+    "title": "高效参与实验室每周组会研讨",
+    "content": "2026-06-02，每周二下午准时投入 2 小时参加导师带领的研究生/本科生混合组会。虽然前面对前沿论文听不懂，但坚持记笔记并主动提问，为自己毕业设计和后续争取科研项目打下了极好基础，极其值得的学术时间投入。",
+    "score": 0.0,
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": ["academic", "study", "worth", "research"],
+    "created_at": "2026-06-02T16:30:00+08:00"
+  }
+]

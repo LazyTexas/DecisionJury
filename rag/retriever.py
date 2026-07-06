@@ -41,8 +41,8 @@ async def rag_search(request: RagRequest):
     # 初始化 BM25 引擎
     bm25 = BM25Okapi(corpus)
 
-    # 步骤 C：对用户传来的 query 也进行切分
-    tokenized_query = jieba.lcut(request.query)
+    # 步骤 C：对用户传来的 query 也进行切分，并彻底过滤掉空格等无效空白字符！
+    tokenized_query = [word.strip() for word in jieba.lcut(request.query) if word.strip()]
 
     # 步骤 D：计算得分 (核心算法)
     scores = bm25.get_scores(tokenized_query)
