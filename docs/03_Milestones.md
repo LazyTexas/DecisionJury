@@ -220,7 +220,7 @@
 
 ### 9.1 C 模块购物法庭进度
 
-截至当前 `dev` 分支，C 模块已完成购物法庭 Agent 编排 mock 流程，并已合并到 `dev`。
+截至当前 `dev` 分支，C 模块已完成购物法庭 Agent 编排主流程，并已完成与 B 后端 adapter、E MCP 工具 adapter 的阶段性集成。
 
 已完成内容：
 
@@ -228,40 +228,37 @@
 - 完成购物法庭多 Agent 编排流程。
 - 完成 mock LLM 调用入口。
 - 完成 mock RAG 接入位置。
-- 完成 mock MCP 工具接入，包括 `cost_analyzer` 和 `cooling_reminder`。
+- 完成 C-E MCP adapter，当前主流程已通过 `backend/app/services/mcp_adapter.py` 调用 E 模块 `cost_analyzer` 和 `cooling_reminder`。
+- 完成 C-B 后端 adapter，当前通过 `backend/app/orchestrator/adapter.py` 向 B 后端提供 `run_case_decision_flow` 调用入口。
 - 完成结构化 `DecisionReport` 输出。
 - 完成 `AgentStep`、`ToolResult`、`RagEvidence`、`TraceItem` 输出。
 - 完成高风险输入拦截，高风险输入不会进入正反方辩论。
 - 完成 RAG 为空时不编造历史证据的处理。
 - 完成 RAG / MCP 异常兜底，异常不会直接中断 Agent 主流程。
 - 完成命令行 demo。
-- 完成 C 模块 Agent 编排测试。
+- 完成 C 模块 Agent 编排测试和 MCP adapter 测试。
 
 当前验证命令：
 
 ```bash
 uv run python -m backend.app.orchestrator.demo
-uv run pytest tests/test_agent_flow.py
-uv run python -m compileall backend tests
+uv run pytest tests/test_agent_flow.py tests/test_mcp_adapter.py
+uv run python -m compileall backend tests mcp_tools
 ```
 
 下一步计划：
 
-- 与 B 后端对接 `/api/cases/{case_id}/debate` 接口。
-- 为 B 后端提供 C 模块调用 adapter。
-- 确认 `case_type`、`description`、`collected_fields` 等字段传入格式。
-- 确认 C 模块输出结果在数据库中的保存方式。
-- 与 A 前端联调 `steps`、`rag_evidence`、`tool_results`、`report`、`trace` 展示。
+- 接入真实 LLM API，替换当前 `MockLLMClient` 的默认输出能力，同时保留 mock fallback。
+- 与 D 模块对齐真实 RAG 检索返回结构，后续用 RAG adapter 替换当前 `mock_rag`。
+- 等 A/B 完成前端真实接口链路后，配合验收 `steps`、`rag_evidence`、`tool_results`、`report`、`trace` 展示。
 
 ### 9.2 C 模块当前完成度判断
 
-购物法庭 C 模块本体已基本跑通，当前完成度约为 75% - 80%。
+购物法庭 C 模块本体已基本跑通，并完成 B/E 两侧关键 adapter 集成，当前购物流程完成度约为 85%。
 
 整体 C 模块仍需完成：
 
-- B 后端接口联调。
 - 真实 LLM 接入。
 - 真实 RAG 模块替换 mock RAG。
-- 真实 MCP 工具替换 mock MCP。
 - time 时间决策流程。
 - 前后端完整链路联调。
