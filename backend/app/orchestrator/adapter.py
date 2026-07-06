@@ -1,7 +1,7 @@
 # backend/app/orchestrator/adapter.py
 from __future__ import annotations
 
-from .decision_flow import run_decision_flow
+from backend.app.orchestrator.decision_flow import run_decision_flow
 from ..schemas.decision import to_dict
 
 

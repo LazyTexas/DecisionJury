@@ -49,3 +49,11 @@ DecisionJury/
 ```text
 用户输入 -> 多轮补全 -> RAG 检索 -> MCP 工具调用 -> 多 Agent 辩论 -> 判决书
 ```
+## 启动方式
+
+### 一键启动（推荐）
+双击项目根目录下的 `start_all.bat` 脚本，自动启动前后端服务。
+
+### 手动启动
+- 后端：`uvicorn backend.main:app --reload`
+- 前端：`npm run dev`
