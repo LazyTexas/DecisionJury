@@ -1,7 +1,7 @@
 # backend/models.py
 from sqlalchemy import Column, String, DateTime, JSON, Text
 from sqlalchemy.sql import func
-from .database import Base
+from backend.database import Base
 
 class Case(Base):
     __tablename__ = "cases"

@@ -2,9 +2,9 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 import uuid
-from ..database import get_db
-from ..models import Case, Message
-from ..schemas import SendMessageRequest, ApiResponse, CaseStatus
+from backend.database import get_db
+from backend.models import Case, Message
+from backend.schemas import SendMessageRequest, ApiResponse, CaseStatus
 
 router = APIRouter(prefix="/api", tags=["chat"])
 

@@ -1,10 +1,10 @@
 # backend/routers/cases.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
-from ..database import get_db
-from ..models import Case
-from ..schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse
+from backend.database import get_db
+from backend.models import Case, Message
+from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse
 
 router = APIRouter(prefix="/api", tags=["cases"])
 

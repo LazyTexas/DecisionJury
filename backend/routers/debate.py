@@ -1,10 +1,10 @@
 # backend/routers/debate.py
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models import Case
-from ..schemas import ApiResponse, CaseStatus
-from ..app.orchestrator.adapter import run_case_decision_flow
+from backend.database import get_db
+from backend.models import Case
+from backend.schemas import ApiResponse, CaseStatus
+from backend.app.orchestrator.adapter import run_case_decision_flow
 
 router = APIRouter(prefix="/api", tags=["debate"])
 
