@@ -49,6 +49,32 @@ class DebateResponse(BaseModel):
     tool_results: List[Dict[str, Any]] = []
     report: Dict[str, Any] = {}
 
+# 案件列表中的单个案件摘要
+class CaseSummary(BaseModel):
+    case_id: str
+    title: str
+    case_type: str
+    status: str
+    description: str
+    updated_at: Optional[str] = None
+    message_count: int = 0
+    has_report: bool = False
+
+# 判决书响应
+class DecisionReportResponse(BaseModel):
+    report_id: str
+    case_type: str
+    final_decision: str
+    confidence: float
+    summary: str
+    case_summary: str
+    pro_points: List[str] = []
+    con_points: List[str] = []
+    next_actions: List[str] = []
+    rag_evidence: List[Dict[str, Any]] = []
+    tool_results: List[Dict[str, Any]] = []
+    created_at: Optional[str] = None
+
 class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
