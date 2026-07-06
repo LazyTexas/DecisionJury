@@ -241,7 +241,7 @@ def test_cooling_reminder_failure_does_not_interrupt_main_flow(monkeypatch: Any)
 
     monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
     monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
-    monkeypatch.setattr("backend.app.orchestrator.decision_flow.cooling_reminder", failed_cooling_reminder)
+    monkeypatch.setattr("backend.app.orchestrator.decision_flow.create_cooling_reminder", failed_cooling_reminder)
 
     result = run_complete_shopping_case()
     report_cooling_result = next(
