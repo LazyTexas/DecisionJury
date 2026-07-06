@@ -355,34 +355,35 @@ POST /api/report/generate
 
 ### 13.1 C 模块购物法庭 Agent 编排测试
 
-当前 C 模块已新增购物法庭 Agent 编排测试。
+当前 C 模块已新增购物法庭 Agent 编排测试，并补充 C-E MCP adapter 转换测试。
 
 测试文件：
 
 ```text
 tests/test_agent_flow.py
+tests/test_mcp_adapter.py
 ```
 
 当前测试数量：
 
 ```text
-12
+16
 ```
 
 验证命令：
 
 ```bash
-uv run pytest tests/test_agent_flow.py
+uv run pytest tests/test_agent_flow.py tests/test_mcp_adapter.py
 uv run python -m backend.app.orchestrator.demo
-uv run python -m compileall backend tests
+uv run python -m compileall backend tests mcp_tools
 ```
 
 当前验证结果：
 
 ```text
-12 passed
+16 passed
 demo 正常输出购物法庭判决 JSON
-backend 和 tests 编译检查通过
+backend、tests 和 mcp_tools 编译检查通过
 ```
 
 已覆盖场景：
@@ -398,6 +399,8 @@ backend 和 tests 编译检查通过
 - `cost_analyzer` 工具结果进入 `tool_results`。
 - `cooling_reminder` 在 `judge_agent` 前进入工具结果。
 - `cooling_reminder` 失败时主流程不中断。
+- C-E MCP adapter 能将 E 模块 `cost_analyzer` 原始结果转换为 `ToolResult`。
+- C-E MCP adapter 能将 E 模块 `cooling_reminder` 成功、业务失败和异常场景转换为稳定的 `ToolResult`。
 - trace 能展示 Agent、RAG、MCP 工具调用顺序。
 
 尚未覆盖场景：
@@ -405,6 +408,6 @@ backend 和 tests 编译检查通过
 - 后端 `/api/cases/{case_id}/debate` 接口级测试。
 - 真实 LLM API 调用测试。
 - 真实 RAG 检索模块联调测试。
-- 真实 MCP 工具联调测试。
+- MCP HTTP/MCP Server 形态联调测试。
 - time 时间决策 Agent 编排测试。
 - 前端端到端流程测试。
