@@ -158,13 +158,15 @@ def test_missing_fields_return_next_question_or_reason(monkeypatch: Any) -> None
 def test_empty_rag_returns_empty_evidence_without_fabrication(monkeypatch: Any) -> None:
     monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
     monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
-    monkeypatch.setattr("backend.app.orchestrator.decision_flow.search_mock_rag", lambda *args, **kwargs: [])
+    monkeypatch.setattr("backend.app.orchestrator.decision_flow.search_rag_evidence", lambda *args, **kwargs: [])
 
     result = run_complete_shopping_case()
+    rag_trace = next(item for item in result["trace"] if item["name"] == "rag_search")
 
     assert result["success"] is True
     assert result["rag_evidence"] == []
     assert result["report"]["rag_evidence"] == []
+    assert rag_trace["status"] == "completed"
 
 
 def test_trace_records_required_steps(monkeypatch: Any) -> None:
@@ -194,11 +196,12 @@ def test_tool_results_include_cost_analyzer(monkeypatch: Any) -> None:
 
 def test_rag_exception_does_not_interrupt_main_flow(monkeypatch: Any) -> None:
     def raise_rag_error(*args: Any, **kwargs: Any) -> list[Any]:
+        assert kwargs["raise_on_error"] is True
         raise RuntimeError("mock rag unavailable")
 
     monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
     monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
-    monkeypatch.setattr("backend.app.orchestrator.decision_flow.search_mock_rag", raise_rag_error)
+    monkeypatch.setattr("backend.app.orchestrator.decision_flow.search_rag_evidence", raise_rag_error)
 
     result = run_complete_shopping_case()
     rag_trace = next(item for item in result["trace"] if item["name"] == "rag_search")

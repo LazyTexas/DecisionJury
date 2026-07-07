@@ -9,7 +9,7 @@ from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
 from backend.app.schemas.decision import AgentStep, DebateResult, ToolResult, TraceItem
 from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder
-from backend.app.services.mock_rag import search_mock_rag
+from backend.app.services.rag_adapter import search_rag_evidence
 
 
 def run_decision_flow(
@@ -64,7 +64,10 @@ def run_decision_flow(
         trace_type="rag_search",
         name="rag_search",
         input_summary=query,
-        func=lambda: search_mock_rag(user_id, case_id, "shopping", query, top_k=3),
+        # 编排层使用严格模式，是为了把“服务失败”和“正常无结果”分开记录：
+        # success=true + [] 会走 completed；HTTP/JSON/契约错误会抛出并由 _record_trace 标记 failed。
+        # fallback=[] 保证 RAG 失败不会中断正方、反方和法官流程，也不会编造历史证据。
+        func=lambda: search_rag_evidence(user_id, case_id, "shopping", query, top_k=3, raise_on_error=True),
         output_summary_builder=lambda result: f"返回 {len(result)} 条历史证据。",
         fallback=[],
     )
