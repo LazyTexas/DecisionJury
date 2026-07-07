@@ -1,21 +1,26 @@
 // ============================================================
 // API 服务层
 // 所有后端接口通过此模块统一导出。
-// 路径和字段名与后端 API 文档 04_API.md 对齐。
-// USE_MOCK = true 时使用 Mock 数据。
+// USE_MOCK = true 时使用 Mock 数据，false 时对接后端。
+//
+// 后端响应统一包裹在 { success, data, message } 中，
+// request() 函数已自动提取 data 字段。
+//
+// 字段映射说明：
+// - 后端 GET /cases/{id} 返回 case_status，前端 Case 用 status
+//   getCaseDetail() 中做了映射
+// - 后端 GET /cases/{id}/report 不返回 case_id，前端补充
+//   getReport() 中做了补充
 // ============================================================
 
 import {
   Case,
   CaseSummary,
   CaseType,
-  CreateCaseResponse,
   Message,
   SendMessageResponse,
   DecisionReport,
   TraceItem,
-  HistoryItem,
-  WatchlistItem,
 } from '../types';
 import {
   fetchCaseList as mockFetchCaseList,
@@ -26,16 +31,11 @@ import {
   startDebate as mockStartDebate,
   fetchReport as mockFetchReport,
   fetchTrace as mockFetchTrace,
-  fetchHistory as mockFetchHistory,
-  fetchWatchlist as mockFetchWatchlist,
 } from './mock';
 
 const USE_MOCK = true;
 const BASE_URL = '/api';
-
-const USER_ID = 'u001'; // MVP 暂定一个用户 ID
-
-// ---- 通用请求工具 ----
+const USER_ID = 'u001';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${url}`, {
@@ -49,52 +49,77 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 // ---- 健康检查 ----
-
 export async function healthCheck(): Promise<{ status: string; version: string }> {
-  if (USE_MOCK) return { status: 'ok', version: '0.2' };
+  if (USE_MOCK) return { status: 'ok', version: '1.0.0' };
   return request('/health');
 }
 
 // ---- 案件 API ----
 
-/** GET /api/cases — 获取案件列表 */
-export async function getCaseList(): Promise<CaseSummary[]> {
-  if (USE_MOCK) return mockFetchCaseList();
-  return request('/cases');
+export async function getCaseList(
+  page = 1,
+  pageSize = 10,
+): Promise<{ items: CaseSummary[]; total: number; page: number; page_size: number }> {
+  if (USE_MOCK) {
+    const items = await mockFetchCaseList();
+    return { items, total: items.length, page, page_size: pageSize };
+  }
+  return request(`/cases?user_id=${USER_ID}&page=${page}&page_size=${pageSize}`);
 }
 
-/** GET /api/cases/{case_id} — 获取案件详情 */
+/**
+ * GET /api/cases/{case_id}
+ *
+ * 后端返回字段 case_status，前端 Case 接口用 status。
+ * 这里做映射：case_status → status
+ */
 export async function getCaseDetail(caseId: string): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
-  return request(`/cases/${caseId}`);
+  const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
+  if (!raw) return null;
+  // 映射后端 case_status → 前端 status
+  return {
+    case_id: raw.case_id as string,
+    user_id: raw.user_id as string,
+    case_type: raw.case_type as CaseType,
+    title: raw.title as string,
+    description: raw.description as string,
+    status: (raw.case_status ?? raw.status) as Case['status'],
+    collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
+    missing_fields: (raw.missing_fields ?? []) as string[],
+    final_decision: (raw.final_decision ?? null) as string | null,
+    report_id: (raw.report_id ?? null) as string | null,
+    created_at: raw.created_at as string,
+    updated_at: raw.updated_at as string,
+  };
 }
 
-/** POST /api/cases — 创建案件 */
 export async function createCase(req: {
   case_type: CaseType; title: string; description: string;
-}): Promise<CreateCaseResponse> {
-  if (USE_MOCK) return mockCreateCase({ user_id: USER_ID, ...req });
+}): Promise<{
+  case_id: string; case_status: string;
+  collected_fields: Record<string, unknown>; missing_fields: string[];
+  next_question: string | null;
+}> {
+  if (USE_MOCK) {
+    const res = await mockCreateCase({ user_id: USER_ID, ...req });
+    return {
+      case_id: res.case.case_id,
+      case_status: res.case.status,
+      collected_fields: {},
+      missing_fields: [],
+      next_question: null,
+    };
+  }
   return request('/cases', {
     method: 'POST',
     body: JSON.stringify({ user_id: USER_ID, ...req }),
   });
 }
 
-/** PATCH /api/cases/{case_id} — 更新案件字段 */
-export async function updateCase(
-  caseId: string,
-  data: { title?: string; description?: string; collected_fields?: Record<string, unknown> },
-): Promise<Case> {
-  if (USE_MOCK) return (await mockFetchCaseDetail(caseId))!;
-  return request(`/cases/${caseId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ user_id: USER_ID, ...data }),
-  });
-}
-
 // ---- 消息 API ----
 
-/** POST /api/cases/{case_id}/messages — 多轮补充信息 */
+/** POST /api/chat — 发送消息 */
 export async function sendMessage(
   caseId: string,
   message: string,
@@ -108,58 +133,52 @@ export async function sendMessage(
       missing_fields: res.missing_fields,
     };
   }
-  return request(`/cases/${caseId}/messages`, {
+  return request('/chat', {
     method: 'POST',
-    body: JSON.stringify({ user_id: USER_ID, message }),
+    body: JSON.stringify({ user_id: USER_ID, case_id: caseId, message }),
   });
 }
 
-/** GET /api/cases/{case_id}/messages — 获取消息列表 */
+/** 获取消息列表（后端暂无此接口，仅 Mock 模式可用） */
 export async function getCaseMessages(caseId: string): Promise<Message[]> {
   if (USE_MOCK) return mockFetchCaseMessages(caseId);
-  return request(`/cases/${caseId}/messages`);
+  return [];
 }
 
 // ---- Agent 分析 API ----
 
-/** POST /api/cases/{case_id}/debate — 启动多 Agent 分析 */
+/** POST /api/cases/{case_id}/debate */
 export async function startDebate(caseId: string): Promise<{
-  case_id: string; case_status: string; steps: any[];
-  rag_evidence: any[]; tool_results: any[]; report: DecisionReport;
+  case_id: string; case_status: string; steps: unknown[];
+  rag_evidence: unknown[]; tool_results: unknown[]; report: DecisionReport;
 }> {
   if (USE_MOCK) return mockStartDebate(caseId);
   return request(`/cases/${caseId}/debate`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: USER_ID }),
   });
 }
 
-/** GET /api/cases/{case_id}/trace — 查询执行轨迹 */
+/**
+ * GET /api/cases/{case_id}/trace
+ * 后端暂无此接口，Mock 模式可用
+ */
 export async function getTrace(caseId: string): Promise<{ case_id: string; trace: TraceItem[] }> {
   if (USE_MOCK) return mockFetchTrace(caseId);
-  return request(`/cases/${caseId}/trace`);
+  return { case_id: caseId, trace: [] };
 }
 
 // ---- 判决书 API ----
 
-/** GET /api/cases/{case_id}/report — 查询判决书 */
+/**
+ * GET /api/cases/{case_id}/report
+ * 后端不返回 case_id，前端补充
+ */
 export async function getReport(caseId: string): Promise<DecisionReport | null> {
   if (USE_MOCK) return mockFetchReport(caseId);
-  return request(`/cases/${caseId}/report`);
-}
-
-// ---- 历史记录 API ----
-
-/** GET /api/history?user_id=... — 查询历史记录 */
-export async function getHistory(): Promise<HistoryItem[]> {
-  if (USE_MOCK) return (await mockFetchHistory()).items;
-  return request(`/history?user_id=${USER_ID}`);
-}
-
-// ---- 观察清单 API ----
-
-/** GET /api/watchlist?user_id=... — 查询观察清单 */
-export async function getWatchlist(): Promise<WatchlistItem[]> {
-  if (USE_MOCK) return (await mockFetchWatchlist()).items;
-  return request(`/watchlist?user_id=${USER_ID}`);
+  const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
+  if (!raw) return null;
+  return {
+    ...raw,
+    case_id: (raw.case_id as string) ?? caseId,
+  } as DecisionReport;
 }
