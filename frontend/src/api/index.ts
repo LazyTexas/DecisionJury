@@ -33,9 +33,9 @@ import {
   fetchTrace as mockFetchTrace,
 } from './mock';
 
-const USE_MOCK = true;
+const USE_MOCK = false;
 const BASE_URL = '/api';
-const USER_ID = 'u001';
+const USER_ID = 'local_user';
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE_URL}${url}`, {
@@ -75,8 +75,9 @@ export async function getCaseList(
  */
 export async function getCaseDetail(caseId: string): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
-  const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
-  if (!raw) return null;
+  try {
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
+    if (!raw) return null;
   // 映射后端 case_status → 前端 status
   return {
     case_id: raw.case_id as string,
@@ -92,6 +93,9 @@ export async function getCaseDetail(caseId: string): Promise<Case | null> {
     created_at: raw.created_at as string,
     updated_at: raw.updated_at as string,
   };
+  } catch {
+    return null;
+  }
 }
 
 export async function createCase(req: {
@@ -172,13 +176,18 @@ export async function getTrace(caseId: string): Promise<{ case_id: string; trace
 /**
  * GET /api/cases/{case_id}/report
  * 后端不返回 case_id，前端补充
+ * 报告不存在时返回 null（不抛异常）
  */
 export async function getReport(caseId: string): Promise<DecisionReport | null> {
   if (USE_MOCK) return mockFetchReport(caseId);
-  const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
-  if (!raw) return null;
-  return {
-    ...raw,
-    case_id: (raw.case_id as string) ?? caseId,
-  } as DecisionReport;
+  try {
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
+    if (!raw) return null;
+    return {
+      ...raw,
+      case_id: (raw.case_id as string) ?? caseId,
+    } as DecisionReport;
+  } catch {
+    return null;
+  }
 }
