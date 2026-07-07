@@ -89,8 +89,8 @@ export interface Case {
   missing_fields: string[];
   final_decision: string | null;
   report_id: string | null;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
 }
 
 /** 消息 */
@@ -173,8 +173,8 @@ export interface CaseSummary {
   case_type: CaseType;
   status: CaseStatus;
   description: string;
-  created_at: string;
-  updated_at: string;
+  created_at: string | null;
+  updated_at: string | null;
   message_count: number;
   has_report: boolean;
 }
@@ -228,7 +228,7 @@ export interface SendMessageRequest {
 /** 发送消息响应 */
 export interface SendMessageResponse {
   reply: string;
-  case_status: CaseStatus;
+  case_status: string;
   collected_fields: Record<string, unknown>;
   missing_fields: string[];
 }
@@ -241,7 +241,7 @@ export interface DebateRequest {
 /** 启动辩论响应 */
 export interface DebateResponse {
   case_id: string;
-  case_status: CaseStatus;
+  case_status: string;
   steps: AgentStep[];
   rag_evidence: RagEvidence[];
   tool_results: ToolResult[];

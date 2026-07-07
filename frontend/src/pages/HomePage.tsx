@@ -119,7 +119,7 @@ export default function HomePage() {
                   </Typography.Paragraph>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {c.message_count} 条消息 · {new Date(c.updated_at).toLocaleDateString('zh-CN')}
+                      {c.message_count} 条消息 · {c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-CN') : '—'}
                     </Typography.Text>
                     <RightOutlined style={{ color: '#ccc', fontSize: 12 }} />
                   </div>
