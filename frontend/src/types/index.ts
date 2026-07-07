@@ -209,15 +209,19 @@ export interface CreateCaseRequest {
   description: string;
 }
 
-/** 创建案件响应 */
+/** 创建案件响应（匹配后端 CreateCaseResponse） */
 export interface CreateCaseResponse {
-  case: Case;
-  next_question: string;
+  case_id: string;
+  case_status: string;
+  collected_fields: Record<string, unknown>;
+  missing_fields: string[];
+  next_question: string | null;
 }
 
-/** 发送消息请求 */
+/** 发送消息请求（匹配后端 POST /api/chat） */
 export interface SendMessageRequest {
   user_id: string;
+  case_id: string;
   message: string;
 }
 
@@ -244,9 +248,20 @@ export interface DebateResponse {
   report: DecisionReport;
 }
 
-/** 查询案件详情响应 */
+/** 查询案件详情响应（后端返回扁平对象） */
 export interface CaseDetailResponse {
-  case: Case;
+  case_id: string;
+  user_id: string;
+  case_type: string;
+  title: string;
+  description: string;
+  case_status: string;
+  collected_fields: Record<string, unknown>;
+  missing_fields: string[];
+  final_decision: string | null;
+  report_id: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 /** 查询判决书响应 */
@@ -346,11 +361,10 @@ export interface ApiErrorResponse {
 
 export type ApiResponse<T> = ApiSuccessResponse<T> | ApiErrorResponse;
 
-/** 分页响应 */
+/** 分页响应（匹配后端 page_size / total 命名） */
 export interface PaginatedResponse<T> {
   data: T[];
   total: number;
   page: number;
-  pageSize: number;
-  totalPages: number;
+  page_size: number;
 }

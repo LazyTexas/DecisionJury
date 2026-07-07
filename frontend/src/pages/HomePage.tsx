@@ -41,8 +41,8 @@ export default function HomePage() {
   useEffect(() => {
     let cancelled = false;
     getCaseList()
-      .then((data) => {
-        if (!cancelled) setCases(data);
+      .then((res) => {
+        if (!cancelled) setCases(res.items);
       })
       .catch((err) => {
         if (!cancelled) setError(err.message || '加载失败');
