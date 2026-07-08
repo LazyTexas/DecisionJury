@@ -218,10 +218,9 @@ export interface CreateCaseResponse {
   next_question: string | null;
 }
 
-/** 发送消息请求（匹配后端 POST /api/chat） */
+/** 发送消息请求（匹配后端 POST /api/cases/{case_id}/messages） */
 export interface SendMessageRequest {
   user_id: string;
-  case_id: string;
   message: string;
 }
 

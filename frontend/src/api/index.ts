@@ -78,21 +78,21 @@ export async function getCaseDetail(caseId: string): Promise<Case | null> {
   try {
     const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
     if (!raw) return null;
-  // 映射后端 case_status → 前端 status
-  return {
-    case_id: raw.case_id as string,
-    user_id: raw.user_id as string,
-    case_type: raw.case_type as CaseType,
-    title: raw.title as string,
-    description: raw.description as string,
-    status: (raw.case_status ?? raw.status) as Case['status'],
-    collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
-    missing_fields: (raw.missing_fields ?? []) as string[],
-    final_decision: (raw.final_decision ?? null) as string | null,
-    report_id: (raw.report_id ?? null) as string | null,
-    created_at: raw.created_at as string,
-    updated_at: raw.updated_at as string,
-  };
+    // 映射后端 case_status → 前端 status
+    return {
+      case_id: raw.case_id as string,
+      user_id: raw.user_id as string,
+      case_type: raw.case_type as CaseType,
+      title: raw.title as string,
+      description: raw.description as string,
+      status: (raw.case_status ?? raw.status) as Case['status'],
+      collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
+      missing_fields: (raw.missing_fields ?? []) as string[],
+      final_decision: (raw.final_decision ?? null) as string | null,
+      report_id: (raw.report_id ?? null) as string | null,
+      created_at: raw.created_at as string,
+      updated_at: raw.updated_at as string,
+    };
   } catch {
     return null;
   }
@@ -121,9 +121,43 @@ export async function createCase(req: {
   });
 }
 
+/** PATCH /api/cases/{case_id} — 更新案件字段（标题/描述/结构化字段） */
+export async function updateCase(
+  caseId: string,
+  data: {
+    title?: string;
+    description?: string;
+    collected_fields?: Record<string, unknown>;
+  },
+): Promise<Case | null> {
+  if (USE_MOCK) return mockFetchCaseDetail(caseId);
+  try {
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ user_id: USER_ID, ...data }),
+    });
+    return {
+      case_id: raw.case_id as string,
+      user_id: raw.user_id as string,
+      case_type: raw.case_type as CaseType,
+      title: raw.title as string,
+      description: raw.description as string,
+      status: (raw.case_status ?? raw.status) as Case['status'],
+      collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
+      missing_fields: (raw.missing_fields ?? []) as string[],
+      final_decision: (raw.final_decision ?? null) as string | null,
+      report_id: (raw.report_id ?? null) as string | null,
+      created_at: raw.created_at as string,
+      updated_at: raw.updated_at as string,
+    };
+  } catch {
+    return null;
+  }
+}
+
 // ---- 消息 API ----
 
-/** POST /api/chat — 发送消息 */
+/** POST /api/cases/{case_id}/messages — 发送消息 */
 export async function sendMessage(
   caseId: string,
   message: string,
@@ -137,9 +171,9 @@ export async function sendMessage(
       missing_fields: res.missing_fields,
     };
   }
-  return request('/chat', {
+  return request(`/cases/${caseId}/messages`, {
     method: 'POST',
-    body: JSON.stringify({ user_id: USER_ID, case_id: caseId, message }),
+    body: JSON.stringify({ user_id: USER_ID, message }),
   });
 }
 
