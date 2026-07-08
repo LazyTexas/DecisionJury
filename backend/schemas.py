@@ -87,6 +87,13 @@ class DecisionReportResponse(BaseModel):
     tool_results: List[Dict[str, Any]] = []
     created_at: Optional[str] = None
 
+class UpdateCaseRequest(BaseModel):
+    """更新案件请求（PATCH）"""
+    user_id: Optional[str] = None
+    title: Optional[str] = None
+    description: Optional[str] = None
+    collected_fields: Optional[Dict[str, Any]] = None
+
 class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
