@@ -5,6 +5,7 @@ import uuid
 from backend.database import get_db
 from backend.models import Case, Message
 from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse
+from backend.schemas import UpdateCaseRequest
 
 router = APIRouter(prefix="/api", tags=["cases"])
 
@@ -180,4 +181,98 @@ def get_report(case_id: str, db: Session = Depends(get_db)):
         success=True,
         data=report_data.model_dump(),
         message=""
+    )
+
+# ... 其他路由 ...
+
+@router.patch("/cases/{case_id}", response_model=ApiResponse)
+def update_case(
+    case_id: str,
+    req: UpdateCaseRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    部分更新案件信息。
+    只有传入的字段才会更新，未传入的字段保持不变。
+    """
+    # 1. 查询案件
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="CASE_NOT_FOUND"
+        )
+
+    # 2. 更新基础字段
+    if req.title is not None:
+        case.title = req.title
+
+    if req.description is not None:
+        case.description = req.description
+
+    if req.user_id is not None:
+        case.user_id = req.user_id
+
+    # 3. 更新 collected_fields（合并更新，不覆盖）
+    if req.collected_fields is not None:
+        # 获取现有字段
+        current = case.collected_fields or {}
+        # 合并更新
+        current.update(req.collected_fields)
+        case.collected_fields = current
+
+        # 4. 重新计算 missing_fields
+        # 购物决策所需字段（与 chat.py 保持一致）
+        shopping_required = [
+            "product_name",
+            "price",
+            "purpose",
+            "monthly_budget_left",
+            "owned_alternatives",
+            "expected_usage_frequency",
+            "trigger_reason"
+        ]
+
+        if case.case_type == "shopping":
+            required_fields = shopping_required
+        else:
+            required_fields = []
+
+        still_missing = [
+            f for f in required_fields
+            if f not in case.collected_fields or case.collected_fields.get(f) in [None, ""]
+        ]
+        case.missing_fields = still_missing
+
+        # 5. 更新状态
+        if still_missing:
+            case.status = CaseStatus.COLLECTING
+        else:
+            # 如果当前状态是 COLLECTING 且已无缺失字段，转为 READY_FOR_DEBATE
+            if case.status == CaseStatus.COLLECTING:
+                case.status = CaseStatus.READY_FOR_DEBATE
+
+    # 6. 提交更新
+    db.commit()
+    db.refresh(case)
+
+    # 7. 返回更新后的案件（与 GET /cases/{case_id} 格式一致）
+    return ApiResponse(
+        success=True,
+        data={
+            "case_id": case.id,
+            "user_id": case.user_id,
+            "case_type": case.case_type,
+            "title": case.title,
+            "description": case.description,
+            "case_status": case.status,
+            "collected_fields": case.collected_fields or {},
+            "missing_fields": case.missing_fields or [],
+            "final_decision": case.final_decision,
+            "report_id": case.report_id,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "updated_at": case.updated_at.isoformat() if case.updated_at else None,
+        },
+        message="case updated"
     )
