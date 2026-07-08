@@ -7,6 +7,8 @@ from backend.models import Case, Message
 from backend.schemas import SendMessageRequest, ApiResponse, CaseStatus
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
+from backend.schemas import SHOPPING_REQUIRED_FIELDS
+from sqlalchemy.orm import attributes
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
@@ -89,6 +91,7 @@ router = APIRouter(prefix="/api", tags=["chat"])
 #         message=""
 #     )
 
+
 @router.post("/cases/{case_id}/messages", response_model=ApiResponse)
 def send_message(
     case_id: str,
@@ -118,7 +121,6 @@ def send_message(
         )
         result_dict = to_dict(result)
     except Exception as e:
-        # 降级：保留现有数据，不中断流程
         print(f"[WARN] input_parser 调用失败: {e}")
         return ApiResponse(
             success=False,
@@ -126,36 +128,47 @@ def send_message(
             message="PARSE_ERROR"
         )
 
-    # 4. 安全保存 extracted_fields
-    # 规则：只保存当前缺失的字段 或 之前不存在的字段，不覆盖已有字段
+    # 4. 增量更新 collected_fields
     safe_fields = case.collected_fields or {}
+    print(f"[DEBUG] BEFORE: {safe_fields}")
 
     for key, value in result_dict.get("extracted_fields", {}).items():
-        # 只更新：① 缺失的字段 ② 之前不存在的字段
-        if key in result_dict.get("missing_fields", []) or key not in safe_fields:
+        if value is not None and value != "":
             safe_fields[key] = value
+
+    print(f"[DEBUG] AFTER: {safe_fields}")
 
     # 5. 更新案件
     case.collected_fields = safe_fields
-    case.missing_fields = result_dict.get("missing_fields", [])
 
-    # 根据 ParserResult 更新状态，但如果是高风险则拒绝
+    # 6. 重新计算缺失字段
+    if case.case_type == "shopping":
+        required_fields = SHOPPING_REQUIRED_FIELDS
+    else:
+        required_fields = []  # time 场景暂不支持
+
+    still_missing = [
+        f for f in required_fields
+        if f not in safe_fields or safe_fields.get(f) in [None, ""]
+    ]
+    case.missing_fields = still_missing
+
+    # 7. 更新状态
     if result_dict.get("is_high_risk"):
         case.status = CaseStatus.REJECTED
         reply = result_dict.get("reject_reason", "该决策超出系统支持范围。")
+    elif not still_missing:
+        case.status = CaseStatus.READY_FOR_DEBATE
+        reply = "信息已补充完整，可以进入正反方分析。"
     else:
-        case.status = result_dict.get("case_status", CaseStatus.COLLECTING)
-
-        if case.status == CaseStatus.READY_FOR_DEBATE:
-            reply = "信息已补充完整，可以进入正反方分析。"
+        case.status = CaseStatus.COLLECTING
+        next_question = result_dict.get("next_question")
+        if next_question:
+            reply = f"还需要补充以下信息：{', '.join(still_missing)}。{next_question}"
         else:
-            next_question = result_dict.get("next_question")
-            if next_question:
-                reply = f"还需要补充以下信息：{', '.join(case.missing_fields)}。{next_question}"
-            else:
-                reply = f"还需要补充以下信息：{', '.join(case.missing_fields)}。请继续补充。"
+            reply = f"还需要补充以下信息：{', '.join(still_missing)}。请继续补充。"
 
-    # 6. 保存助手消息
+    # 8. 保存助手消息
     assistant_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -164,7 +177,17 @@ def send_message(
         message_type="text"
     )
     db.add(assistant_msg)
+
+    # 9. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    try:
+        attributes.flag_modified(case, 'collected_fields')
+        attributes.flag_modified(case, 'missing_fields')
+    except Exception as e:
+        print(f"[WARN] flag_modified 失败: {e}")
+
+    # 10. 提交事务
     db.commit()
+    print(f"[DEBUG] COMMIT 成功，case_id={case_id}")
 
     return ApiResponse(
         success=True,
@@ -172,7 +195,7 @@ def send_message(
             "reply": reply,
             "case_status": case.status,
             "collected_fields": safe_fields,
-            "missing_fields": case.missing_fields,
+            "missing_fields": still_missing,
         },
         message=""
     )
