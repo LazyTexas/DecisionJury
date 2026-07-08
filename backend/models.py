@@ -16,6 +16,7 @@ class Case(Base):
     missing_fields = Column(JSON, default=[])     # 缺失的字段列表
     final_decision = Column(String, nullable=True)  # buy / delay / reject / alternative
     report_id = Column(String, nullable=True)
+    debate_result = Column(JSON, nullable=True)  # ← 新增：存储完整辩论结果
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 

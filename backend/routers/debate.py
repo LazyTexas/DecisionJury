@@ -63,6 +63,9 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
         if result.get("report", {}).get("report_id"):
             case.report_id = result["report"]["report_id"]
 
+        # ===== 新增：保存完整辩论结果 =====
+        case.debate_result = result
+        
         # 7. 保存 trace
         trace_data = result.get("trace", [])
         for step in trace_data:
