@@ -149,37 +149,25 @@ def list_cases(
 def get_report(case_id: str, db: Session = Depends(get_db)):
     """
     获取案件的判决书。
-    如果案件已完成且有 report_id，则返回完整报告；否则返回错误。
+    从 debate_result 中读取 C 模块生成的真实报告。
     """
-    # 查询案件
+    # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
-    # 检查是否有报告
-    if not case.report_id:
+    # 2. 检查是否有辩论结果
+    if not case.debate_result:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
-    # 组装报告数据
-    # MVP 阶段：报告数据从 case 表的字段生成
-    report_data = DecisionReportResponse(
-        report_id=case.report_id,
-        case_type=case.case_type,
-        final_decision=case.final_decision or "unknown",
-        confidence=0.75,  # MVP 阶段固定值，后续由 C 模块提供
-        summary=f"本案建议{'购买' if case.final_decision == 'buy' else '暂缓' if case.final_decision == 'delay' else '不购买'}",
-        case_summary=case.description,
-        pro_points=["正方观点待补充"],
-        con_points=["反方观点待补充"],
-        next_actions=["冷静期后复盘"],
-        rag_evidence=[],
-        tool_results=[],
-        created_at=case.updated_at.isoformat() if case.updated_at else None,
-    )
+    # 3. 从 debate_result 中提取 report
+    report_data = case.debate_result.get("report", {})
+    if not report_data:
+        return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
     return ApiResponse(
         success=True,
-        data=report_data.model_dump(),
+        data=report_data,
         message=""
     )
 
