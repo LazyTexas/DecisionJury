@@ -32,7 +32,7 @@ class CreateCaseResponse(BaseModel):
 
 class SendMessageRequest(BaseModel):
     user_id: str
-    case_id: str
+    # case_id: str # 已移除，从路径参数获取
     message: str
 
 class SendMessageResponse(BaseModel):
