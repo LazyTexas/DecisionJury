@@ -3,6 +3,18 @@ from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
+
+# 购物决策所需字段
+SHOPPING_REQUIRED_FIELDS = [
+    "product_name",
+    "price",
+    "purpose",
+    "monthly_budget_left",
+    "owned_alternatives",
+    "expected_usage_frequency",
+    "trigger_reason"
+]
+
 # ===== 枚举值（与 API 文档对齐）=====
 class CaseStatus:
     COLLECTING = "collecting"
