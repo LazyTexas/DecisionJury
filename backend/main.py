@@ -8,12 +8,13 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from backend.database import engine, Base
 from backend import models
-from backend.routers import cases, chat, debate, watchlist, history
+from backend.routers import cases, chat, debate, tools, watchlist, history
 from pydantic import ValidationError
 import traceback
 import json
 from backend.schemas import ApiResponse, ErrorResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
+
 
 def check_database():
     """启动时检测数据库结构，自动修复不兼容问题"""
@@ -199,5 +200,6 @@ async def json_decode_error_handler(request: Request, exc: json.JSONDecodeError)
 app.include_router(cases.router)
 app.include_router(chat.router)
 app.include_router(debate.router)
-app.include_router(watchlist.router)  # 注册观察清单路由
-app.include_router(history.router)  # 注册历史记录路由
+app.include_router(tools.router)
+app.include_router(watchlist.router)
+app.include_router(history.router)
