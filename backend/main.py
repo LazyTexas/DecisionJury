@@ -8,7 +8,7 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from backend.database import engine, Base
 from backend import models
-from backend.routers import cases, chat, debate, watchlist, history
+from backend.routers import cases, chat, debate, tools, watchlist, history
 from pydantic import ValidationError
 import traceback
 import json
