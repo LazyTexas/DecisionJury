@@ -1,5 +1,5 @@
 # backend/models.py
-from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index
+from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index, Float
 from sqlalchemy.sql import func
 from backend.database import Base
 
@@ -50,10 +50,20 @@ class History(Base):
     result = Column(String)  # worth / regret / neutral
     tags = Column(JSON, default=[])
     created_at = Column(DateTime, server_default=func.now())
+    title = Column(String, nullable=True)  # 商品/活动名称
+    price = Column(Float, nullable=True)  # 商品价格
+    usage_frequency = Column(String, nullable=True)  # daily / weekly / monthly / once
+    context = Column(Text, nullable=True)  # 详细决策背景（如"考研期间每天学习需要降噪"）
+    pros = Column(JSON, default=[])  # 正方观点摘要
+    cons = Column(JSON, default=[])  # 反方观点摘要
+    final_decision = Column(String, nullable=True)  # buy / delay / reject / alternative
+    case_id = Column(String, nullable=True)  # 关联原案件 ID
+    report_id = Column(String, nullable=True)  # ← 新增：关联报告 ID
 
     __table_args__ = (
         Index("ix_histories_user_id_created_at", "user_id", "created_at"),
         Index("ix_histories_user_id_case_type", "user_id", "case_type"),
+        Index("ix_histories_case_id", "case_id"),  # ← 新增索引
     )
 
 class Trace(Base):
