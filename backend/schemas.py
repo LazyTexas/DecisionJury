@@ -1,6 +1,6 @@
 # backend/schemas.py
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime
 
 
@@ -144,3 +144,18 @@ class ApiResponse(BaseModel):
     success: bool
     data: Optional[Any] = None
     message: str = ""
+
+class ErrorResponse(BaseModel):
+    """统一错误响应格式"""
+    success: bool = False
+    data: None = None
+    message: str = ""
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": False,
+                "data": None,
+                "message": "VALIDATION_ERROR"
+            }
+        }
