@@ -26,6 +26,7 @@ import {
 } from '@ant-design/icons';
 import { DecisionReport, RagEvidence, ToolResult, TraceItem } from '../types';
 import { getReport, getTrace } from '../api';
+import FeedbackModal from '../components/FeedbackModal';
 
 const finalDecisionMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
   buy: { label: '建议购买', color: 'success', icon: <CheckCircleOutlined /> },
@@ -44,6 +45,7 @@ export default function VerdictPage() {
   const [steps, setSteps] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   useEffect(() => {
     if (!caseId) return;
@@ -260,7 +262,7 @@ export default function VerdictPage() {
       )}
 
       {/* 元信息 */}
-      <Card style={{ borderRadius: 8 }}>
+      <Card style={{ borderRadius: 8, marginBottom: 24 }}>
         <Descriptions size="small" column={{ xs: 1, sm: 2 }}>
           <Descriptions.Item label="判决书 ID">{report.report_id}</Descriptions.Item>
           <Descriptions.Item label="生成时间">
@@ -269,6 +271,19 @@ export default function VerdictPage() {
           <Descriptions.Item label="案件类型">{report.case_type}</Descriptions.Item>
         </Descriptions>
       </Card>
+
+      {/* 复盘按钮 */}
+      <div style={{ textAlign: 'center', marginBottom: 24 }}>
+        <Button type="default" size="large" onClick={() => setFeedbackOpen(true)}>
+          提交决策复盘
+        </Button>
+        <Typography.Text type="secondary" style={{ display: 'block', marginTop: 4, fontSize: 12 }}>
+          你的反馈将帮助未来的决策更准确
+        </Typography.Text>
+      </div>
+
+      {/* 复盘 Modal */}
+      <FeedbackModal caseId={caseId!} open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }

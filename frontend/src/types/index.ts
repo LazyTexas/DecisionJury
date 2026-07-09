@@ -70,8 +70,8 @@ export enum RiskLevel {
 
 /** 历史记录结果 */
 export enum HistoryResult {
+  WORTH = 'worth',
   REGRET = 'regret',
-  SATISFIED = 'satisfied',
   NEUTRAL = 'neutral',
 }
 
@@ -184,9 +184,12 @@ export interface HistoryItem {
   history_id: string;
   user_id: string;
   case_type: CaseType;
+  title: string;
   summary: string;
   result: HistoryResult;
   tags: string[];
+  case_id: string;
+  report_id: string | null;
   created_at: string;
 }
 

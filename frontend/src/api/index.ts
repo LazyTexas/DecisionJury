@@ -2,21 +2,13 @@
 // API 服务层
 // 所有后端接口通过此模块统一导出。
 // USE_MOCK = true 时使用 Mock 数据，false 时对接后端。
-//
-// 后端响应统一包裹在 { success, data, message } 中，
-// request() 函数已自动提取 data 字段。
-//
-// 字段映射说明：
-// - 后端 GET /cases/{id} 返回 case_status，前端 Case 用 status
-//   getCaseDetail() 中做了映射
-// - 后端 GET /cases/{id}/report 不返回 case_id，前端补充
-//   getReport() 中做了补充
 // ============================================================
 
 import {
   Case,
   CaseSummary,
   CaseType,
+  HistoryItem,
   Message,
   SendMessageResponse,
   DecisionReport,
@@ -67,18 +59,11 @@ export async function getCaseList(
   return request(`/cases?user_id=${USER_ID}&page=${page}&page_size=${pageSize}`);
 }
 
-/**
- * GET /api/cases/{case_id}
- *
- * 后端返回字段 case_status，前端 Case 接口用 status。
- * 这里做映射：case_status → status
- */
 export async function getCaseDetail(caseId: string): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
   try {
     const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
     if (!raw) return null;
-    // 映射后端 case_status → 前端 status
     return {
       case_id: raw.case_id as string,
       user_id: raw.user_id as string,
@@ -121,14 +106,9 @@ export async function createCase(req: {
   });
 }
 
-/** PATCH /api/cases/{case_id} — 更新案件字段（标题/描述/结构化字段） */
 export async function updateCase(
   caseId: string,
-  data: {
-    title?: string;
-    description?: string;
-    collected_fields?: Record<string, unknown>;
-  },
+  data: { title?: string; description?: string; collected_fields?: Record<string, unknown> },
 ): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
   try {
@@ -157,7 +137,6 @@ export async function updateCase(
 
 // ---- 消息 API ----
 
-/** POST /api/cases/{case_id}/messages — 发送消息 */
 export async function sendMessage(
   caseId: string,
   message: string,
@@ -177,7 +156,6 @@ export async function sendMessage(
   });
 }
 
-/** 获取消息列表（后端暂无此接口，仅 Mock 模式可用） */
 export async function getCaseMessages(caseId: string): Promise<Message[]> {
   if (USE_MOCK) return mockFetchCaseMessages(caseId);
   return [];
@@ -185,43 +163,60 @@ export async function getCaseMessages(caseId: string): Promise<Message[]> {
 
 // ---- Agent 分析 API ----
 
-/** POST /api/cases/{case_id}/debate */
 export async function startDebate(caseId: string): Promise<{
   case_id: string; case_status: string; steps: unknown[];
   rag_evidence: unknown[]; tool_results: unknown[]; report: DecisionReport;
 }> {
   if (USE_MOCK) return mockStartDebate(caseId);
-  return request(`/cases/${caseId}/debate`, {
-    method: 'POST',
-  });
+  return request(`/cases/${caseId}/debate`, { method: 'POST' });
 }
 
-/**
- * GET /api/cases/{case_id}/trace
- * 后端暂无此接口，Mock 模式可用
- */
 export async function getTrace(caseId: string): Promise<{ case_id: string; trace: TraceItem[] }> {
   if (USE_MOCK) return mockFetchTrace(caseId);
-  return { case_id: caseId, trace: [] };
+  return request(`/cases/${caseId}/trace`);
 }
 
 // ---- 判决书 API ----
 
-/**
- * GET /api/cases/{case_id}/report
- * 后端不返回 case_id，前端补充
- * 报告不存在时返回 null（不抛异常）
- */
 export async function getReport(caseId: string): Promise<DecisionReport | null> {
   if (USE_MOCK) return mockFetchReport(caseId);
   try {
     const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
     if (!raw) return null;
-    return {
-      ...raw,
-      case_id: (raw.case_id as string) ?? caseId,
-    } as DecisionReport;
+    return { ...raw, case_id: (raw.case_id as string) ?? caseId } as DecisionReport;
   } catch {
     return null;
   }
+}
+
+// ---- 历史记录 API ----
+
+export async function getHistory(params?: {
+  page?: number; page_size?: number; case_type?: CaseType; result?: string;
+}): Promise<{ items: HistoryItem[]; total: number; page: number; page_size: number }> {
+  if (USE_MOCK) {
+    const mock = (await import('./mock')).fetchHistory;
+    return (await mock()) as any;
+  }
+  const query = new URLSearchParams({ user_id: USER_ID });
+  if (params?.page) query.set('page', String(params.page));
+  if (params?.page_size) query.set('page_size', String(params.page_size));
+  if (params?.case_type) query.set('case_type', params.case_type);
+  if (params?.result) query.set('result', params.result);
+  return request(`/history?${query.toString()}`);
+}
+
+// ---- 复盘 API ----
+
+export async function submitFeedback(
+  caseId: string,
+  data: { actual_action: string; satisfaction: number; review?: string },
+): Promise<{ saved_to_history: boolean; history_id: string }> {
+  if (USE_MOCK) {
+    return { saved_to_history: true, history_id: `history_mock_${Date.now()}` };
+  }
+  return request(`/cases/${caseId}/feedback`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: USER_ID, ...data }),
+  });
 }
