@@ -1,0 +1,35 @@
+### 测试 1：健康检查
+GET http://127.0.0.1:8000/api/health
+
+### 测试 2：创建案件（类型错误）
+POST http://127.0.0.1:8000/api/cases
+Content-Type: application/json
+
+{
+  "user_id": "local_user",
+  "case_type": 123,
+  "title": "测试",
+  "description": "测试描述"
+}
+
+### 测试 3：404 Not Found
+GET http://127.0.0.1:8000/api/not-exist
+
+### 测试 4：案件不存在
+POST http://127.0.0.1:8000/api/cases/case_not_exist/debate
+Content-Type: application/json
+
+{
+  "user_id": "local_user"
+}
+
+### 测试 5：JSON 格式错误（正确 JSON 应该成功）
+POST http://127.0.0.1:8000/api/cases
+Content-Type: application/json
+
+{
+  "user_id": "local_user",
+  "case_type": "shopping",
+  "title": "测试",
+  "description": "测试描述"
+,}
