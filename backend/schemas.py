@@ -61,6 +61,13 @@ class CreateHistoryRequest(BaseModel):
     case_id: Optional[str] = None  # 关联原案件 ID
     report_id: Optional[str] = None  # 关联报告 ID
     
+class CreateFeedbackRequest(BaseModel):
+    """决策复盘请求"""
+    user_id: str
+    actual_action: str  # bought / not_bought / delayed / other
+    satisfaction: int  # 1-5
+    review: Optional[str] = None
+    
 class SendMessageRequest(BaseModel):
     user_id: str
     # case_id: str # 已移除，从路径参数获取
