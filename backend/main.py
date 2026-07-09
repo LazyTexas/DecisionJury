@@ -6,7 +6,8 @@ from sqlalchemy import inspect
 from sqlalchemy.exc import OperationalError
 from backend.database import engine, Base
 from backend import models
-from backend.routers import cases, chat, debate, watchlist, history
+from backend.routers import cases, chat, debate, tools, watchlist, history
+
 
 def check_database():
     """启动时检测数据库结构，自动修复不兼容问题"""
@@ -95,5 +96,6 @@ def health_check():
 app.include_router(cases.router)
 app.include_router(chat.router)
 app.include_router(debate.router)
-app.include_router(watchlist.router)  # 注册观察清单路由
-app.include_router(history.router)  # 注册历史记录路由
+app.include_router(tools.router)
+app.include_router(watchlist.router)
+app.include_router(history.router)
