@@ -78,6 +78,63 @@ def test_extract_trigger():
     assert result.extracted_fields.get("trigger_reason") == "促销"
 
 
+def test_extract_complete_chinese_shopping_description():
+    """中文完整购物描述应尽量一次提取出演示链路所需核心字段。"""
+    result = parse_input("我想买一副1299元的降噪耳机，最近学习需要安静，预计每天使用，这次是刚需。")
+
+    assert result.extracted_fields.get("price") == 1299.0
+    assert result.extracted_fields.get("product_name") == "降噪耳机"
+    assert result.extracted_fields.get("purpose") == "学习需要安静"
+    assert result.extracted_fields.get("expected_usage_frequency") == "每天"
+    assert result.extracted_fields.get("trigger_reason") == "刚需"
+
+
+def test_product_name_keeps_taideng_after_price():
+    """“一个399元的台灯”里的“台”是商品名组成部分，不能被误当量词裁掉。"""
+    result = parse_input("我想买一个399元的台灯")
+
+    assert result.extracted_fields.get("price") == 399.0
+    assert result.extracted_fields.get("product_name") == "台灯"
+
+
+def test_product_name_keeps_taideng_without_price():
+    """“一盏台灯”属于明确量词边界，应该去掉“一盏”，但保留完整商品名“台灯”。"""
+    result = parse_input("我想买一盏台灯")
+
+    assert result.extracted_fields.get("product_name") == "台灯"
+
+
+def test_product_name_keeps_normal_classifier_behavior():
+    """正常量词场景仍应继续工作，避免修复“台灯”时把“一台显示器”这类案例带坏。"""
+    result = parse_input("我想买一台显示器")
+
+    assert result.extracted_fields.get("product_name") == "显示器"
+
+
+def test_product_name_keeps_taishiji():
+    """“台式机”本身是名词，不应因为首字是“台”就被裁成“式机”。"""
+    result = parse_input("我想买一台台式机")
+
+    assert result.extracted_fields.get("product_name") == "台式机"
+
+
+def test_extract_chinese_budget_and_alternative_message():
+    """中文补充消息应提取预算和已有替代品，且预算不能误写到 price。"""
+    result = parse_input("本月预算还剩3000元，已有普通耳机。")
+
+    assert result.extracted_fields.get("monthly_budget_left") == 3000.0
+    assert result.extracted_fields.get("owned_alternatives") == "普通耳机"
+    assert "price" not in result.extracted_fields
+
+
+def test_budget_message_does_not_become_price():
+    """预算语义必须优先于通用金额兜底，避免 3000 元预算被当成商品价格。"""
+    result = parse_input("预算还剩 3000 元")
+
+    assert result.extracted_fields.get("monthly_budget_left") == 3000.0
+    assert result.extracted_fields.get("price") is None
+
+
 # ========== 缺失字段与状态判断 ==========
 
 def test_missing_fields_detection():
@@ -111,6 +168,23 @@ def test_merge_with_existing_fields():
     result = parse_input("预算还剩 800 元", existing_collected_fields=existing)
     assert result.merged_fields["monthly_budget_left"] == 800.0
     assert result.merged_fields["purpose"] == "学习"
+
+
+def test_chinese_message_merge_and_missing_fields():
+    """中文创建案件与补充消息组合后，应只剩真正未补齐的字段。"""
+    existing = {
+        "price": 1299.0,
+        "product_name": "降噪耳机",
+        "purpose": "学习需要安静",
+        "expected_usage_frequency": "每天",
+        "trigger_reason": "刚需",
+    }
+    result = parse_input("本月预算还剩3000元，已有普通耳机。", existing_collected_fields=existing)
+
+    assert result.merged_fields["monthly_budget_left"] == 3000.0
+    assert result.merged_fields["owned_alternatives"] == "普通耳机"
+    assert result.missing_fields == []
+    assert result.case_status == "ready_for_debate"
 
 
 # ========== next_question ==========
