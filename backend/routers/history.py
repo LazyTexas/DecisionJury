@@ -67,7 +67,7 @@ def create_history(req: CreateHistoryRequest, db: Session = Depends(get_db)):
 def get_history(
     user_id: str = Query(..., description="用户 ID（必填）"),
     page: int = Query(1, ge=1, description="页码，默认 1"),
-    page_size: int = Query(10, ge=1, le=100, description="每页条数，默认 10，最大 100"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页条数，默认 10，最大 100"),
     case_type: Optional[str] = Query(None, description="案件类型筛选：shopping / time"),
     result: Optional[str] = Query(None, description="结果筛选：worth / regret / neutral"),
     db: Session = Depends(get_db)
