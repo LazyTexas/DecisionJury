@@ -1,4 +1,4 @@
-"""cooling_reminder — MCP tool for creating cooling-off reminders.
+"""create_reminder — MCP tool for creating cooling-off reminders.
 
 When the judge agent suggests "delay" or "reject", this tool creates
 a watchlist entry with a scheduled reminder for follow-up review.
@@ -14,7 +14,7 @@ def create_reminder(
     user_id: str,
     case_id: str,
     title: str,
-    days: int = 3,
+    cooling_days: int = 3,
     reason: str = "",
 ) -> dict:
     """Create a cooling-off reminder for a decision case.
@@ -23,7 +23,7 @@ def create_reminder(
         user_id: User identifier.
         case_id: Case identifier.
         title: Short reminder title (e.g. "降噪耳机冷静期复盘").
-        days: Cooling-off period in days. Defaults to 3.
+        cooling_days: Cooling-off period in days. Defaults to 3.
         reason: Why the reminder was set.
 
     Returns:
@@ -34,7 +34,7 @@ def create_reminder(
     if not user_id or not case_id:
         return {"error": "user_id and case_id are required", "status": "error"}
 
-    effective_days = max(days, 1)
+    effective_days = max(cooling_days, 1)
     due_at = (datetime.now() + timedelta(days=effective_days)).strftime(
         "%Y-%m-%dT%H:%M:%S+08:00"
     )
@@ -48,7 +48,7 @@ def create_reminder(
     duration = (time.perf_counter() - start) * 1000
     logger.log_call(
         "cooling_reminder",
-        {"user_id": user_id, "case_id": case_id, "title": title, "days": days, "reason": reason},
+        {"user_id": user_id, "case_id": case_id, "title": title, "cooling_days": cooling_days, "reason": reason},
         result,
         duration,
     )
