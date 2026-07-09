@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from backend.database import engine, Base
-from backend.routers import cases, chat, debate
+from backend.routers import cases, chat, debate, watchlist
 from backend import models
 
 # 创建数据库表
@@ -32,3 +32,4 @@ def health_check():
 app.include_router(cases.router)
 app.include_router(chat.router)
 app.include_router(debate.router)
+app.include_router(watchlist.router)  # 注册观察清单路由
