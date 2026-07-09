@@ -3,9 +3,8 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
 from backend.database import get_db
-from backend.models import Case, Message
-from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse
-from backend.schemas import UpdateCaseRequest
+from backend.models import Case, Message, Reminder, History
+from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 
@@ -276,4 +275,71 @@ def update_case(
             "updated_at": case.updated_at.isoformat() if case.updated_at else None,
         },
         message="case updated"
+    )
+
+@router.post("/cases/{case_id}/feedback", response_model=ApiResponse)
+def create_feedback(
+    case_id: str,
+    req: CreateFeedbackRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    决策复盘接口
+    用户对已完成决策进行复盘，反馈实际行为和满意度
+    """
+    # 1. 查询案件
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
+
+    # 2. 检查案件是否已完成
+    if case.status != CaseStatus.COMPLETED:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="CASE_NOT_COMPLETED"
+        )
+
+    # 3. 根据 satisfaction 映射 result
+    # >= 4 → worth, <= 2 → regret, 3 → neutral
+    if req.satisfaction >= 4:
+        result = "worth"
+    elif req.satisfaction <= 2:
+        result = "regret"
+    else:
+        result = "neutral"
+
+    # 4. 创建历史记录
+    history = History(
+        id=f"history_{uuid.uuid4().hex[:8]}",
+        user_id=req.user_id,
+        case_type=case.case_type,
+        summary=f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★",
+        result=result,
+        tags=[],
+        title=case.title,
+        case_id=case.id,
+        report_id=case.report_id,
+        context=req.review or "",
+        final_decision=case.final_decision,
+    )
+    db.add(history)
+
+    # 5. 更新观察清单状态（如果有）
+    reminder = db.query(Reminder).filter(
+        Reminder.case_id == case_id,
+        Reminder.status == "waiting"
+    ).first()
+    if reminder:
+        reminder.status = "reviewed"
+
+    db.commit()
+
+    return ApiResponse(
+        success=True,
+        data={
+            "saved_to_history": True,
+            "history_id": history.id,
+        },
+        message=""
     )
