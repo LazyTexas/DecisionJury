@@ -1,5 +1,5 @@
 # backend/models.py
-from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index, Float
+from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index, Float, ForeignKey
 from sqlalchemy.sql import func
 from backend.database import Base
 
@@ -32,7 +32,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True, index=True)
-    case_id = Column(String, index=True)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True)
     role = Column(String)  # user / assistant / pro_agent / con_agent / judge
     content = Column(Text)
     message_type = Column(String, default="text")  # text / question / argument / verdict / system
@@ -75,7 +75,7 @@ class Trace(Base):
     __tablename__ = "traces"
 
     id = Column(String, primary_key=True, index=True)
-    case_id = Column(String, index=True, nullable=False)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
     step = Column(Integer, nullable=False)
     type = Column(String, nullable=False)  # agent / rag_search / tool_call
     name = Column(String, nullable=False)  # input_parser / pro_agent / rag_search / cost_analyzer 等
@@ -97,7 +97,7 @@ class Reminder(Base):
 
     id = Column(String, primary_key=True, index=True)
     user_id = Column(String, index=True, nullable=False)
-    case_id = Column(String, index=True, nullable=False)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
     title = Column(String, nullable=False)
     reason = Column(String, nullable=True)
     due_at = Column(DateTime, nullable=False)

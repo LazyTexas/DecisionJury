@@ -20,39 +20,88 @@ def check_database():
     """启动时检测数据库结构，自动修复不兼容问题"""
     try:
         inspector = inspect(engine)
-        existing_tables = inspector.get_table_names()
+        existing_tables = set(inspector.get_table_names())
         print(f"📋 现有表: {existing_tables}")
 
-        required_tables = ["cases", "messages", "histories", "traces", "reminders"]
-        missing_tables = [t for t in required_tables if t not in existing_tables]
+        metadata = Base.metadata
+        required_tables = set(metadata.tables.keys())
+        print(f"📋 模型定义表: {required_tables}")
 
+        # ===== 1. 检查是否有表缺失 =====
+        missing_tables = required_tables - existing_tables
         if missing_tables:
             print(f"⚠️  缺少表: {missing_tables}，正在重建数据库...")
             Base.metadata.create_all(bind=engine)
             print("✅ 数据库重建完成")
             return
 
-        if "cases" in existing_tables:
-            columns = [c["name"] for c in inspector.get_columns("cases")]
-            if "debate_result" not in columns:
-                print("⚠️  cases 表缺少 debate_result 字段，正在重建数据库...")
-                Base.metadata.create_all(bind=engine)
-                print("✅ 数据库重建完成")
-                return
+        # ===== 2. 检查各表的字段是否完整 =====
+        need_rebuild = False
+        for table_name in required_tables:
+            model_columns = set(metadata.tables[table_name].columns.keys())
+            db_columns = set(c["name"] for c in inspector.get_columns(table_name))
+            if db_columns != model_columns:
+                missing = model_columns - db_columns
+                if missing:
+                    print(f"⚠️  表 {table_name} 缺少字段: {missing}")
+                need_rebuild = True
 
-        if "histories" in existing_tables:
-            columns = [c["name"] for c in inspector.get_columns("histories")]
-            required_fields = ["title", "price", "context", "pros", "cons", "report_id"]
-            missing_fields = [f for f in required_fields if f not in columns]
-            if missing_fields:
-                print(f"⚠️  histories 表缺少字段: {missing_fields}，正在重建数据库...")
-                Base.metadata.create_all(bind=engine)
-                print("✅ 数据库重建完成")
-                return
+        if need_rebuild:
+            print("🔨 正在重建数据库以同步表结构...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ 数据库重建完成")
+            return
+
+        # ===== 3. 检查外键约束 =====
+        need_rebuild_fk = False
+        for table_name in required_tables:
+            if table_name not in existing_tables:
+                continue
+            model_fks = metadata.tables[table_name].foreign_keys
+            if not model_fks:
+                continue
+            db_fks = inspector.get_foreign_keys(table_name)
+            for fk in model_fks:
+                referred_table = fk.column.table.name
+                referred_col = fk.column.name
+                has_fk = any(
+                    f.get("referred_table") == referred_table and
+                    f.get("referred_columns") == [referred_col]
+                    for f in db_fks
+                )
+                if not has_fk:
+                    print(f"⚠️  表 {table_name} 缺少外键: {fk.parent.name} → {referred_table}.{referred_col}")
+                    need_rebuild_fk = True
+
+        if need_rebuild_fk:
+            print("🔨 正在重建数据库以添加外键约束...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ 数据库重建完成")
+            return
+
+        # ===== 4. 检查索引是否存在 =====
+        need_rebuild_idx = False
+        for table_name in required_tables:
+            if table_name not in existing_tables:
+                continue
+            model_indexes = [idx.name for idx in metadata.tables[table_name].indexes]
+            if not model_indexes:
+                continue
+            db_indexes = [idx["name"] for idx in inspector.get_indexes(table_name)]
+            missing_indexes = [idx for idx in model_indexes if idx not in db_indexes]
+            if missing_indexes:
+                print(f"⚠️  表 {table_name} 缺少索引: {missing_indexes}")
+                need_rebuild_idx = True
+
+        if need_rebuild_idx:
+            print("🔨 正在重建数据库以添加索引...")
+            Base.metadata.create_all(bind=engine)
+            print("✅ 数据库重建完成")
+            return
 
         print("✅ 数据库结构检查通过")
 
-    except OperationalError as e:
+    except SQLAlchemyError as e:
         if "no such table" in str(e):
             print("ℹ️  数据库未初始化，正在创建...")
             Base.metadata.create_all(bind=engine)
