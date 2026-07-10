@@ -125,7 +125,7 @@ export default function ChatPage() {
           };
           setMessages((prev) => [...prev, assistantMsg]);
           // 更新案件状态
-          setCaseData((prev) => prev ? { ...prev, status: res.case_status, missing_fields: res.missing_fields } : prev);
+          setCaseData((prev) => prev ? { ...prev, status: res.case_status as CaseStatus, missing_fields: res.missing_fields } : prev);
 
           // 如果还有缺失字段，追加追问
           if (res.missing_fields.length > 0) {

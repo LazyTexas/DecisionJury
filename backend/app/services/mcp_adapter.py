@@ -75,7 +75,7 @@ def create_cooling_reminder(
             user_id=user_id,
             case_id=case_id,
             title=title,
-            days=cooling_days,
+            cooling_days=cooling_days,
             reason=reason,
         )
 

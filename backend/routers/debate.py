@@ -2,9 +2,10 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from backend.database import get_db
-from backend.models import Case
+from backend.models import Case, Trace
 from backend.schemas import ApiResponse, CaseStatus
 from backend.app.orchestrator.adapter import run_case_decision_flow
+import uuid
 
 router = APIRouter(prefix="/api", tags=["debate"])
 
@@ -20,8 +21,16 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
         return ApiResponse(success=False, data=None, message="HIGH_RISK_DECISION")
 
     if case.status != CaseStatus.READY_FOR_DEBATE:
-        return ApiResponse(success=False, data=None, message="MISSING_FIELDS")
-
+        return ApiResponse(
+        success=False,
+        data={
+            "case_status": case.status,
+            "missing_fields": case.missing_fields or [],
+            "next_question": "请继续补充以下信息" if case.missing_fields else None,
+        },
+        message="MISSING_FIELDS"
+    )
+    
     # 3. 更新状态为 debating
     case.status = CaseStatus.DEBATING
     db.commit()
@@ -61,7 +70,29 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
             case.final_decision = result["report"]["final_decision"]
         if result.get("report", {}).get("report_id"):
             case.report_id = result["report"]["report_id"]
+
+        # ===== 新增：保存完整辩论结果 =====
+        case.debate_result = result
+        
+        # 7. 保存 trace
+        trace_data = result.get("trace", [])
+        for step in trace_data:
+            trace = Trace(
+                id=f"trace_{uuid.uuid4().hex[:8]}",
+                case_id=case_id,
+                step=step.get("step", 0),
+                type=step.get("type", "agent"),
+                name=step.get("name", "unknown"),
+                input_summary=step.get("input_summary", ""),
+                output_summary=step.get("output_summary", ""),
+                duration_ms=step.get("duration_ms"),
+                status=step.get("status", "completed"),
+                error=step.get("error"),
+            )
+            db.add(trace)
+
         db.commit()
+        # ===== 保存 trace 结束 =====
 
         return ApiResponse(
             success=True,
@@ -76,9 +107,50 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
             message="debate completed"
         )
 
-    # 7. 其他失败情况
+    # 8. 其他失败情况
     return ApiResponse(
         success=False,
         data=None,
         message=result.get("message", "DEBATE_FAILED")
+    )
+
+@router.get("/cases/{case_id}/trace", response_model=ApiResponse)
+def get_trace(case_id: str, db: Session = Depends(get_db)):
+    """
+    获取 Agent 执行轨迹
+    """
+    # 1. 检查案件是否存在
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="CASE_NOT_FOUND"
+        )
+
+    # 2. 查询 trace
+    traces = db.query(Trace).filter(Trace.case_id == case_id).order_by(Trace.step).all()
+
+    # 3. 组装返回数据
+    return ApiResponse(
+        success=True,
+        data={
+            "case_id": case_id,
+            "trace": [
+                {
+                    "trace_id": t.id,
+                    "step": t.step,
+                    "type": t.type,
+                    "name": t.name,
+                    "input_summary": t.input_summary,
+                    "output_summary": t.output_summary,
+                    "duration_ms": t.duration_ms,
+                    "status": t.status,
+                    "error": t.error,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                }
+                for t in traces
+            ]
+        },
+        message=""
     )

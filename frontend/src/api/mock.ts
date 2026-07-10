@@ -209,8 +209,9 @@ const mockTrace: TraceItem[] = [
 const mockHistory: HistoryItem[] = [
   {
     history_id: 'history_001', user_id: 'u001', case_type: CaseType.SHOPPING,
-    summary: '上个月购买蓝牙键盘后使用频率较低。', result: HistoryResult.REGRET,
-    tags: ['electronics', 'idle'], created_at: '2026-06-20T12:00:00+08:00',
+    title: '蓝牙键盘', summary: '上个月购买蓝牙键盘后使用频率较低。',
+    result: HistoryResult.REGRET, tags: ['electronics', 'idle'],
+    case_id: 'case_demo', report_id: null, created_at: '2026-06-20T12:00:00+08:00',
   },
 ];
 
@@ -369,9 +370,9 @@ export async function fetchTrace(caseId: string): Promise<{ case_id: string; tra
 }
 
 /** 获取历史记录 */
-export async function fetchHistory(): Promise<{ items: HistoryItem[] }> {
+export async function fetchHistory(): Promise<{ items: HistoryItem[]; total: number; page: number; page_size: number }> {
   await delay();
-  return { items: mockHistory };
+  return { items: mockHistory, total: mockHistory.length, page: 1, page_size: 10 };
 }
 
 /** 获取观察清单 */

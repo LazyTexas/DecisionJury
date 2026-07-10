@@ -19,7 +19,7 @@ export default function CreateCasePage() {
         description: values.description,
       });
       message.success('案件创建成功！');
-      navigate(`/chat/${res.case.case_id}`);
+      navigate(`/chat/${res.case_id}`);
     } catch (err: any) {
       message.error(err.message || '创建失败，请重试');
     } finally {

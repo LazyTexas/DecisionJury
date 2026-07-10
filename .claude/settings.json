@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"from backend.database import Base; from backend.models import Case, Message, History; print\\([t.name for t in Base.metadata.sorted_tables]\\)\")"
+    ]
+  }
+}

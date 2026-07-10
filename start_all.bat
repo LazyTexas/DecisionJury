@@ -55,12 +55,13 @@ start "DecisionJury Frontend" cmd /k "cd /d %~dp0frontend && npm run dev"
 
 echo.
 echo ============================================
-echo   ✅ 项目启动完成！
-echo   前端: http://127.0.0.1:5173
-echo   后端: http://127.0.0.1:8000
-echo   RAG:  http://127.0.0.1:8001
-echo   API文档: http://127.0.0.1:8000/docs
+echo   [OK] 项目启动完成！
+echo   Frontend: http://localhost:5173
+echo   Backend:  http://127.0.0.1:8000
+echo   RAG:      http://127.0.0.1:8001
+echo   API:      http://127.0.0.1:8000/docs
 echo ============================================
 echo.
 echo [提示] 如需停止服务，请关闭对应的命令行窗口。
+echo.
 pause

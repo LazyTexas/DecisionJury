@@ -44,14 +44,38 @@ HIGH_RISK_KEYWORDS = [
     "买房",
 ]
 
+BUY_INTENT_KEYWORDS = [
+    "想买",
+    "买",
+    "购买",
+    "入手",
+    "下单",
+    "换",
+    "办",
+    "考虑买",
+    "准备买",
+]
+
+BUDGET_CONTEXT_KEYWORDS = [
+    "预算",
+    "生活费",
+    "可支配",
+    "本月",
+    "这个月",
+    "还剩",
+    "剩余",
+    "余额",
+]
+
 
 def parse_input(
     raw_input: str,
     existing_collected_fields: dict[str, Any] | None = None,
 ) -> ParserResult:
     existing = existing_collected_fields or {}
+    normalized_input = _normalize_text(raw_input)
 
-    if _is_high_risk(raw_input):
+    if _is_high_risk(normalized_input):
         step = AgentStep(
             agent="input_parser",
             status="completed",
@@ -75,7 +99,7 @@ def parse_input(
             agent_step=step,
         )
 
-    extracted = _extract_shopping_fields(raw_input)
+    extracted = _extract_shopping_fields(normalized_input)
     merged = {**existing, **{key: value for key, value in extracted.items() if value not in (None, "")}}
     missing_fields = [field for field in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(field))]
     status = "ready_for_debate" if not missing_fields else "collecting"
@@ -111,13 +135,18 @@ def _is_high_risk(text: str) -> bool:
 
 def _extract_shopping_fields(text: str) -> dict[str, Any]:
     fields: dict[str, Any] = {}
-    price = _extract_first_number(text)
-    if price is not None:
-        fields["price"] = price
 
-    budget = _extract_budget(text)
+    # 预算和价格都表现为“数字 + 元”，但业务语义完全不同。
+    # 这里必须先识别预算语义，再决定某个金额能不能当作商品价格，
+    # 否则“本月预算还剩3000元”这类补充消息会被错误写进 price。
+    budget_match = _extract_budget_match(text)
+    budget = budget_match[0] if budget_match else None
     if budget is not None:
         fields["monthly_budget_left"] = budget
+
+    price = _extract_price(text, budget_match[1] if budget_match else None)
+    if price is not None:
+        fields["price"] = price
 
     product = _extract_product(text)
     if product:
@@ -142,65 +171,98 @@ def _extract_shopping_fields(text: str) -> dict[str, Any]:
     return fields
 
 
-def _extract_first_number(text: str) -> float | None:
-    match = re.search(r"(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB|￥)?", text)
-    return float(match.group(1)) if match else None
+def _normalize_text(text: str) -> str:
+    # 这里只做最轻量的文本归一化：统一空白和货币符号，避免中文输入里
+    # 因为全角字符、额外空格或换行导致正则边界失效。我们不做激进清洗，
+    # 是为了保留“最近学习需要安静”“已有普通耳机”这类句子原本的语义线索。
+    normalized = text.replace("\u3000", " ")
+    normalized = normalized.replace("￥", "元")
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
 
 
-def _extract_budget(text: str) -> float | None:
+def _extract_budget_match(text: str) -> tuple[float, tuple[int, int]] | None:
     patterns = [
-        r"(?:预算|生活费|可支配)[^\d]{0,8}(?:还剩|剩余|有)?\s*(\d+(?:\.\d+)?)",
-        r"(?:还剩|剩余)\s*(\d+(?:\.\d+)?)\s*(?:元|块)?.{0,8}(?:预算|生活费)",
+        r"(?:本月|这个月)?(?:预算|生活费|可支配预算|可支配金额|剩余预算)[^\d]{0,8}(?:还剩|剩余|还有|有)?\s*(\d+(?:\.\d+)?)\s*(?:元|块)?",
+        r"(?:本月|这个月)?(?:还剩|剩余|还有)\s*(\d+(?:\.\d+)?)\s*(?:元|块)?[^\n，。；;]{0,8}(?:预算|生活费|可支配)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
+            return float(match.group(1)), match.span(1)
+    return None
+
+
+def _extract_price(text: str, budget_span: tuple[int, int] | None) -> float | None:
+    patterns = [
+        r"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)[^\d]{0,6}(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)?",
+        r"(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)\s*的",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text):
+            number_span = match.span(1)
+            if budget_span and number_span == budget_span:
+                continue
+            if _is_budget_context(text, number_span):
+                continue
             return float(match.group(1))
     return None
 
 
+def _is_budget_context(text: str, span: tuple[int, int]) -> bool:
+    context_start = max(0, span[0] - 8)
+    context_end = min(len(text), span[1] + 8)
+    context = text[context_start:context_end]
+    return any(keyword in context for keyword in BUDGET_CONTEXT_KEYWORDS)
+
+
 def _extract_product(text: str) -> str | None:
     patterns = [
-        r"(\d+(?:\.\d+)?)\s*(?:元|块).{0,4}的([\u4e00-\u9fa5A-Za-z0-9]+)",
-        r"(?:买|入手|下单|换|办|购买)(?:一[个件副台盏份])?\s*(?:(?:\d+(?:\.\d+)?)\s*(?:元|块)\s*的?)?\s*([\u4e00-\u9fa5A-Za-z]+)",
+        r"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)(?:[一1]?(?:个|件|副|台|盏|份|部|张|只|套))?\s*(?:(?:\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)\s*的?)?\s*([^\s，。；;]+)",
+        r"\d+(?:\.\d+)?\s*(?:元|块|rmb|RMB)\s*的([^\s，。；;]+)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            product = match.group(match.lastindex or 1)
-            product = re.sub(r"^(一个|一件|一副|一台|一盏|一份)", "", product)
-            return product[:20]
+            product = _clean_product_name(match.group(match.lastindex or 1))
+            if product:
+                return product[:20]
     return None
 
 
 def _extract_purpose(text: str) -> str | None:
     patterns = [
-        r"(?:为了|用于|用来|最近需要)([\u4e00-\u9fa5A-Za-z0-9，,。；; ]{2,30})",
+        r"(?:为了|用于|用来)([^，。；;\n]{2,30})",
+        r"最近([^，。；;\n]{2,20}?需要[^，。；;\n]{0,12})",
+        r"([^，。；;\n]{1,16}?需要[^，。；;\n]{1,12})",
         r"(学习|通勤|运动|降噪|提升效率|安静|备考)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            return _clean_phrase(match.group(1))
+            return _clean_phrase(match.group(1), strip_quantity=False)
     return None
 
 
 def _extract_alternatives(text: str) -> str | None:
     patterns = [
-        r"(?:已有|有|现在有)([\u4e00-\u9fa5A-Za-z0-9，,。；; ]{2,30})",
+        r"(?:已有|已经有|现在有|手头有)\s*([^，。；;\n]{1,20})",
+        r"(?:有[一1]?(?:个|件|副|台|盏|份|部|张|只|套))\s*([^，。；;\n]{1,20})",
         r"(没有|无)(?:类似|替代|可替代|同类)?(?:物品|东西|替代品)?",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            return _clean_phrase(match.group(1))
+            value = match.group(1)
+            if value in {"没有", "无"}:
+                return value
+            return _clean_phrase(value)
     return None
 
 
 def _extract_frequency(text: str) -> str | None:
     patterns = [
-        r"(每天|每日|每周\d?次|一周\d?次|偶尔|只用一次|经常|高频)",
-        r"(?:预计|大概|可能).{0,6}(每天|每周|偶尔|经常)",
+        r"(?:预计|大概|可能|平时|基本|一般)?\s*(每天|每日|每周\d+次|一周\d+次|每周|每月\d+次|偶尔|经常|高频|低频)\s*(?:使用|会用)?",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
@@ -219,8 +281,36 @@ def _extract_trigger(text: str) -> str | None:
     return None
 
 
-def _clean_phrase(value: str) -> str:
-    return re.split(r"[。；;，,\n]", value.strip())[0].strip()
+def _clean_product_name(value: str) -> str:
+    # 商品名只应该保留“要买什么”，不能把用途、预算、补充说明一起吞进去。
+    # 所以这里专门按照购物描述里常见的语义分隔词截断，而不是简单按长度硬切。
+    product = re.split(r"(?:为了|用于|用来|最近|预计|本月|这次|已有|已经有|现在有|手头有|还剩|预算)", value.strip())[0]
+    product = re.split(r"[。；;，,\n]", product)[0]
+    return _strip_leading_quantity(product)
+
+
+def _clean_phrase(value: str, strip_quantity: bool = True) -> str:
+    cleaned = re.split(r"[。；;，,\n]", value.strip())[0].strip()
+    return _strip_leading_quantity(cleaned) if strip_quantity else cleaned
+
+
+def _strip_leading_quantity(value: str) -> str:
+    # 这里不能再像旧逻辑那样“只要首字像量词就删掉”，因为中文里很多真实商品名
+    # 本身就是以这些字开头的，例如“台灯”“台式机”。如果无条件删除首字，会把真实
+    # 商品名误裁成“灯”“式机”，直接影响后续 create_case 和主流程演示。
+    #
+    # 因此这里只移除“数量词边界明确”的前缀，例如“一个键盘”“一副耳机”“1台显示器”。
+    # 这类前缀同时满足两个条件：
+    # 1. 前面有数量信息（如“一”“1”“两”“2”）；
+    # 2. 数量后面跟的是量词。
+    #
+    # 这样既能保留正常的量词清洗能力，也能避免把“台灯”“台式机”这种本体词误伤。
+    cleaned = re.sub(
+        r"^(?:(?:一|1|两|2)\s*(?:个|件|副|台|盏|份|部|张|只|套))",
+        "",
+        value,
+    ).strip()
+    return cleaned
 
 
 def _is_missing(value: Any) -> bool:
