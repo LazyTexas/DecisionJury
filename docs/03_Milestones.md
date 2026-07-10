@@ -284,3 +284,95 @@ uv run python -m compileall backend tests mcp_tools
 - C 与 D 对齐 RAG 调用入口、返回字段、异常行为和启动方式。
 - C 新增 RAG adapter，将 D 返回结果转换为 C 侧稳定的 `RagEvidence[]`。
 - 保留 RAG 失败时 fallback 为 `[]` 的行为，确保 Agent 主流程不中断且不编造历史证据。
+
+### 9.4 B模块 P0 任务完成情况
+
+| 编号 | 任务 | 状态 | 完成时间 |
+|:---:|---|---|:---:|
+| 1 | chat 路由改为 `/cases/{case_id}/messages`，接入 `input_parser` | ✅ 已完成 | 2026-07-08 |
+| 2 | `GET /api/cases/{case_id}/trace` — 执行轨迹存储与查询 | ✅ 已完成 | 2026-07-08 |
+| 3 | `GET /api/cases/{case_id}/report` — 返回 C 模块真实数据 | ✅ 已完成 | 2026-07-08 |
+| 4 | Trace 表创建 + 辩论后自动保存 trace | ✅ 已完成 | 2026-07-08 |
+
+### 9.5 B模块 P1 任务完成情况
+
+| 编号 | 任务 | 状态 | 完成时间 |
+|:---:|---|---|:---:|
+| 5 | `PATCH /api/cases/{case_id}` — 更新案件字段 | ✅ 已完成 | 2026-07-08 |
+| 6 | `GET /api/watchlist` — 观察清单查询 | ✅ 已完成 | 2026-07-09 |
+| 7 | `GET /api/history` + `POST /api/history` — 历史记录 CRUD | ✅ 已完成 | 2026-07-09 |
+| 8 | `POST /api/cases/{case_id}/feedback` — 决策复盘 | ✅ 已完成 | 2026-07-09 |
+| 9 | chat 路由事务修复（两次 commit → 一次） | ✅ 已完成 | 2026-07-08 |
+
+### 9.6 B模块 P2 任务完成情况
+
+| 编号 | 任务 | 状态 | 说明 |
+|:---:|---|---|---|
+| 10 | 全局异常处理器 | ✅ 已完成 | 7 种异常统一处理 |
+| 11 | 前后端 API 契约对齐修复 | ✅ 已完成 | 枚举值统一为 snake_case |
+| 12 | 数据库索引优化 | ✅ 已完成 | 8 个复合索引 |
+| 13 | 外键约束 | ✅ 已完成 | 3 个外键 + `ondelete=CASCADE` |
+| 14 | 用户登录认证 | ⏳ 待实现 | 所有功能稳定后统一添加 |
+
+## 9.7 B模块 接口实现总览
+
+| 接口 | 路径 | 状态 |
+|------|------|:---:|
+| 健康检查 | `GET /api/health` | ✅ |
+| 创建案件 | `POST /api/cases` | ✅ |
+| 案件详情 | `GET /api/cases/{case_id}` | ✅ |
+| 案件列表 | `GET /api/cases` | ✅ |
+| 补充信息 | `POST /api/cases/{case_id}/messages` | ✅ |
+| 启动辩论 | `POST /api/cases/{case_id}/debate` | ✅ |
+| 判决书查询 | `GET /api/cases/{case_id}/report` | ✅ |
+| 执行轨迹 | `GET /api/cases/{case_id}/trace` | ✅ |
+| 更新案件 | `PATCH /api/cases/{case_id}` | ✅ |
+| 观察清单 | `GET /api/watchlist` | ✅ |
+| 创建历史记录 | `POST /api/history` | ✅ |
+| 查询历史记录 | `GET /api/history` | ✅ |
+| 决策复盘 | `POST /api/cases/{case_id}/feedback` | ✅ |
+
+**接口完成率：13/13 = 100%**
+
+## 9.8 B模块 测试覆盖
+
+| 测试文件 | 测试数量 | 状态 |
+|---|---|---|
+| `test_cases_router.py` | 12 | ✅ |
+| `test_chat_router.py` | 10 | ✅ |
+| `test_debate_router.py` | 6 | ✅ |
+| `test_history_router.py` | 10 | ✅ |
+| `test_watchlist_router.py` | 5 | ✅ |
+| `test_feedback_router.py` | 9 | ✅ |
+| `test_trace_router.py` | 5 | ✅ |
+| `test_health_router.py` | 2 | ✅ |
+| `test_migrate.py` | 6 | ✅ |
+| **合计** | **65** | ✅ |
+
+## 9.9 B模块 剩余工作
+
+| 优先级 | 任务 | 负责人 | 预计完成 |
+|:---:|---|---|:---:|
+| P0 | 前端联调与 API 接入 | A + B | 答辩前 |
+| P0 | 演示数据与演示脚本准备 | 全员 | 答辩前 |
+| P0 | 演示视频录制（加分项） | 全员 | 答辩前 |
+| P1 | 用户登录认证（JWT） | B | 答辩后 |
+| P2 | Docker 部署 | E | 可选 |
+| P2 | time 决策支持 | C | 可选 |
+
+## 10. 里程碑完成状态
+
+| 里程碑 | 内容 | 状态 |
+|---|---|---|
+| M1 | 完成基础工程和本地启动 | ✅ 已完成 |
+| M2 | 完成前端案件创建页 | ✅ 已完成 |
+| M3 | 跑通 LLM API | ✅ 已完成 |
+| M4 | 完成多 Agent 基础流程 | ✅ 已完成 |
+| M5 | 完成历史记录样例数据 | ✅ 已完成 |
+| M6 | 完成 RAG 检索 | ✅ 已完成 |
+| M7 | 完成成本计算 MCP 工具 | ✅ 已完成 |
+| M8 | 完成冷静期提醒 MCP 工具 | ✅ 已完成 |
+| M9 | Agent 接入 RAG 和 MCP | ✅ 已完成 |
+| M10 | 完成前端主流程 | ⏳ 联调中 |
+| M11 | 完成测试和缺陷修复 | ✅ 已完成 |
+| M12 | 完成部署和演示环境冻结 | ⏳ 待完成 |

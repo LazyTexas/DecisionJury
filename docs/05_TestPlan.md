@@ -65,6 +65,40 @@
 
 ## 4. 功能测试用例
 
+### 4.1 测试文件清单
+
+| 测试文件 | 测试数量 | 覆盖功能 |
+| --- | --- | --- |
+| `test_cases_router.py` | 12 | 案件创建、查询、列表、报告 |
+| `test_chat_router.py` | 10 | 多轮对话、字段提取、状态流转 |
+| `test_debate_router.py` | 6 | 辩论启动、错误处理、trace |
+| `test_history_router.py` | 10 | 历史记录 CRUD、分页、筛选 |
+| `test_watchlist_router.py` | 5 | 观察清单查询、排序 |
+| `test_feedback_router.py` | 9 | 反馈提交、满意度映射、联动 |
+| `test_trace_router.py` | 5 | 执行轨迹查询、排序、字段完整性 |
+| `test_health_router.py` | 2 | 健康检查 |
+| `test_migrate.py` | 6 | 数据库迁移函数 |
+| 合计 | 65 |  |
+
+### 4.2 运行测试
+
+```bash
+# 运行所有测试
+pytest
+
+# 运行指定测试文件
+pytest tests/test_debate_router.py -v
+
+# 运行特定测试
+pytest tests/test_debate_router.py::test_debate_success -v
+```
+
+### 4.3 测试通过标准
+
+- 所有测试用例通过率 100%
+- 无跳过的测试（`@pytest.mark.skip` 除外）
+- 测试执行时间 < 30 秒
+
 ### TC-001 创建购物决策案件
 
 输入：
@@ -75,10 +109,12 @@
 
 预期：
 
-- 系统识别为 shopping。
+- 系统识别为 `shopping`。
 - 系统追问预算和已有替代品。
-- 成功创建 case_id。
-- 案件状态为 collecting。
+- 成功创建 `case_id`。
+- 案件状态为 `collecting`。
+
+自动化测试：`test_cases_router.py::test_create_case_success`
 
 ### TC-002 创建时间决策案件
 
@@ -109,7 +145,9 @@
 
 - 系统逐步更新案件字段。
 - 不重复追问已经回答的问题。
-- 最终状态变为 ready_for_debate。
+- 最终状态变为 `ready_for_debate`。
+
+自动化测试：`test_chat_router.py::test_messages_transitions_to_ready`
 
 ### TC-004 多轮补全时间信息
 
@@ -130,9 +168,9 @@
 
 步骤：
 
-- 创建一个完整案件。
-- 补全必要信息。
-- 启动分析流程。
+1. 创建一个完整案件。
+2. 补全必要信息。
+3. 启动分析流程。
 
 预期：
 
@@ -140,6 +178,8 @@
 - 反方 Agent 输出风险和替代方案。
 - 法官 Agent 输出最终裁决。
 - 输出内容结构清晰。
+
+自动化测试：`test_debate_router.py::test_debate_success`
 
 ### TC-006 判决书生成
 
@@ -152,6 +192,23 @@
 - 成本分析。
 - 最终裁决。
 - 后续动作。
+
+自动化测试：`test_cases_router.py::test_get_report_success`
+
+### TC-007 决策复盘
+
+步骤：
+
+1. 完成辩论的案件。
+2. 用户提交反馈（`actual_action`、`satisfaction`、`review`）。
+
+预期：
+
+- 创建历史记录。
+- `satisfaction` 自动映射 `result`（5/4 → `worth`，3 → `neutral`，2/1 → `regret`）。
+- 观察清单状态更新为 `reviewed`。
+
+自动化测试：`test_feedback_router.py`
 
 ## 5. RAG 测试
 
@@ -186,6 +243,8 @@ MVP 至少记录：
 - 系统说明未找到相关历史记录。
 - 系统不能编造历史记录。
 - 系统仍可基于正反方分析和工具结果给出低置信度建议。
+
+自动化测试：`test_debate_router.py::test_debate_success`（验证 RAG fallback 场景）
 
 ## 6. MCP 工具测试
 
@@ -226,6 +285,8 @@ MVP 至少记录：
 - 不生成裁决。
 - 不调用冷静期工具。
 
+自动化测试：`test_debate_router.py::test_debate_high_risk_returns_rejected`
+
 ## 8. 前端验收
 
 前端至少包含：
@@ -254,7 +315,7 @@ MVP 至少记录：
 必须使用以下接口路径：
 
 | 功能 | 接口 |
-|---|---|
+| --- | --- |
 | 创建案件 | `POST /api/cases` |
 | 多轮补充信息 | `POST /api/cases/{case_id}/messages` |
 | 启动 Agent 分析 | `POST /api/cases/{case_id}/debate` |
@@ -263,16 +324,9 @@ MVP 至少记录：
 | RAG 检索 | `POST /api/rag/search` |
 | 成本计算工具 | `POST /api/tools/cost-analyzer` |
 | 冷静期提醒工具 | `POST /api/tools/cooling-reminder` |
-
-不得继续使用旧接口名，例如：
-
-```text
-POST /api/cases/create
-POST /api/chat
-POST /api/tools/cost
-POST /api/tools/reminder
-POST /api/report/generate
-```
+| 历史记录 | `GET /api/history`、`POST /api/history` |
+| 观察清单 | `GET /api/watchlist` |
+| 决策复盘 | `POST /api/cases/{case_id}/feedback` |
 
 ### 9.2 公共结构验收
 
@@ -293,6 +347,8 @@ POST /api/report/generate
 - `AgentStep` 必须包含 `agent`、`status`、`summary`、`confidence`、`arguments`、`used_rag_ids`、`used_tool_names`、`error`。
 - `DecisionReport` 必须包含最终裁决、正方观点、反方观点、RAG 证据、工具结果和后续动作。
 - `TraceItem` 必须能展示 Agent、RAG、工具调用的执行顺序。
+- 响应格式统一为 `{success, data, message}`
+- 所有枚举值使用小写 `snake_case`
 
 ### 9.3 错误场景验收
 
@@ -306,12 +362,12 @@ POST /api/report/generate
 
 ## 10. 课程要求验收
 
-| 要求 | 验收方式 |
-|---|---|
-| 调用至少一个 LLM API | 演示多 Agent 输出 |
-| 至少一个 RAG 检索功能 | 展示历史记录检索结果 |
-| 至少两个 MCP 工具 | 展示成本计算和冷静期提醒调用 |
-| 多轮对话和状态管理 | 演示用户补充和修改案件信息 |
+| 要求 | 验收方式 | 状态 |
+| --- | --- | --- |
+| 调用至少一个 LLM API | 演示多 Agent 输出 | ✅ |
+| 至少一个 RAG 检索功能 | 展示历史记录检索结果 | ✅ |
+| 至少两个 MCP 工具 | 展示成本计算和冷静期提醒调用 | ✅ |
+| 多轮对话和状态管理 | 演示用户补充和修改案件信息 | ✅ |
 
 ## 11. 最终演示脚本
 
@@ -319,14 +375,15 @@ POST /api/report/generate
 
 ```text
 1. 创建案件：想买 1299 元降噪耳机。
-2. 补充预算：本月剩余 2000 元。
+2. 补充预算：本月剩余 3000 元（使用 3000 确保风险 medium）。
 3. 补充替代品：已有普通耳机。
 4. 启动分析。
 5. 展示 RAG 命中历史电子产品闲置记录。
-6. 展示成本计算工具结果。
+6. 展示成本计算工具结果（budget_ratio=43%，medium）。
 7. 展示正方、反方、法官输出。
-8. 展示暂缓购买判决。
+8. 展示暂缓购买判决（delay）。
 9. 展示观察清单和提醒。
+10. 提交决策复盘。
 ```
 
 ### 11.2 时间决策演示
