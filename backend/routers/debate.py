@@ -21,8 +21,16 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
         return ApiResponse(success=False, data=None, message="HIGH_RISK_DECISION")
 
     if case.status != CaseStatus.READY_FOR_DEBATE:
-        return ApiResponse(success=False, data=None, message="MISSING_FIELDS")
-
+        return ApiResponse(
+        success=False,
+        data={
+            "case_status": case.status,
+            "missing_fields": case.missing_fields or [],
+            "next_question": "请继续补充以下信息" if case.missing_fields else None,
+        },
+        message="MISSING_FIELDS"
+    )
+    
     # 3. 更新状态为 debating
     case.status = CaseStatus.DEBATING
     db.commit()
