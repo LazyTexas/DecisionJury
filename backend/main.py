@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request, HTTPException, status
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import inspect
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from backend.database import engine, Base
 from backend import models
@@ -13,99 +13,140 @@ from pydantic import ValidationError
 import traceback
 import json
 from backend.schemas import ApiResponse, ErrorResponse
+from backend.config import Config
+from backend.migrate import run_all_migrations, migrate_indexes, backup_and_rebuild
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 def check_database():
     """启动时检测数据库结构，自动修复不兼容问题"""
     try:
-        inspector = inspect(engine)
-        existing_tables = set(inspector.get_table_names())
-        print(f"📋 现有表: {existing_tables}")
+        with engine.connect() as conn:
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+            conn.commit()
+            inspector = inspect(conn)
 
-        metadata = Base.metadata
-        required_tables = set(metadata.tables.keys())
-        print(f"📋 模型定义表: {required_tables}")
+            existing_tables = set(inspector.get_table_names())
+            print(f"[INFO] 现有表: {existing_tables}")
 
-        # ===== 1. 检查是否有表缺失 =====
-        missing_tables = required_tables - existing_tables
-        if missing_tables:
-            print(f"⚠️  缺少表: {missing_tables}，正在重建数据库...")
-            Base.metadata.create_all(bind=engine)
-            print("✅ 数据库重建完成")
-            return
+            metadata = Base.metadata
+            required_tables = set(metadata.tables.keys())
+            print(f"[INFO] 模型定义表: {required_tables}")
 
-        # ===== 2. 检查各表的字段是否完整 =====
-        need_rebuild = False
-        for table_name in required_tables:
-            model_columns = set(metadata.tables[table_name].columns.keys())
-            db_columns = set(c["name"] for c in inspector.get_columns(table_name))
-            if db_columns != model_columns:
-                missing = model_columns - db_columns
-                if missing:
-                    print(f"⚠️  表 {table_name} 缺少字段: {missing}")
-                need_rebuild = True
+            # ===== 1. 检查是否有表缺失 =====
+            missing_tables = required_tables - existing_tables
+            if missing_tables:
+                print(f"[WARN] 缺少表: {missing_tables}")
+                if Config.is_production():
+                    print("[INFO] 生产环境: 创建缺失的表...")
+                    Base.metadata.create_all(bind=engine)
+                    print("[OK] 表创建完成")
+                    return
+                else:
+                    print("[INFO] 开发环境: 正在重建数据库...")
+                    Base.metadata.drop_all(bind=engine)
+                    Base.metadata.create_all(bind=engine)
+                    print("[OK] 数据库重建完成")
+                    return
 
-        if need_rebuild:
-            print("🔨 正在重建数据库以同步表结构...")
-            Base.metadata.create_all(bind=engine)
-            print("✅ 数据库重建完成")
-            return
+            # ===== 2. 检查各表的字段是否完整 =====
+            need_rebuild = False
+            for table_name in required_tables:
+                if table_name not in existing_tables:
+                    continue
+                model_columns = set(metadata.tables[table_name].columns.keys())
+                db_columns = set(c["name"] for c in inspector.get_columns(table_name))
+                if db_columns != model_columns:
+                    missing = model_columns - db_columns
+                    if missing:
+                        print(f"[WARN] 表 {table_name} 缺少字段: {missing}")
+                    need_rebuild = True
 
-        # ===== 3. 检查外键约束 =====
-        need_rebuild_fk = False
-        for table_name in required_tables:
-            if table_name not in existing_tables:
-                continue
-            model_fks = metadata.tables[table_name].foreign_keys
-            if not model_fks:
-                continue
-            db_fks = inspector.get_foreign_keys(table_name)
-            for fk in model_fks:
-                referred_table = fk.column.table.name
-                referred_col = fk.column.name
-                has_fk = any(
-                    f.get("referred_table") == referred_table and
-                    f.get("referred_columns") == [referred_col]
-                    for f in db_fks
-                )
-                if not has_fk:
-                    print(f"⚠️  表 {table_name} 缺少外键: {fk.parent.name} → {referred_table}.{referred_col}")
-                    need_rebuild_fk = True
+            if need_rebuild:
+                if Config.is_production():
+                    print("[INFO] 生产环境: 执行字段迁移...")
+                    run_all_migrations()
+                    print("[OK] 字段迁移完成")
+                    return
+                else:
+                    print("[INFO] 开发环境: 正在重建数据库...")
+                    Base.metadata.drop_all(bind=engine)
+                    Base.metadata.create_all(bind=engine)
+                    print("[OK] 数据库重建完成")
+                    return
 
-        if need_rebuild_fk:
-            print("🔨 正在重建数据库以添加外键约束...")
-            Base.metadata.create_all(bind=engine)
-            print("✅ 数据库重建完成")
-            return
+            # ===== 3. 检查外键约束 =====
+            need_full_rebuild = False
+            for table_name in required_tables:
+                if table_name not in existing_tables:
+                    continue
+                model_fks = metadata.tables[table_name].foreign_keys
+                if not model_fks:
+                    continue
+                db_fks = inspector.get_foreign_keys(table_name)
+                for fk in model_fks:
+                    referred_table = fk.column.table.name
+                    referred_col = fk.column.name
+                    has_fk = any(
+                        f.get("referred_table") == referred_table and
+                        f.get("referred_columns") == [referred_col]
+                        for f in db_fks
+                    )
+                    if not has_fk:
+                        print(f"[WARN] 表 {table_name} 缺少外键: {fk.parent.name} → {referred_table}.{referred_col}")
+                        need_full_rebuild = True
 
-        # ===== 4. 检查索引是否存在 =====
-        need_rebuild_idx = False
-        for table_name in required_tables:
-            if table_name not in existing_tables:
-                continue
-            model_indexes = [idx.name for idx in metadata.tables[table_name].indexes]
-            if not model_indexes:
-                continue
-            db_indexes = [idx["name"] for idx in inspector.get_indexes(table_name)]
-            missing_indexes = [idx for idx in model_indexes if idx not in db_indexes]
-            if missing_indexes:
-                print(f"⚠️  表 {table_name} 缺少索引: {missing_indexes}")
-                need_rebuild_idx = True
+            if need_full_rebuild:
+                print("[WARN] 外键缺失，SQLite 不支持 ALTER TABLE ADD FOREIGN KEY")
+                if Config.is_production():
+                    print("[INFO] 生产环境: 执行备份-重建-恢复...")
+                    success = backup_and_rebuild()
+                    if success:
+                        print("[OK] 数据库重建并恢复数据完成")
+                        return
+                    else:
+                        raise RuntimeError("数据库重建失败")
+                else:
+                    print("[INFO] 开发环境: 正在重建数据库...")
+                    Base.metadata.drop_all(bind=engine)
+                    Base.metadata.create_all(bind=engine)
+                    print("[OK] 数据库重建完成")
+                    return
 
-        if need_rebuild_idx:
-            print("🔨 正在重建数据库以添加索引...")
-            Base.metadata.create_all(bind=engine)
-            print("✅ 数据库重建完成")
-            return
+            # ===== 4. 检查索引是否存在 =====
+            need_rebuild_idx = False
+            for table_name in required_tables:
+                if table_name not in existing_tables:
+                    continue
+                model_indexes = [idx.name for idx in metadata.tables[table_name].indexes]
+                if not model_indexes:
+                    continue
+                db_indexes = [idx["name"] for idx in inspector.get_indexes(table_name)]
+                missing_indexes = [idx for idx in model_indexes if idx not in db_indexes]
+                if missing_indexes:
+                    print(f"[WARN] 表 {table_name} 缺少索引: {missing_indexes}")
+                    need_rebuild_idx = True
 
-        print("✅ 数据库结构检查通过")
+            if need_rebuild_idx:
+                if Config.is_production():
+                    print("[INFO] 生产环境: 创建缺失的索引...")
+                    migrate_indexes()
+                    print("[OK] 索引创建完成")
+                    return
+                else:
+                    print("[INFO] 开发环境: 正在重建数据库...")
+                    Base.metadata.drop_all(bind=engine)
+                    Base.metadata.create_all(bind=engine)
+                    print("[OK] 数据库重建完成")
+                    return
+
+            print("[OK] 数据库结构检查通过")
 
     except SQLAlchemyError as e:
         if "no such table" in str(e):
-            print("ℹ️  数据库未初始化，正在创建...")
+            print("[INFO] 数据库未初始化，正在创建...")
             Base.metadata.create_all(bind=engine)
-            print("✅ 数据库初始化完成")
+            print("[OK] 数据库初始化完成")
         else:
             raise e
 
@@ -114,12 +155,12 @@ def check_database():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # --- 启动逻辑 (Startup) ---
-    print("🚀 DecisionJury API 正在启动...")
+    print("[INFO] DecisionJury API 正在启动...")
     check_database()
-    print("✅ API 启动完成")
+    print("[OK] API 启动完成")
     yield  # 应用在此处运行
     # --- 关闭逻辑 (Shutdown) ---
-    print("🛑 DecisionJury API 正在关闭...")
+    print("[INFO] DecisionJury API 正在关闭...")
     # 如果有需要清理的资源（如数据库连接池），可以放在这里
 
 
