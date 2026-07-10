@@ -11,7 +11,10 @@ class Base(DeclarativeBase):
 # 创建数据库引擎
 engine = create_engine(
     Config.DATABASE_URL,
-    connect_args={"check_same_thread": False}  # SQLite 专用
+    connect_args={
+        "check_same_thread": False,
+        "foreign_keys": True,  # ← 启用 SQLite 外键约束
+        }  # SQLite 专用
 )
 
 # 会话工厂
