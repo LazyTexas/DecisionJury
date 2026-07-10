@@ -5,6 +5,26 @@ import re
 
 from backend.main import app
 from backend.database import get_db as _get_db
+from backend.models import Case
+
+
+def _insert_case(client, user_id="u001", status="collecting",
+                 collected_fields=None, missing_fields=None):
+    """辅助：通过 DB 直接插入一条案例，返回 case_id。"""
+    db = next(app.dependency_overrides[_get_db]())
+    case = Case(
+        id="case_chat01",
+        user_id=user_id,
+        case_type="shopping",
+        title="买耳机",
+        description="想买个降噪耳机",
+        status=status,
+        collected_fields=collected_fields or {"description": "想买个降噪耳机"},
+        missing_fields=missing_fields or ["monthly_budget_left", "owned_alternatives"],
+    )
+    db.add(case)
+    db.commit()
+    return case.id
 
 
 def test_create_case_success(client):
@@ -173,11 +193,9 @@ def test_get_report_not_found(client):
 
 
 def test_get_report_success(client):
-    """有 report_id 的案例查报告返回完整报告，confidence 为 MVP 固定值 0.75。"""
-    # 直接通过 DB 插入一个有 report_id 的案例
+    """有完整 debate_result 的案例查报告返回真实数据（从 debate_result 读取）。"""
     from backend.models import Case
 
-    # 用 override 的 get_db 获取 session
     db = next(app.dependency_overrides[_get_db]())
 
     case = Case(
@@ -189,8 +207,23 @@ def test_get_report_success(client):
         status="completed",
         collected_fields={},
         missing_fields=[],
-        final_decision="buy",
+        final_decision="delay",
         report_id="report_test01",
+        debate_result={
+            "report": {
+                "report_id": "report_test01",
+                "final_decision": "delay",
+                "confidence": 0.85,
+                "summary": "建议暂缓购买",
+                "case_summary": "用户想买降噪耳机",
+                "pro_points": ["正方观点1"],
+                "con_points": ["反方观点1"],
+                "next_actions": ["3天后复盘"],
+                "rag_evidence": [],
+                "tool_results": [],
+                "created_at": "2026-07-10T10:00:00+08:00"
+            }
+        }
     )
     db.add(case)
     db.commit()
@@ -200,8 +233,9 @@ def test_get_report_success(client):
     assert body["success"] is True
     data = body["data"]
     assert data["report_id"] == "report_test01"
-    assert data["final_decision"] == "buy"
-    assert data["confidence"] == 0.75
+    assert data["final_decision"] == "delay"
+    # confidence 现在从 debate_result 读取，不再是固定 0.75
+    assert data["confidence"] == 0.85
     assert "summary" in data
     assert isinstance(data["pro_points"], list)
     assert isinstance(data["con_points"], list)

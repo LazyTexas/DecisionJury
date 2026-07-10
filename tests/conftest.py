@@ -2,7 +2,7 @@
 """共享测试 fixture：内存 SQLite 数据库 + FastAPI TestClient"""
 
 import pytest
-from sqlalchemy import create_engine, StaticPool
+from sqlalchemy import create_engine, StaticPool, event
 from sqlalchemy.orm import sessionmaker
 from fastapi.testclient import TestClient
 
@@ -22,6 +22,14 @@ def db_engine():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # 启用外键约束
+    @event.listens_for(engine, "connect")
+    def enable_foreign_keys(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
     Base.metadata.create_all(bind=engine)
     yield engine
     Base.metadata.drop_all(bind=engine)

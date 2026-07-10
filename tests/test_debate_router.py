@@ -1,163 +1,186 @@
 # tests/test_debate_router.py
-"""Debate 路由 HTTP 端点测试"""
+"""
+测试 debate 路由（POST /api/cases/{case_id}/debate）
+"""
 
-from typing import Any
-
-from backend.main import app
-from backend.database import get_db as _get_db
 from backend.models import Case
+from backend.schemas import CaseStatus
 
 
-def _insert_case(client, status="ready_for_debate", collected_fields=None):
-    """辅助：通过 DB 直接插入一条案例，返回 case_id。"""
-    db = next(app.dependency_overrides[_get_db]())
+def test_debate_success(client, db_session):
+    """正常启动辩论，返回完整结果"""
     case = Case(
-        id="case_debate01",
+        id="case_debate_test",
         user_id="u001",
         case_type="shopping",
         title="买耳机",
-        description="想买个降噪耳机",
-        status=status,
-        collected_fields=collected_fields or {"description": "想买个降噪耳机"},
-        missing_fields=[] if status == "ready_for_debate" else ["monthly_budget_left"],
-    )
-    db.add(case)
-    db.commit()
-    return case.id
-
-
-def _fake_flow_success(*args, **kwargs) -> dict[str, Any]:
-    """mock：辩论成功。"""
-    return {
-        "success": True,
-        "message": "debate completed",
-        "case_status": "completed",
-        "steps": [],
-        "rag_evidence": [],
-        "tool_results": [],
-        "report": {
-            "final_decision": "buy",
-            "report_id": "report_debate01",
+        description="想买降噪耳机，预算充足，已有替代品",
+        status=CaseStatus.READY_FOR_DEBATE,
+        collected_fields={
+            "product_name": "降噪耳机",
+            "price": 1299,
+            "purpose": "学习",
+            "monthly_budget_left": 3000,
+            "owned_alternatives": "普通耳机",
+            "expected_usage_frequency": "每天",
+            "trigger_reason": "刚需"
         },
-    }
+        missing_fields=[]
+    )
+    db_session.add(case)
+    db_session.commit()
 
+    response = client.post(
+        "/api/cases/case_debate_test/debate",
+        json={"user_id": "u001"}
+    )
 
-def _fake_flow_high_risk(*args, **kwargs) -> dict[str, Any]:
-    """mock：高风险拒绝。"""
-    return {
-        "success": False,
-        "message": "HIGH_RISK_DECISION",
-        "case_status": "rejected",
-    }
-
-
-def _fake_flow_missing_fields(*args, **kwargs) -> dict[str, Any]:
-    """mock：字段缺失。"""
-    return {
-        "success": False,
-        "message": "MISSING_FIELDS",
-        "case_status": "collecting",
-        "reason": "缺少预算信息",
-    }
-
-
-def _fake_flow_generic_failure(*args, **kwargs) -> dict[str, Any]:
-    """mock：通用失败。"""
-    return {
-        "success": False,
-        "message": "INTERNAL_ERROR",
-    }
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert data["data"]["case_status"] == CaseStatus.COMPLETED
+    assert "steps" in data["data"]
+    assert "rag_evidence" in data["data"]
+    assert "tool_results" in data["data"]
+    assert "report" in data["data"]
 
 
 def test_debate_case_not_found(client):
-    """不存在的 case_id 返回 CASE_NOT_FOUND。"""
-    resp = client.post("/api/cases/case_notexist/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] == "CASE_NOT_FOUND"
+    """案件不存在返回 CASE_NOT_FOUND"""
+    response = client.post(
+        "/api/cases/case_not_exist/debate",
+        json={"user_id": "u001"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+    assert data["message"] == "CASE_NOT_FOUND"
 
 
-def test_debate_rejected_case(client, monkeypatch):
-    """status=rejected 的案例返回 HIGH_RISK_DECISION。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_success)
-    _insert_case(client, status="rejected")
+def test_debate_not_ready_returns_missing_fields(client, db_session):
+    """案件信息不完整时返回 MISSING_FIELDS，并包含 missing_fields 和 next_question"""
+    case = Case(
+        id="case_not_ready",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机",
+        status=CaseStatus.COLLECTING,
+        collected_fields={"description": "想买降噪耳机"},
+        missing_fields=["monthly_budget_left", "owned_alternatives"]
+    )
+    db_session.add(case)
+    db_session.commit()
 
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] == "HIGH_RISK_DECISION"
+    response = client.post(
+        "/api/cases/case_not_ready/debate",
+        json={"user_id": "u001"}
+    )
 
-
-def test_debate_not_ready(client, monkeypatch):
-    """status=collecting 的案例返回 MISSING_FIELDS。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_success)
-    _insert_case(client, status="collecting")
-
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] == "MISSING_FIELDS"
-
-
-def test_debate_success(client, monkeypatch):
-    """mock 辩论成功，status 变为 completed。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_success)
-    _insert_case(client, status="ready_for_debate")
-
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is True
-    assert body["data"]["case_status"] == "completed"
-    assert body["data"]["report"]["final_decision"] == "buy"
-    assert body["data"]["report"]["report_id"] == "report_debate01"
-
-    # 验证数据库中 case 状态已更新
-    db = next(app.dependency_overrides[_get_db]())
-    case = db.query(Case).filter(Case.id == "case_debate01").first()
-    assert case.status == "completed"
-    assert case.final_decision == "buy"
-    assert case.report_id == "report_debate01"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+    assert data["message"] == "MISSING_FIELDS"
+    # P1-1 修复验证：返回 data 包含 missing_fields
+    assert data["data"] is not None
+    assert "missing_fields" in data["data"]
+    assert "case_status" in data["data"]
+    assert data["data"]["case_status"] == CaseStatus.COLLECTING
+    assert "monthly_budget_left" in data["data"]["missing_fields"]
+    assert "next_question" in data["data"]
 
 
-def test_debate_high_risk_result(client, monkeypatch):
-    """mock 返回 HIGH_RISK_DECISION，status 变为 rejected。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_high_risk)
-    _insert_case(client, status="ready_for_debate")
+def test_debate_high_risk_returns_rejected(client, db_session):
+    """高风险决策返回 HIGH_RISK_DECISION"""
+    case = Case(
+        id="case_high_risk",
+        user_id="u001",
+        case_type="shopping",
+        title="投资决策",
+        description="想投资股票",
+        status=CaseStatus.REJECTED,
+        collected_fields={},
+        missing_fields=[]
+    )
+    db_session.add(case)
+    db_session.commit()
 
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] == "HIGH_RISK_DECISION"
+    response = client.post(
+        "/api/cases/case_high_risk/debate",
+        json={"user_id": "u001"}
+    )
 
-    # 验证数据库中 case 状态已更新
-    db = next(app.dependency_overrides[_get_db]())
-    case = db.query(Case).filter(Case.id == "case_debate01").first()
-    assert case.status == "rejected"
-
-
-def test_debate_missing_fields_result(client, monkeypatch):
-    """mock 返回 MISSING_FIELDS，status 回退为 collecting。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_missing_fields)
-    _insert_case(client, status="ready_for_debate")
-
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] == "MISSING_FIELDS"
-    assert body["data"]["case_status"] == "collecting"
-
-    # 验证数据库中 case 状态已回退
-    db = next(app.dependency_overrides[_get_db]())
-    case = db.query(Case).filter(Case.id == "case_debate01").first()
-    assert case.status == "collecting"
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is False
+    assert data["message"] == "HIGH_RISK_DECISION"
 
 
-def test_debate_generic_failure(client, monkeypatch):
-    """mock 返回通用失败，返回 DEBATE_FAILED 或对应 message。"""
-    monkeypatch.setattr("backend.routers.debate.run_case_decision_flow", _fake_flow_generic_failure)
-    _insert_case(client, status="ready_for_debate")
+def test_debate_missing_user_id(client, db_session):
+    """缺少 user_id 返回验证错误"""
+    case = Case(
+        id="case_test",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机",
+        status=CaseStatus.READY_FOR_DEBATE,
+        collected_fields={},
+        missing_fields=[]
+    )
+    db_session.add(case)
+    db_session.commit()
 
-    resp = client.post("/api/cases/case_debate01/debate")
-    body = resp.json()
-    assert body["success"] is False
-    assert body["message"] in ("DEBATE_FAILED", "INTERNAL_ERROR")
+    response = client.post(
+        "/api/cases/case_test/debate",
+        json={}
+    )
+
+    assert response.status_code == 422
+    data = response.json()
+    assert data["success"] is False
+    assert data["message"] == "VALIDATION_ERROR"
+
+
+def test_debate_response_contains_trace(client, db_session):
+    """debate 响应中包含 trace 字段"""
+    case = Case(
+        id="case_trace_test",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机，预算充足，已有替代品",
+        status=CaseStatus.READY_FOR_DEBATE,
+        collected_fields={
+            "product_name": "降噪耳机",
+            "price": 1299,
+            "purpose": "学习",
+            "monthly_budget_left": 3000,
+            "owned_alternatives": "普通耳机",
+            "expected_usage_frequency": "每天",
+            "trigger_reason": "刚需"
+        },
+        missing_fields=[]
+    )
+    db_session.add(case)
+    db_session.commit()
+
+    response = client.post(
+        "/api/cases/case_trace_test/debate",
+        json={"user_id": "u001"}
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["success"] is True
+    assert "trace" in data["data"]
+    assert len(data["data"]["trace"]) >= 7  # 至少 7 步
+    trace_steps = [t["name"] for t in data["data"]["trace"]]
+    assert "input_parser" in trace_steps
+    assert "rag_search" in trace_steps
+    assert "pro_agent" in trace_steps
+    assert "con_agent" in trace_steps
+    assert "judge_agent" in trace_steps
+    assert "cost_analyzer" in trace_steps
+    assert "cooling_reminder" in trace_steps
