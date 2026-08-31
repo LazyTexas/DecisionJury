@@ -8,13 +8,13 @@
 
 本项目 5 人分工只按具体实现模块划分。文档、答辩、PPT、演示讲解不作为单独岗位，后期由全员基于自己负责模块共同补充。
 
-| 成员 | 实现方向 | 主要职责 |
-|---|---|---|
-| A | 前端交互开发 | 页面结构、案件创建页、多轮对话页、判决书展示、RAG/MCP 结果展示 |
-| B | 后端 API 与状态管理 | FastAPI 接口、案件 CRUD、SQLite 数据存储、多轮会话状态、接口联调 |
-| C | Agent 编排与 LLM 调用 | LLM API 接入、输入解析 Agent、正方 Agent、反方 Agent、法官 Agent、Prompt 模板 |
-| D | RAG 与数据检索 | 历史记录样例、规则知识库、BM25/向量/混合检索、证据引用、RAG 评测 |
-| E | MCP 工具与工程化 | cost_analyzer、cooling_reminder、工具调用日志、自动化测试、Docker 或一键启动 |
+| 成员  | 实现方向             | 主要职责                                                       |
+| --- | ---------------- | ---------------------------------------------------------- |
+| A   | 前端交互开发           | 页面结构、案件创建页、多轮对话页、判决书展示、RAG/MCP 结果展示                        |
+| B   | 后端 API 与状态管理     | FastAPI 接口、案件 CRUD、SQLite 数据存储、多轮会话状态、接口联调                 |
+| C   | Agent 编排与 LLM 调用 | LLM API 接入、输入解析 Agent、正方 Agent、反方 Agent、法官 Agent、Prompt 模板 |
+| D   | RAG 与数据检索        | 历史记录样例、规则知识库、BM25/向量/混合检索、证据引用、RAG 评测                      |
+| E   | MCP 工具与工程化       | cost_analyzer、cooling_reminder、工具调用日志、自动化测试、Docker 或一键启动   |
 
 ## 3. 三周总计划
 
@@ -76,68 +76,68 @@
 
 ### 第 1 周
 
-| 天数 | 目标 | 主要负责人 | 输出物 |
-|---|---|---|---|
-| Day 1 | 明确实现范围和技术选型 | 全员 | 技术栈、目录、接口草案 |
-| Day 2 | 搭建基础工程和本地运行方式 | B / E | 后端启动、工具模块骨架、README 运行说明 |
-| Day 3 | 跑通 LLM API 和基础后端 | B / C | `/api/chat` Demo、LLM 调用 Demo |
-| Day 4 | 完成多 Agent Prompt 初版 | C | 正方、反方、法官输出 |
-| Day 5 | 准备历史记录样例和 RAG 初版 | D | 样例数据、检索 Demo |
-| Day 6 | 前端基础页面 | A | 创建案件页面 |
-| Day 7 | 第一次阶段演示 | 全员 | 命令行或页面 Demo |
+| 天数    | 目标                  | 主要负责人 | 输出物                          |
+| ----- | ------------------- | ----- | ---------------------------- |
+| Day 1 | 明确实现范围和技术选型         | 全员    | 技术栈、目录、接口草案                  |
+| Day 2 | 搭建基础工程和本地运行方式       | B / E | 后端启动、工具模块骨架、README 运行说明      |
+| Day 3 | 跑通 LLM API 和基础后端    | B / C | `/api/chat` Demo、LLM 调用 Demo |
+| Day 4 | 完成多 Agent Prompt 初版 | C     | 正方、反方、法官输出                   |
+| Day 5 | 准备历史记录样例和 RAG 初版    | D     | 样例数据、检索 Demo                 |
+| Day 6 | 前端基础页面              | A     | 创建案件页面                       |
+| Day 7 | 第一次阶段演示             | 全员    | 命令行或页面 Demo                  |
 
 ### 第 2 周
 
-| 天数 | 目标 | 主要负责人 | 输出物 |
-|---|---|---|---|
-| Day 8 | 完成 RAG 接入 Agent | C / D | 法官可引用历史记录 |
-| Day 9 | 实现成本计算工具 | E | cost_analyzer |
-| Day 10 | 实现冷静期提醒工具 | E | cooling_reminder |
-| Day 11 | Agent 接入两个 MCP 工具 | C / E | 工具调用链路 |
-| Day 12 | 完成购物决策完整流程 | A / B / C / D / E | 购物 Demo |
-| Day 13 | 完成时间决策完整流程 | A / B / C / D / E | 时间 Demo |
-| Day 14 | 第二次阶段演示和问题修复 | 全员 | 可运行集成版本 |
+| 天数     | 目标                | 主要负责人             | 输出物              |
+| ------ | ----------------- | ----------------- | ---------------- |
+| Day 8  | 完成 RAG 接入 Agent   | C / D             | 法官可引用历史记录        |
+| Day 9  | 实现成本计算工具          | E                 | cost_analyzer    |
+| Day 10 | 实现冷静期提醒工具         | E                 | cooling_reminder |
+| Day 11 | Agent 接入两个 MCP 工具 | C / E             | 工具调用链路           |
+| Day 12 | 完成购物决策完整流程        | A / B / C / D / E | 购物 Demo          |
+| Day 13 | 完成时间决策完整流程        | A / B / C / D / E | 时间 Demo          |
+| Day 14 | 第二次阶段演示和问题修复      | 全员                | 可运行集成版本          |
 
 ### 第 3 周
 
-| 天数 | 目标 | 主要负责人 | 输出物 |
-|---|---|---|---|
-| Day 15 | 前端完善和结果页展示 | A | 判决书页面 |
-| Day 16 | 测试用例和评测指标 | D / E | RAG 评测、工具测试、端到端测试 |
-| Day 17 | Docker 或一键启动脚本 | E | 可复现运行环境 |
-| Day 18 | 联调修复和体验优化 | 全员 | 稳定集成版本 |
-| Day 19 | 全流程压测和边界 case 修复 | 全员 | 缺陷修复清单 |
-| Day 20 | 演示环境冻结和全流程彩排 | 全员 | 可演示版本 |
-| Day 21 | 最终修复、合并 main、提交 | 全员 | v1.0-demo |
+| 天数     | 目标               | 主要负责人 | 输出物               |
+| ------ | ---------------- | ----- | ----------------- |
+| Day 15 | 前端完善和结果页展示       | A     | 判决书页面             |
+| Day 16 | 测试用例和评测指标        | D / E | RAG 评测、工具测试、端到端测试 |
+| Day 17 | Docker 或一键启动脚本   | E     | 可复现运行环境           |
+| Day 18 | 联调修复和体验优化        | 全员    | 稳定集成版本            |
+| Day 19 | 全流程压测和边界 case 修复 | 全员    | 缺陷修复清单            |
+| Day 20 | 演示环境冻结和全流程彩排     | 全员    | 可演示版本             |
+| Day 21 | 最终修复、合并 main、提交  | 全员    | v1.0-demo         |
 
 ## 5. 具体里程碑
 
-| 里程碑 | 内容 | 负责人 | 截止时间 |
-|---|---|---|---|
-| M1 | 完成基础工程和本地启动 | B / E | 第 1 周第 2 天 |
-| M2 | 完成前端案件创建页 | A | 第 1 周第 6 天 |
-| M3 | 跑通 LLM API | C | 第 1 周第 3 天 |
-| M4 | 完成多 Agent 基础流程 | C | 第 1 周第 5 天 |
-| M5 | 完成历史记录样例数据 | D | 第 1 周第 5 天 |
-| M6 | 完成 RAG 检索 | D | 第 2 周第 2 天 |
-| M7 | 完成成本计算 MCP 工具 | E | 第 2 周第 3 天 |
-| M8 | 完成冷静期提醒 MCP 工具 | E | 第 2 周第 4 天 |
-| M9 | Agent 接入 RAG 和 MCP | C / D / E | 第 2 周第 6 天 |
-| M10 | 完成前端主流程 | A / B | 第 3 周第 2 天 |
-| M11 | 完成测试和缺陷修复 | 全员 | 第 3 周第 4 天 |
-| M12 | 完成部署和演示环境冻结 | E / 全员 | 第 3 周第 6 天 |
+| 里程碑 | 内容                 | 负责人       | 截止时间       |
+| --- | ------------------ | --------- | ---------- |
+| M1  | 完成基础工程和本地启动        | B / E     | 第 1 周第 2 天 |
+| M2  | 完成前端案件创建页          | A         | 第 1 周第 6 天 |
+| M3  | 跑通 LLM API         | C         | 第 1 周第 3 天 |
+| M4  | 完成多 Agent 基础流程     | C         | 第 1 周第 5 天 |
+| M5  | 完成历史记录样例数据         | D         | 第 1 周第 5 天 |
+| M6  | 完成 RAG 检索          | D         | 第 2 周第 2 天 |
+| M7  | 完成成本计算 MCP 工具      | E         | 第 2 周第 3 天 |
+| M8  | 完成冷静期提醒 MCP 工具     | E         | 第 2 周第 4 天 |
+| M9  | Agent 接入 RAG 和 MCP | C / D / E | 第 2 周第 6 天 |
+| M10 | 完成前端主流程            | A / B     | 第 3 周第 2 天 |
+| M11 | 完成测试和缺陷修复          | 全员        | 第 3 周第 4 天 |
+| M12 | 完成部署和演示环境冻结        | E / 全员    | 第 3 周第 6 天 |
 
 ## 6. 各角色交付清单
 
 ### 6.1 目录责任分工
 
-| 成员 | 主要负责目录 | 配合目录 | 说明 |
-|---|---|---|---|
-| A 前端交互开发 | `frontend/` | `backend/` | 负责页面、交互、结果展示、接口联调 |
-| B 后端 API 与状态管理 | `backend/` | `tests/`、`data/` | 负责 API、数据库、案件状态、多轮会话状态 |
-| C Agent 编排与 LLM 调用 | `backend/` | `mcp_tools/`、`rag/` | 负责 LLM 接入、多 Agent 工作流、Prompt 模板、判决书生成 |
-| D RAG 与数据检索 | `rag/`、`data/` | `backend/`、`tests/` | 负责样例数据、知识库、检索逻辑、证据引用 |
-| E MCP 工具与工程化 | `mcp_tools/`、`tests/` | `backend/`、部署文件 | 负责 MCP 工具、工具测试、调用日志、Docker 或一键启动 |
+| 成员                 | 主要负责目录                | 配合目录                | 说明                                    |
+| ------------------ | --------------------- | ------------------- | ------------------------------------- |
+| A 前端交互开发           | `frontend/`           | `backend/`          | 负责页面、交互、结果展示、接口联调                     |
+| B 后端 API 与状态管理     | `backend/`            | `tests/`、`data/`    | 负责 API、数据库、案件状态、多轮会话状态                |
+| C Agent 编排与 LLM 调用 | `backend/`            | `mcp_tools/`、`rag/` | 负责 LLM 接入、多 Agent 工作流、Prompt 模板、判决书生成 |
+| D RAG 与数据检索        | `rag/`、`data/`        | `backend/`、`tests/` | 负责样例数据、知识库、检索逻辑、证据引用                  |
+| E MCP 工具与工程化       | `mcp_tools/`、`tests/` | `backend/`、部署文件     | 负责 MCP 工具、工具测试、调用日志、Docker 或一键启动      |
 
 开发要求：
 
@@ -198,14 +198,14 @@
 
 ## 7. 风险与预案
 
-| 风险 | 影响 | 预案 |
-|---|---|---|
-| LLM API 不稳定 | Agent 无法输出 | 准备备用模型或 mock 输出 |
-| RAG 效果差 | 法官依据不足 | 使用高质量模拟历史记录 |
-| MCP 工具接入慢 | 课程要求受影响 | 先做 HTTP 接口形式，再封装 MCP |
-| 前端来不及 | 演示困难 | 先用 Streamlit 或简洁 Web 页面 |
-| 范围失控 | 三周做不完 | 只保留购物和时间两类案件 |
-| 结果太主观 | 答辩说服力下降 | 强制输出证据和工具结果 |
+| 风险          | 影响         | 预案                      |
+| ----------- | ---------- | ----------------------- |
+| LLM API 不稳定 | Agent 无法输出 | 准备备用模型或 mock 输出         |
+| RAG 效果差     | 法官依据不足     | 使用高质量模拟历史记录             |
+| MCP 工具接入慢   | 课程要求受影响    | 先做 HTTP 接口形式，再封装 MCP    |
+| 前端来不及       | 演示困难       | 先用 Streamlit 或简洁 Web 页面 |
+| 范围失控        | 三周做不完      | 只保留购物和时间两类案件            |
+| 结果太主观       | 答辩说服力下降    | 强制输出证据和工具结果             |
 
 ## 8. 每日同步格式
 
@@ -274,8 +274,8 @@ uv run python -m compileall backend tests mcp_tools
 
 当前限制：
 
-- C 模块主流程仍调用 `backend/app/services/mock_rag.py`，尚未接入 D 的真实 RAG。
-- `rag/data_loader.py` 读取 `data/history_records.json`，但当前仓库尚未看到该数据文件，需要 D 确认数据文件路径、是否提交演示数据或由启动脚本生成。
+- C 模块已通过 `backend/app/services/rag_adapter.py` 以 HTTP 调用 D 的 `/api/rag/search`，RAG 失败时 fallback 为空数组、不中断主流程；真实 RAG 服务需在本机单独启动（端口 8001）。
+- `data/history_records.json` 已随仓库提交，含 10 条购物 + 10 条时间历史记录，`rag/data_loader.py` 可直接读取。
 - `rag/retriever.py` 当前更像独立 FastAPI 服务，C 需要和 D 确认最终是通过 HTTP 调用，还是提供 Python 函数/adapter 供 C 直接调用。
 - RAG 依赖记录在 `rag/requirements.txt`，但是否纳入项目统一 `pyproject.toml` / `uv` 环境仍需确认。
 
@@ -284,3 +284,24 @@ uv run python -m compileall backend tests mcp_tools
 - C 与 D 对齐 RAG 调用入口、返回字段、异常行为和启动方式。
 - C 新增 RAG adapter，将 D 返回结果转换为 C 侧稳定的 `RagEvidence[]`。
 - 保留 RAG 失败时 fallback 为 `[]` 的行为，确保 Agent 主流程不中断且不编造历史证据。
+
+### 9.4 E 模块 MCP 工具与工程化进度
+
+截至当前 `dev` 分支，E 模块已完成 MCP 工具主体、工具调用日志、HTTP 接口和基础单测，并补充了 MCP 工具契约层与联调测试。
+
+已完成内容：
+
+- `mcp_tools/cost_analyzer.py`：实现购物预算占比与时间成本分析，支持 low / medium / high 风险等级，并新增数值校验（负数/空值会明确报错，由上层转成 `failed` ToolResult）。
+- `mcp_tools/cooling_reminder.py`：实现冷静期提醒，自动生成 reminder_id 与 due_at，缺 user_id/case_id 返回业务错误。
+- `mcp_tools/logger.py`：记录每次工具调用的输入、输出、耗时与时间戳（答辩取证用）。
+- `backend/routers/tools.py`：提供 `POST /api/tools/cost-analyzer` 与 `POST /api/tools/cooling-reminder`，返回统一 `ToolResult` 结构，冷却提醒会写入 `reminders` 表。
+- 新增 `mcp_tools/mcp.py`：MCP 工具契约层，定义两个工具的 inputSchema，并支持 `call_tool(name, arguments)` 统一分发，为后续封装 MCP Server 做准备。
+- 新增 `mcp_tools/demo.py`：`python -m mcp_tools.demo` 可一键展示 cost_analyzer（购物+时间）与 cooling_reminder 的调用及日志。
+- 测试：已补齐工具边界测试、MCP 契约层测试、HTTP 接口联调测试，并在 `tests/conftest.py` 补充共享 `db_session` 夹具，供各路由测试复用同一内存数据库。
+
+尚未完成：
+
+- time 决策主流程接入（`analyze_time_cost` 已实现，但 `decision_flow.py` 仍只走 shopping，需等 C 模块的 time 流程）。
+- Docker 部署（可选加分项，M12；当前已有 `start_all.bat` 一键启动三端）。
+- 真实 RAG 与后端全链路联调（依赖 D/C 侧联调整体推进）。
+- `decision_score` 可选工具（时间紧可砍）。

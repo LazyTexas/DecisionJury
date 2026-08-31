@@ -10,6 +10,18 @@ from .logger import logger
 import time
 
 
+def _validate_non_negative(value: float, name: str) -> None:
+    """确保数值不为空且不为负数。
+
+    0 是合法的边界值（例如剩余预算为 0），负数或 None 属于错误输入，
+    由调用方决定如何兜底（上层 adapter/dispatcher 会转成 failed ToolResult）。
+    """
+    if value is None:
+        raise ValueError(f"{name} 不能为空")
+    if value < 0:
+        raise ValueError(f"{name} 不能为负数，收到: {value}")
+
+
 def analyze_shopping(price: float, monthly_budget_left: float) -> dict:
     """Analyze purchase cost against remaining monthly budget.
 
@@ -22,6 +34,8 @@ def analyze_shopping(price: float, monthly_budget_left: float) -> dict:
     """
     start = time.perf_counter()
 
+    _validate_non_negative(price, "price")
+    _validate_non_negative(monthly_budget_left, "monthly_budget_left")
     budget_ratio = price / monthly_budget_left if monthly_budget_left > 0 else 1.0
     budget_left_after = monthly_budget_left - price
 
@@ -62,6 +76,10 @@ def analyze_time(hours_required: float, free_hours_this_week: float, urgent_task
     """
     start = time.perf_counter()
 
+    _validate_non_negative(hours_required, "hours_required")
+    _validate_non_negative(free_hours_this_week, "free_hours_this_week")
+    if urgent_tasks is None or urgent_tasks < 0:
+        raise ValueError(f"urgent_tasks 不能为负数或为空，收到: {urgent_tasks}")
     time_ratio = hours_required / free_hours_this_week if free_hours_this_week > 0 else 1.0
 
     if time_ratio <= 0.3:
