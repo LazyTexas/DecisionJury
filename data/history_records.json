@@ -1,202 +1,3002 @@
 [
   {
-    "id": "h_shop_001",
-    "title": "机械键盘冲动消费复盘",
-    "content": "2026-05-10，花费 399 元购买了青轴机械键盘。本以为能提高写代码和论文的动力，但由于平时主要在图书馆和自习室学习，打字声音太大完全不敢用，最后扔在宿舍抽屉里吃灰。复盘结论为严重脱离真实使用场景的冲动购买。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["electronics", "idle", "regret", "keyboard"],
-    "created_at": "2026-05-10T14:30:00+08:00"
-  },
-  {
-    "id": "h_shop_002",
-    "title": "护眼学习台灯超值投资",
-    "content": "2026-05-15，花费 129 元购买了全光谱护眼台灯。宿舍晚上熄灯后备考期末非常需要，每天晚上均高频使用，大大减轻了眼睛疲劳，复盘结论为极高回报率的刚需值得消费。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["study", "useful", "worth", "lighting"],
-    "created_at": "2026-05-15T20:15:00+08:00"
-  },
-  {
-    "id": "h_shop_003",
-    "title": "头戴式降噪耳机使用复盘",
-    "content": "2026-05-20，花费 1299 元购买了头戴式降噪耳机。在考研/期末周复习时屏蔽周围噪音效果极好，专注力大幅提升；但夏天佩戴较为闷热。综合考虑由于每天自习都在用，属于高频刚需生产力工具，复盘结论为值得购买。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["electronics", "useful", "study", "headphones"],
-    "created_at": "2026-05-20T11:00:00+08:00"
-  },
-  {
-    "id": "h_shop_004",
-    "title": "冲动跟风办理健身房年卡",
-    "content": "2026-04-01，在开学季促销气氛下花费 1599 元办理了健身房年卡。结果课业繁重加上距离宿舍步行需 15 分钟，一学期下来只去了不到 5 次，平均每次成本超过 300 元，严重挤占了当月生活费预算，复盘结论为高溢价闲置翻车。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["fitness", "idle", "budget_overflow", "regret"],
-    "created_at": "2026-04-01T18:00:00+08:00"
-  },
-  {
-    "id": "h_shop_005",
-    "title": "大屏平板电脑生产力转爱奇艺",
-    "content": "2026-03-12，花 2899 元购买了最新款大屏平板及触控笔，初衷是用它代替纸质书做电子无纸化笔记。但由于已经拥有便携笔记本电脑，实际做笔记频率很低，绝大多数时间拿来在床上追剧看短视频，完全沦为娱乐工具，结论为伪需求溢价消费。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["electronics", "idle", "pseudo_demand", "tablet"],
-    "created_at": "2026-03-12T15:20:00+08:00"
-  },
-  {
-    "id": "h_shop_006",
-    "title": "二手机械腕表盲目跟风超支",
-    "content": "2026-04-18，在数码论坛被种草，花费 2100 元购买了一块二手复古机械腕表。购买导致当月剩余预算瞬间清零，连续吃半个月食堂泡面。且看时间主要还是掏手机，腕表戴了两周就觉得沉重繁琐，复盘为情绪化冲动购买。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["luxury", "budget_overflow", "regret", "impulse"],
-    "created_at": "2026-04-18T21:40:00+08:00"
-  },
-  {
-    "id": "h_shop_007",
-    "title": "付费英语口语训练营闲置复盘",
-    "content": "2026-05-01，看到打卡立返优惠，花费 499 元购买了 21 天口语纠音训练营。结果前五天热情很高，中间因为赶专业课大作业连续中断打卡，最终不仅没拿到返现，课也没听完，复盘为低估自身惰性与时间冲突的盲目付费。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["course", "idle", "procrastination"],
-    "created_at": "2026-05-01T09:30:00+08:00"
-  },
-  {
-    "id": "h_shop_008",
-    "title": "人体工学电脑座椅改善腰痛",
-    "content": "2026-03-25，花费 699 元给宿舍书桌配置了入门级人体工学椅。之前长期用宿舍木板椅写代码导致腰酸背痛，更换后每天久坐编程的舒适度大增，显著提升了项目专注时长，属于对健康的值得长期投资。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["health", "useful", "worth", "chair"],
-    "created_at": "2026-03-25T16:00:00+08:00"
-  },
-  {
-    "id": "h_shop_009",
-    "title": "囤积限量版联名手办模型",
-    "content": "2026-06-01，为收集喜爱的动漫 IP，冲动斥资 899 元预购了限量手办。到货后只拍照发了一条朋友圈，随后放回盒子里吃灰，不仅占据狭小宿舍空间，还不产生任何实际效用，典型的为短时多巴胺买单。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["hobby", "idle", "regret", "impulse"],
-    "created_at": "2026-06-01T12:10:00+08:00"
-  },
-  {
-    "id": "h_shop_010",
-    "title": "正版 AI 开发编程辅助软件订阅",
-    "content": "2026-05-28，花 140 元订阅了年度 GitHub Copilot 和 AI 代码工具包。在完成计算机专业课大作业及多 Agent 项目时节省了超过 30% 的查资料与 Debug 时间，性价比极大，属于绝佳的专业生产力工具支出。",
-    "score": 0.0,
-    "source": "decision_history",
-    "case_type": "shopping",
-    "tags": ["software", "useful", "worth", "programming"],
-    "created_at": "2026-05-28T10:00:00+08:00"
-  },
-  {
-    "id": "h_time_001",
-    "title": "社团换届晚会彩排挤占学业",
-    "content": "2026-05-12，作为社团骨干接下了周年庆晚会的总现场布置任务，连续周末两整天（约 16 小时）在会场搬道具和踩点。直接导致当周 CSAPP 系统实验（MallocLab）来不及 Debug，最后踩线压秒交差导致评分过低，复盘为严重没有守住学业底线的时间过载。",
-    "score": 0.0,
+    "id": "h_time_2011",
+    "case_id": "c_time_657",
+    "report_id": "rep_4477",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "头脑发热去搞了 报班考 驾照科目二。事后复盘发现不仅导致作息极其不规律，伤身体，还占用了太多本来该复习专业课的时间。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
     "source": "decision_history",
     "case_type": "time",
-    "tags": ["club", "delay", "overload", "regret"],
-    "created_at": "2026-05-12T22:00:00+08:00"
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "regret"
+    ],
+    "created_at": "2026-05-01T00:00:00+08:00"
   },
   {
-    "id": "h_time_002",
-    "title": "前沿 AI Agent 线上实战分享会",
-    "content": "2026-06-08，周六晚上抽出 2 小时参加了企业校友组织的 AI Agent 实战开发与低代码平台接入技术分享。学到了非常多的工程落地细节和面试技巧，并结识了正在大厂做 Agent 实习的学长，时间投资回报极高，值得参加。",
-    "score": 0.0,
+    "id": "h_shop_1043",
+    "case_id": "c_shop_923",
+    "report_id": "rep_2323",
+    "title": "石头 T7S 扫地机器人 消费复盘",
+    "content": "花费 1899 元购买了 石头 T7S 扫地机器人。体验中规中矩，一方面让我结识了一群优秀的同频朋友，另一方面又导致作息极其不规律，伤身体。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 1899,
+    "usage_frequency": "每周2次",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["tech", "career", "worth", "networking"],
-    "created_at": "2026-06-08T21:00:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "清洁",
+      "懒人",
+      "省时",
+      "neutral"
+    ],
+    "created_at": "2025-12-04T00:00:00+08:00"
   },
   {
-    "id": "h_time_003",
-    "title": "期末突击承接两份兼职家教",
-    "content": "2026-06-15，在期末复习最关键的 2 周，为了赚零花钱同时接了周末两份家教（共 8 小时/周，外加往返通勤 4 小时）。结果精疲力竭，导致高等代数和数据结构复习时间严重不足，整周处于极度焦虑和精神耗竭状态，复盘为短视得不偿失。",
-    "score": 0.0,
+    "id": "h_time_2037",
+    "case_id": "c_time_252",
+    "report_id": "rep_2081",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "投入大量时间参与了 报班考 驾照科目二。这段经历带来了极高的情绪价值，并且让我结识了一群优秀的同频朋友。即使过程中导致作息极其不规律，伤身体，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "do",
+    "result": "worth",
     "source": "decision_history",
     "case_type": "time",
-    "tags": ["part_time", "exhaustion", "conflict", "regret"],
-    "created_at": "2026-06-15T19:30:00+08:00"
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "worth"
+    ],
+    "created_at": "2025-12-09T00:00:00+08:00"
   },
   {
-    "id": "h_time_004",
-    "title": "学会拒绝无效学生会琐碎水会",
-    "content": "2026-04-20，期中考试周期间，主动拒绝了某学生会组织的一场耗时 3 小时却无实质议题的例会。利用省下来的完整晚上将算法导论的作业做完并提前复习了错题，确保了期中考试成绩稳居前列，复盘结论为学会理性拒绝时间黑洞是高效时间管理核心。",
-    "score": 0.0,
+    "id": "h_shop_1010",
+    "case_id": "c_shop_624",
+    "report_id": "rep_3373",
+    "title": "戴森 HD15 吹风机 消费复盘",
+    "content": "冲动消费花了 2990 元入手 戴森 HD15 吹风机。买回来后发现价格溢价太高，性价比低，更糟的是团队沟通内耗严重，心力交瘁。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 2990,
+    "usage_frequency": "每天",
+    "pros": [
+      "成为了写进简历的亮点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["study", "refusal", "worth", "time_management"],
-    "created_at": "2026-04-20T21:00:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "生活品质",
+      "个护",
+      "高溢价",
+      "regret"
+    ],
+    "created_at": "2025-02-13T00:00:00+08:00"
   },
   {
-    "id": "h_time_005",
-    "title": "仓促组队参加黑客松大赛",
-    "content": "2026-05-22，临时被同学拉去参加 48 小时极限黑客马拉松开发比赛。虽然氛围很好，但因为前期团队磨合不够、题目方向发散，连续两天只睡 4 小时导致身体透支，且与周一的专业课展示时间严重冲突，导致双双表现不佳，结论为冲动接任务。",
-    "score": 0.0,
+    "id": "h_shop_1026",
+    "case_id": "c_shop_663",
+    "report_id": "rep_7905",
+    "title": "Bose QC Earbuds II 消费复盘",
+    "content": "花了 1999 元买了 Bose QC Earbuds II。复盘来看，它成为了写进简历的亮点，而且极大提升了日常效率。虽然占用了太多本来该复习专业课的时间，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【降噪】的需求，考察了很久才决定入手。",
+    "price": 1999,
+    "usage_frequency": "每天通勤",
+    "pros": [
+      "成为了写进简历的亮点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["competition", "overload", "exhaustion", "regret"],
-    "created_at": "2026-05-22T23:30:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "降噪",
+      "通勤",
+      "音频",
+      "刚需",
+      "worth"
+    ],
+    "created_at": "2025-01-25T00:00:00+08:00"
   },
   {
-    "id": "h_time_006",
-    "title": "坚持每天半小时校园夜跑锻炼",
-    "content": "2026-04-10，在感到每天坐在电脑前敲代码精力下滑后，决定每天晚上 9 点抽出 30 分钟去操场夜跑。时间占用极少，但坚持两个月后，睡眠质量和白天课堂专注度显著上升，属于成本低微但收益巨大的优质时间习惯。",
-    "score": 0.0,
+    "id": "h_shop_1013",
+    "case_id": "c_shop_110",
+    "report_id": "rep_7042",
+    "title": "极米 智能投影仪 消费复盘",
+    "content": "花了 2999 元买了 极米 智能投影仪。复盘来看，它设计精良，使用体验极佳，而且极大提升了日常效率。虽然导致作息极其不规律，伤身体，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【影音】的需求，考察了很久才决定入手。",
+    "price": 2999,
+    "usage_frequency": "周末看电影",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["health", "habit", "worth", "low_cost"],
-    "created_at": "2026-04-10T22:00:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "影音",
+      "家居",
+      "娱乐",
+      "提升幸福感",
+      "worth"
+    ],
+    "created_at": "2025-03-21T00:00:00+08:00"
   },
   {
-    "id": "h_time_007",
-    "title": "盲目答应帮同学代写排版文档",
-    "content": "2026-05-05，碍于面子不好意思拒绝，答应帮别系的同学整理并排版 50 页的活动申报材料。本以为 1 小时搞定，结果反复修改耗费了整整一个星期六下午（6小时），导致原本规划好的个人开源项目开发停滞，复盘为老好人心理导致时间被侵占。",
-    "score": 0.0,
+    "id": "h_shop_1037",
+    "case_id": "c_shop_618",
+    "report_id": "rep_3535",
+    "title": "始祖鸟 冲锋衣 消费复盘",
+    "content": "花了 3500 元买了 始祖鸟 冲锋衣。复盘来看，它带来了极高的情绪价值，而且完美解决了我的刚需痛点。虽然导致作息极其不规律，伤身体，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【户外】的需求，考察了很久才决定入手。",
+    "price": 3500,
+    "usage_frequency": "秋冬日常",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["favor", "time_waste", "regret", "boundary"],
-    "created_at": "2026-05-05T18:00:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "户外",
+      "穿搭",
+      "保暖",
+      "跟风",
+      "worth"
+    ],
+    "created_at": "2025-02-23T00:00:00+08:00"
   },
   {
-    "id": "h_time_008",
-    "title": "参加优质校企合作企业开放日",
-    "content": "2026-05-18，向辅导员请假半天（耗时 4 小时）前往本地头部互联网人工智能公司参观。直观了解了企业级大模型团队的工作流程与工位日常，让接下来的暑期实习备战方向清晰了许多，属于高价值认知拓展活动。",
-    "score": 0.0,
+    "id": "h_time_2036",
+    "case_id": "c_time_367",
+    "report_id": "rep_2928",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "参与了 期末前 极限突击复习高数。过程中确实带来了极高的情绪价值，但同时也隐藏的后续维护成本很高。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
     "source": "decision_history",
     "case_type": "time",
-    "tags": ["career", "company_visit", "worth"],
-    "created_at": "2026-05-18T17:00:00+08:00"
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "neutral"
+    ],
+    "created_at": "2025-09-09T00:00:00+08:00"
   },
   {
-    "id": "h_time_009",
-    "title": "过度投入游戏公会开荒活动",
-    "content": "2026-03-30，为了在网络游戏中抢首杀，连续三天每天晚上固定抽出 4 小时参加公会固定团队开荒。直接导致多门基础课程作业堆积到周日通宵赶工，不仅作息大乱，而且交上去的作业错误率极高，典型的缺乏节制消遣。",
-    "score": 0.0,
+    "id": "h_shop_1040",
+    "case_id": "c_shop_633",
+    "report_id": "rep_2580",
+    "title": "任天堂 Switch OLED 消费复盘",
+    "content": "冲动消费花了 2199 元入手 任天堂 Switch OLED。买回来后发现新鲜感过后迅速吃灰，使用率极低，更糟的是隐藏的后续维护成本很高。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【游戏】的需求，考察了很久才决定入手。",
+    "price": 2199,
+    "usage_frequency": "每月1次",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
     "source": "decision_history",
-    "case_type": "time",
-    "tags": ["gaming", "procrastination", "regret"],
-    "created_at": "2026-03-30T02:00:00+08:00"
+    "case_type": "shopping",
+    "tags": [
+      "游戏",
+      "娱乐",
+      "掌机",
+      "吃灰",
+      "regret"
+    ],
+    "created_at": "2025-09-26T00:00:00+08:00"
   },
   {
-    "id": "h_time_010",
-    "title": "高效参与实验室每周组会研讨",
-    "content": "2026-06-02，每周二下午准时投入 2 小时参加导师带领的研究生/本科生混合组会。虽然前面对前沿论文听不懂，但坚持记笔记并主动提问，为自己毕业设计和后续争取科研项目打下了极好基础，极其值得的学术时间投入。",
-    "score": 0.0,
+    "id": "h_shop_1001",
+    "case_id": "c_shop_609",
+    "report_id": "rep_8220",
+    "title": "始祖鸟 冲锋衣 消费复盘",
+    "content": "冲动消费花了 3500 元入手 始祖鸟 冲锋衣。买回来后发现团队沟通内耗严重，心力交瘁，更糟的是隐藏的后续维护成本很高。原本以为能完美解决了我的刚需痛点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【户外】的需求，考察了很久才决定入手。",
+    "price": 3500,
+    "usage_frequency": "秋冬日常",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "户外",
+      "穿搭",
+      "保暖",
+      "跟风",
+      "regret"
+    ],
+    "created_at": "2025-06-10T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1034",
+    "case_id": "c_shop_417",
+    "report_id": "rep_2458",
+    "title": "Apple iPad Pro 2024 消费复盘",
+    "content": "花费 8999 元购买了 Apple iPad Pro 2024。体验中规中矩，一方面让我结识了一群优秀的同频朋友，另一方面又团队沟通内耗严重，心力交瘁。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【生产力】的需求，考察了很久才决定入手。",
+    "price": 8999,
+    "usage_frequency": "每周3次",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "生产力",
+      "学习",
+      "平板",
+      "电子产品",
+      "neutral"
+    ],
+    "created_at": "2025-04-19T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2027",
+    "case_id": "c_time_881",
+    "report_id": "rep_3807",
+    "title": "沉迷 黑神话悟空 连续通宵 精力投入复盘",
+    "content": "参与了 沉迷 黑神话悟空 连续通宵。过程中确实设计精良，使用体验极佳，但同时也价格溢价太高，性价比低。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【游戏】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
     "source": "decision_history",
     "case_type": "time",
-    "tags": ["academic", "study", "worth", "research"],
-    "created_at": "2026-06-02T16:30:00+08:00"
+    "tags": [
+      "游戏",
+      "娱乐",
+      "沉迷",
+      "逃避现实",
+      "neutral"
+    ],
+    "created_at": "2025-01-21T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1048",
+    "case_id": "c_shop_624",
+    "report_id": "rep_8709",
+    "title": "石头 T7S 扫地机器人 消费复盘",
+    "content": "花了 1899 元买了 石头 T7S 扫地机器人。复盘来看，它极大提升了日常效率，而且完美解决了我的刚需痛点。虽然团队沟通内耗严重，心力交瘁，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 1899,
+    "usage_frequency": "每周2次",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "清洁",
+      "懒人",
+      "省时",
+      "worth"
+    ],
+    "created_at": "2025-06-11T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1021",
+    "case_id": "c_shop_528",
+    "report_id": "rep_7657",
+    "title": "HHKB 机械键盘 消费复盘",
+    "content": "花了 2399 元买了 HHKB 机械键盘。复盘来看，它完美解决了我的刚需痛点，而且设计精良，使用体验极佳。虽然团队沟通内耗严重，心力交瘁，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【外设】的需求，考察了很久才决定入手。",
+    "price": 2399,
+    "usage_frequency": "每天",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "外设",
+      "办公",
+      "码农",
+      "退烧",
+      "worth"
+    ],
+    "created_at": "2025-08-21T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2023",
+    "case_id": "c_time_561",
+    "report_id": "rep_9991",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "投入大量时间参与了 期末前 极限突击复习高数。这段经历让我结识了一群优秀的同频朋友，并且设计精良，使用体验极佳。即使过程中导致作息极其不规律，伤身体，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "worth"
+    ],
+    "created_at": "2025-08-25T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2044",
+    "case_id": "c_time_473",
+    "report_id": "rep_8524",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "头脑发热去搞了 期末前 极限突击复习高数。事后复盘发现不仅团队沟通内耗严重，心力交瘁，还新鲜感过后迅速吃灰，使用率极低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "regret"
+    ],
+    "created_at": "2026-04-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2007",
+    "case_id": "c_time_605",
+    "report_id": "rep_1777",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "投入大量时间参与了 期末前 极限突击复习高数。这段经历带来了极高的情绪价值，并且设计精良，使用体验极佳。即使过程中价格溢价太高，性价比低，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "worth"
+    ],
+    "created_at": "2025-11-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1004",
+    "case_id": "c_shop_423",
+    "report_id": "rep_1880",
+    "title": "戴森 HD15 吹风机 消费复盘",
+    "content": "冲动消费花了 2990 元入手 戴森 HD15 吹风机。买回来后发现价格溢价太高，性价比低，更糟的是导致作息极其不规律，伤身体。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 2990,
+    "usage_frequency": "每天",
+    "pros": [
+      "成为了写进简历的亮点",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "生活品质",
+      "个护",
+      "高溢价",
+      "regret"
+    ],
+    "created_at": "2025-05-02T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2033",
+    "case_id": "c_time_583",
+    "report_id": "rep_9889",
+    "title": "组队参加 大学生大创科研项目 精力投入复盘",
+    "content": "投入大量时间参与了 组队参加 大学生大创科研项目。这段经历带来了极高的情绪价值，并且完美解决了我的刚需痛点。即使过程中团队沟通内耗严重，心力交瘁，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【科研】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "科研",
+      "项目",
+      "划水",
+      "抱大腿",
+      "worth"
+    ],
+    "created_at": "2025-08-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2049",
+    "case_id": "c_time_743",
+    "report_id": "rep_9927",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "投入大量时间参与了 期末前 极限突击复习高数。这段经历完美解决了我的刚需痛点，并且让我结识了一群优秀的同频朋友。即使过程中占用了太多本来该复习专业课的时间，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "worth"
+    ],
+    "created_at": "2025-04-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1022",
+    "case_id": "c_shop_258",
+    "report_id": "rep_3231",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "花费 14999 元购买了 ROG RTX 4090 显卡。体验中规中矩，一方面极大提升了日常效率，另一方面又新鲜感过后迅速吃灰，使用率极低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "极大提升了日常效率",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "neutral"
+    ],
+    "created_at": "2025-07-14T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2025",
+    "case_id": "c_time_677",
+    "report_id": "rep_2954",
+    "title": "周末去 星巴克兼职打工 精力投入复盘",
+    "content": "头脑发热去搞了 周末去 星巴克兼职打工。事后复盘发现不仅新鲜感过后迅速吃灰，使用率极低，还占用了太多本来该复习专业课的时间。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【兼职】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "兼职",
+      "赚钱",
+      "体力活",
+      "打工人",
+      "regret"
+    ],
+    "created_at": "2026-02-26T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2012",
+    "case_id": "c_time_580",
+    "report_id": "rep_9233",
+    "title": "花2周时间 手搓个人博客网站 精力投入复盘",
+    "content": "参与了 花2周时间 手搓个人博客网站。过程中确实带来了极高的情绪价值，但同时也占用了太多本来该复习专业课的时间。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【开发】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "开发",
+      "个人品牌",
+      "技术",
+      "成就感",
+      "neutral"
+    ],
+    "created_at": "2025-08-04T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1028",
+    "case_id": "c_shop_823",
+    "report_id": "rep_3597",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "花费 14999 元购买了 ROG RTX 4090 显卡。体验中规中矩，一方面设计精良，使用体验极佳，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "neutral"
+    ],
+    "created_at": "2026-02-15T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2024",
+    "case_id": "c_time_556",
+    "report_id": "rep_9177",
+    "title": "五一假期 泰山特种兵旅游 精力投入复盘",
+    "content": "头脑发热去搞了 五一假期 泰山特种兵旅游。事后复盘发现不仅新鲜感过后迅速吃灰，使用率极低，还团队沟通内耗严重，心力交瘁。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【旅游】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "旅游",
+      "特种兵",
+      "人挤人",
+      "疲惫",
+      "regret"
+    ],
+    "created_at": "2025-01-08T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1020",
+    "case_id": "c_shop_768",
+    "report_id": "rep_1805",
+    "title": "石头 T7S 扫地机器人 消费复盘",
+    "content": "花费 1899 元购买了 石头 T7S 扫地机器人。体验中规中矩，一方面极大提升了日常效率，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 1899,
+    "usage_frequency": "每周2次",
+    "pros": [
+      "极大提升了日常效率",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "清洁",
+      "懒人",
+      "省时",
+      "neutral"
+    ],
+    "created_at": "2025-06-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2048",
+    "case_id": "c_time_826",
+    "report_id": "rep_8249",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "投入大量时间参与了 报班考 驾照科目二。这段经历完美解决了我的刚需痛点，并且让我结识了一群优秀的同频朋友。即使过程中价格溢价太高，性价比低，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "worth"
+    ],
+    "created_at": "2026-02-23T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1009",
+    "case_id": "c_shop_776",
+    "report_id": "rep_2203",
+    "title": "HHKB 机械键盘 消费复盘",
+    "content": "花费 2399 元购买了 HHKB 机械键盘。体验中规中矩，一方面完美解决了我的刚需痛点，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【外设】的需求，考察了很久才决定入手。",
+    "price": 2399,
+    "usage_frequency": "每天",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "外设",
+      "办公",
+      "码农",
+      "退烧",
+      "neutral"
+    ],
+    "created_at": "2026-02-10T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2010",
+    "case_id": "c_time_430",
+    "report_id": "rep_2758",
+    "title": "沉迷 黑神话悟空 连续通宵 精力投入复盘",
+    "content": "投入大量时间参与了 沉迷 黑神话悟空 连续通宵。这段经历让我结识了一群优秀的同频朋友，并且极大提升了日常效率。即使过程中占用了太多本来该复习专业课的时间，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【游戏】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "游戏",
+      "娱乐",
+      "沉迷",
+      "逃避现实",
+      "worth"
+    ],
+    "created_at": "2026-03-19T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2021",
+    "case_id": "c_time_781",
+    "report_id": "rep_1916",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "头脑发热去搞了 报班考 驾照科目二。事后复盘发现不仅隐藏的后续维护成本很高，还团队沟通内耗严重，心力交瘁。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "regret"
+    ],
+    "created_at": "2026-02-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1030",
+    "case_id": "c_shop_142",
+    "report_id": "rep_8230",
+    "title": "戴森 HD15 吹风机 消费复盘",
+    "content": "花了 2990 元买了 戴森 HD15 吹风机。复盘来看，它设计精良，使用体验极佳，而且让我结识了一群优秀的同频朋友。虽然新鲜感过后迅速吃灰，使用率极低，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 2990,
+    "usage_frequency": "每天",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "生活品质",
+      "个护",
+      "高溢价",
+      "worth"
+    ],
+    "created_at": "2025-09-05T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1005",
+    "case_id": "c_shop_740",
+    "report_id": "rep_8168",
+    "title": "Apple iPad Pro 2024 消费复盘",
+    "content": "冲动消费花了 8999 元入手 Apple iPad Pro 2024。买回来后发现隐藏的后续维护成本很高，更糟的是导致作息极其不规律，伤身体。原本以为能带来了极高的情绪价值，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【生产力】的需求，考察了很久才决定入手。",
+    "price": 8999,
+    "usage_frequency": "每周3次",
+    "pros": [
+      "带来了极高的情绪价值",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "生产力",
+      "学习",
+      "平板",
+      "电子产品",
+      "regret"
+    ],
+    "created_at": "2025-07-07T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2032",
+    "case_id": "c_time_272",
+    "report_id": "rep_1479",
+    "title": "报名 21天英语口语打卡营 精力投入复盘",
+    "content": "投入大量时间参与了 报名 21天英语口语打卡营。这段经历极大提升了日常效率，并且成为了写进简历的亮点。即使过程中导致作息极其不规律，伤身体，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "课程",
+      "自我提升",
+      "拖延",
+      "worth"
+    ],
+    "created_at": "2026-05-17T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2005",
+    "case_id": "c_time_881",
+    "report_id": "rep_4549",
+    "title": "沉迷 黑神话悟空 连续通宵 精力投入复盘",
+    "content": "头脑发热去搞了 沉迷 黑神话悟空 连续通宵。事后复盘发现不仅导致作息极其不规律，伤身体，还团队沟通内耗严重，心力交瘁。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【游戏】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "游戏",
+      "娱乐",
+      "沉迷",
+      "逃避现实",
+      "regret"
+    ],
+    "created_at": "2025-10-10T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2009",
+    "case_id": "c_time_793",
+    "report_id": "rep_1157",
+    "title": "五一假期 泰山特种兵旅游 精力投入复盘",
+    "content": "参与了 五一假期 泰山特种兵旅游。过程中确实成为了写进简历的亮点，但同时也团队沟通内耗严重，心力交瘁。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【旅游】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "旅游",
+      "特种兵",
+      "人挤人",
+      "疲惫",
+      "neutral"
+    ],
+    "created_at": "2025-05-15T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1000",
+    "case_id": "c_shop_646",
+    "report_id": "rep_1061",
+    "title": "Apple iPad Pro 2024 消费复盘",
+    "content": "花费 8999 元购买了 Apple iPad Pro 2024。体验中规中矩，一方面成为了写进简历的亮点，另一方面又价格溢价太高，性价比低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【生产力】的需求，考察了很久才决定入手。",
+    "price": 8999,
+    "usage_frequency": "每周3次",
+    "pros": [
+      "成为了写进简历的亮点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "生产力",
+      "学习",
+      "平板",
+      "电子产品",
+      "neutral"
+    ],
+    "created_at": "2025-04-01T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2038",
+    "case_id": "c_time_809",
+    "report_id": "rep_4559",
+    "title": "周末去 星巴克兼职打工 精力投入复盘",
+    "content": "投入大量时间参与了 周末去 星巴克兼职打工。这段经历极大提升了日常效率，并且完美解决了我的刚需痛点。即使过程中新鲜感过后迅速吃灰，使用率极低，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【兼职】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "兼职",
+      "赚钱",
+      "体力活",
+      "打工人",
+      "worth"
+    ],
+    "created_at": "2026-01-08T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2016",
+    "case_id": "c_time_958",
+    "report_id": "rep_8814",
+    "title": "跟风去 草莓音乐节/演唱会 精力投入复盘",
+    "content": "参与了 跟风去 草莓音乐节/演唱会。过程中确实让我结识了一群优秀的同频朋友，但同时也隐藏的后续维护成本很高。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【社交】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "社交",
+      "音乐",
+      "冲动",
+      "高消费",
+      "neutral"
+    ],
+    "created_at": "2026-01-30T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2040",
+    "case_id": "c_time_818",
+    "report_id": "rep_8044",
+    "title": "跟风去 草莓音乐节/演唱会 精力投入复盘",
+    "content": "参与了 跟风去 草莓音乐节/演唱会。过程中确实完美解决了我的刚需痛点，但同时也团队沟通内耗严重，心力交瘁。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【社交】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "社交",
+      "音乐",
+      "冲动",
+      "高消费",
+      "neutral"
+    ],
+    "created_at": "2026-03-29T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2028",
+    "case_id": "c_time_662",
+    "report_id": "rep_4383",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "参与了 报班考 驾照科目二。过程中确实带来了极高的情绪价值，但同时也新鲜感过后迅速吃灰，使用率极低。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "neutral"
+    ],
+    "created_at": "2025-11-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1044",
+    "case_id": "c_shop_965",
+    "report_id": "rep_4803",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "花了 14999 元买了 ROG RTX 4090 显卡。复盘来看，它完美解决了我的刚需痛点，而且让我结识了一群优秀的同频朋友。虽然新鲜感过后迅速吃灰，使用率极低，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "worth"
+    ],
+    "created_at": "2025-11-25T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1011",
+    "case_id": "c_shop_696",
+    "report_id": "rep_4985",
+    "title": "HHKB 机械键盘 消费复盘",
+    "content": "花费 2399 元购买了 HHKB 机械键盘。体验中规中矩，一方面带来了极高的情绪价值，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【外设】的需求，考察了很久才决定入手。",
+    "price": 2399,
+    "usage_frequency": "每天",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "外设",
+      "办公",
+      "码农",
+      "退烧",
+      "neutral"
+    ],
+    "created_at": "2025-06-23T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1017",
+    "case_id": "c_shop_821",
+    "report_id": "rep_6160",
+    "title": "大疆 Mini 4 Pro 无人机 消费复盘",
+    "content": "花费 4788 元购买了 大疆 Mini 4 Pro 无人机。体验中规中矩，一方面完美解决了我的刚需痛点，另一方面又新鲜感过后迅速吃灰，使用率极低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【摄影】的需求，考察了很久才决定入手。",
+    "price": 4788,
+    "usage_frequency": "出去旅游用过1次",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "摄影",
+      "航拍",
+      "数码",
+      "吃灰",
+      "neutral"
+    ],
+    "created_at": "2026-02-17T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2043",
+    "case_id": "c_time_490",
+    "report_id": "rep_3084",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "参与了 报班考 驾照科目二。过程中确实成为了写进简历的亮点，但同时也导致作息极其不规律，伤身体。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "neutral"
+    ],
+    "created_at": "2025-02-11T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2017",
+    "case_id": "c_time_283",
+    "report_id": "rep_6085",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "参与了 期末前 极限突击复习高数。过程中确实成为了写进简历的亮点，但同时也占用了太多本来该复习专业课的时间。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "neutral"
+    ],
+    "created_at": "2026-04-15T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2002",
+    "case_id": "c_time_952",
+    "report_id": "rep_7293",
+    "title": "报名 21天英语口语打卡营 精力投入复盘",
+    "content": "头脑发热去搞了 报名 21天英语口语打卡营。事后复盘发现不仅价格溢价太高，性价比低，还隐藏的后续维护成本很高。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "课程",
+      "自我提升",
+      "拖延",
+      "regret"
+    ],
+    "created_at": "2026-02-03T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1003",
+    "case_id": "c_shop_120",
+    "report_id": "rep_2601",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "花费 14999 元购买了 ROG RTX 4090 显卡。体验中规中矩，一方面极大提升了日常效率，另一方面又占用了太多本来该复习专业课的时间。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "极大提升了日常效率",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "neutral"
+    ],
+    "created_at": "2026-05-30T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2003",
+    "case_id": "c_time_277",
+    "report_id": "rep_5218",
+    "title": "五一假期 泰山特种兵旅游 精力投入复盘",
+    "content": "参与了 五一假期 泰山特种兵旅游。过程中确实带来了极高的情绪价值，但同时也新鲜感过后迅速吃灰，使用率极低。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【旅游】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "旅游",
+      "特种兵",
+      "人挤人",
+      "疲惫",
+      "neutral"
+    ],
+    "created_at": "2025-06-25T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2035",
+    "case_id": "c_time_701",
+    "report_id": "rep_9941",
+    "title": "周末去 星巴克兼职打工 精力投入复盘",
+    "content": "参与了 周末去 星巴克兼职打工。过程中确实设计精良，使用体验极佳，但同时也团队沟通内耗严重，心力交瘁。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【兼职】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "兼职",
+      "赚钱",
+      "体力活",
+      "打工人",
+      "neutral"
+    ],
+    "created_at": "2025-11-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2000",
+    "case_id": "c_time_180",
+    "report_id": "rep_5276",
+    "title": "组队参加 大学生大创科研项目 精力投入复盘",
+    "content": "头脑发热去搞了 组队参加 大学生大创科研项目。事后复盘发现不仅隐藏的后续维护成本很高，还新鲜感过后迅速吃灰，使用率极低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【科研】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "科研",
+      "项目",
+      "划水",
+      "抱大腿",
+      "regret"
+    ],
+    "created_at": "2026-01-07T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2018",
+    "case_id": "c_time_227",
+    "report_id": "rep_9130",
+    "title": "连续熬夜3天 追完权游全集 精力投入复盘",
+    "content": "头脑发热去搞了 连续熬夜3天 追完权游全集。事后复盘发现不仅新鲜感过后迅速吃灰，使用率极低，还团队沟通内耗严重，心力交瘁。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【娱乐】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "娱乐",
+      "拖延",
+      "放纵",
+      "黑眼圈",
+      "regret"
+    ],
+    "created_at": "2026-02-23T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1032",
+    "case_id": "c_shop_655",
+    "report_id": "rep_1791",
+    "title": "始祖鸟 冲锋衣 消费复盘",
+    "content": "花了 3500 元买了 始祖鸟 冲锋衣。复盘来看，它成为了写进简历的亮点，而且极大提升了日常效率。虽然价格溢价太高，性价比低，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【户外】的需求，考察了很久才决定入手。",
+    "price": 3500,
+    "usage_frequency": "秋冬日常",
+    "pros": [
+      "成为了写进简历的亮点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "户外",
+      "穿搭",
+      "保暖",
+      "跟风",
+      "worth"
+    ],
+    "created_at": "2025-10-21T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2045",
+    "case_id": "c_time_984",
+    "report_id": "rep_4842",
+    "title": "花2周时间 手搓个人博客网站 精力投入复盘",
+    "content": "参与了 花2周时间 手搓个人博客网站。过程中确实让我结识了一群优秀的同频朋友，但同时也团队沟通内耗严重，心力交瘁。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【开发】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "开发",
+      "个人品牌",
+      "技术",
+      "成就感",
+      "neutral"
+    ],
+    "created_at": "2025-05-07T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1012",
+    "case_id": "c_shop_651",
+    "report_id": "rep_1896",
+    "title": "威尔仕 健身房年卡 消费复盘",
+    "content": "花费 1599 元购买了 威尔仕 健身房年卡。体验中规中矩，一方面让我结识了一群优秀的同频朋友，另一方面又价格溢价太高，性价比低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【健康】的需求，考察了很久才决定入手。",
+    "price": 1599,
+    "usage_frequency": "几乎没去",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "健康",
+      "健身",
+      "运动",
+      "冲动消费",
+      "neutral"
+    ],
+    "created_at": "2025-06-22T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1007",
+    "case_id": "c_shop_258",
+    "report_id": "rep_7730",
+    "title": "大疆 Mini 4 Pro 无人机 消费复盘",
+    "content": "花费 4788 元购买了 大疆 Mini 4 Pro 无人机。体验中规中矩，一方面设计精良，使用体验极佳，另一方面又新鲜感过后迅速吃灰，使用率极低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【摄影】的需求，考察了很久才决定入手。",
+    "price": 4788,
+    "usage_frequency": "出去旅游用过1次",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "摄影",
+      "航拍",
+      "数码",
+      "吃灰",
+      "neutral"
+    ],
+    "created_at": "2025-08-03T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2020",
+    "case_id": "c_time_326",
+    "report_id": "rep_5527",
+    "title": "花2周时间 手搓个人博客网站 精力投入复盘",
+    "content": "头脑发热去搞了 花2周时间 手搓个人博客网站。事后复盘发现不仅占用了太多本来该复习专业课的时间，还新鲜感过后迅速吃灰，使用率极低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【开发】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "开发",
+      "个人品牌",
+      "技术",
+      "成就感",
+      "regret"
+    ],
+    "created_at": "2025-09-27T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1002",
+    "case_id": "c_shop_987",
+    "report_id": "rep_9103",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "花了 14999 元买了 ROG RTX 4090 显卡。复盘来看，它设计精良，使用体验极佳，而且让我结识了一群优秀的同频朋友。虽然导致作息极其不规律，伤身体，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "worth"
+    ],
+    "created_at": "2025-06-26T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1035",
+    "case_id": "c_shop_836",
+    "report_id": "rep_6065",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "冲动消费花了 14999 元入手 ROG RTX 4090 显卡。买回来后发现价格溢价太高，性价比低，更糟的是占用了太多本来该复习专业课的时间。原本以为能设计精良，使用体验极佳，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "regret"
+    ],
+    "created_at": "2025-04-17T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1019",
+    "case_id": "c_shop_848",
+    "report_id": "rep_8197",
+    "title": "石头 T7S 扫地机器人 消费复盘",
+    "content": "冲动消费花了 1899 元入手 石头 T7S 扫地机器人。买回来后发现导致作息极其不规律，伤身体，更糟的是占用了太多本来该复习专业课的时间。原本以为能设计精良，使用体验极佳，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 1899,
+    "usage_frequency": "每周2次",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "清洁",
+      "懒人",
+      "省时",
+      "regret"
+    ],
+    "created_at": "2026-05-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2019",
+    "case_id": "c_time_942",
+    "report_id": "rep_3362",
+    "title": "花2周时间 手搓个人博客网站 精力投入复盘",
+    "content": "投入大量时间参与了 花2周时间 手搓个人博客网站。这段经历成为了写进简历的亮点，并且完美解决了我的刚需痛点。即使过程中导致作息极其不规律，伤身体，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【开发】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "成为了写进简历的亮点",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "开发",
+      "个人品牌",
+      "技术",
+      "成就感",
+      "worth"
+    ],
+    "created_at": "2025-12-05T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2039",
+    "case_id": "c_time_156",
+    "report_id": "rep_9952",
+    "title": "连续熬夜3天 追完权游全集 精力投入复盘",
+    "content": "头脑发热去搞了 连续熬夜3天 追完权游全集。事后复盘发现不仅占用了太多本来该复习专业课的时间，还导致作息极其不规律，伤身体。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【娱乐】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "娱乐",
+      "拖延",
+      "放纵",
+      "黑眼圈",
+      "regret"
+    ],
+    "created_at": "2025-06-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2014",
+    "case_id": "c_time_473",
+    "report_id": "rep_4321",
+    "title": "报名 21天英语口语打卡营 精力投入复盘",
+    "content": "投入大量时间参与了 报名 21天英语口语打卡营。这段经历极大提升了日常效率，并且让我结识了一群优秀的同频朋友。即使过程中团队沟通内耗严重，心力交瘁，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "课程",
+      "自我提升",
+      "拖延",
+      "worth"
+    ],
+    "created_at": "2026-03-16T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2046",
+    "case_id": "c_time_731",
+    "report_id": "rep_8327",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "参与了 期末前 极限突击复习高数。过程中确实完美解决了我的刚需痛点，但同时也价格溢价太高，性价比低。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "neutral"
+    ],
+    "created_at": "2025-08-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1008",
+    "case_id": "c_shop_661",
+    "report_id": "rep_5906",
+    "title": "HHKB 机械键盘 消费复盘",
+    "content": "冲动消费花了 2399 元入手 HHKB 机械键盘。买回来后发现隐藏的后续维护成本很高，更糟的是团队沟通内耗严重，心力交瘁。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【外设】的需求，考察了很久才决定入手。",
+    "price": 2399,
+    "usage_frequency": "每天",
+    "pros": [
+      "成为了写进简历的亮点",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "外设",
+      "办公",
+      "码农",
+      "退烧",
+      "regret"
+    ],
+    "created_at": "2025-11-08T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2042",
+    "case_id": "c_time_580",
+    "report_id": "rep_6529",
+    "title": "跟风去 草莓音乐节/演唱会 精力投入复盘",
+    "content": "头脑发热去搞了 跟风去 草莓音乐节/演唱会。事后复盘发现不仅导致作息极其不规律，伤身体，还占用了太多本来该复习专业课的时间。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【社交】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "社交",
+      "音乐",
+      "冲动",
+      "高消费",
+      "regret"
+    ],
+    "created_at": "2025-05-18T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2008",
+    "case_id": "c_time_210",
+    "report_id": "rep_8494",
+    "title": "沉迷 黑神话悟空 连续通宵 精力投入复盘",
+    "content": "头脑发热去搞了 沉迷 黑神话悟空 连续通宵。事后复盘发现不仅占用了太多本来该复习专业课的时间，还新鲜感过后迅速吃灰，使用率极低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【游戏】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "游戏",
+      "娱乐",
+      "沉迷",
+      "逃避现实",
+      "regret"
+    ],
+    "created_at": "2026-03-02T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2029",
+    "case_id": "c_time_882",
+    "report_id": "rep_3487",
+    "title": "连续熬夜3天 追完权游全集 精力投入复盘",
+    "content": "头脑发热去搞了 连续熬夜3天 追完权游全集。事后复盘发现不仅新鲜感过后迅速吃灰，使用率极低，还导致作息极其不规律，伤身体。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【娱乐】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "娱乐",
+      "拖延",
+      "放纵",
+      "黑眼圈",
+      "regret"
+    ],
+    "created_at": "2025-07-28T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2015",
+    "case_id": "c_time_657",
+    "report_id": "rep_7566",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "头脑发热去搞了 期末前 极限突击复习高数。事后复盘发现不仅团队沟通内耗严重，心力交瘁，还占用了太多本来该复习专业课的时间。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "regret"
+    ],
+    "created_at": "2025-02-06T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2006",
+    "case_id": "c_time_194",
+    "report_id": "rep_6271",
+    "title": "沉迷 黑神话悟空 连续通宵 精力投入复盘",
+    "content": "参与了 沉迷 黑神话悟空 连续通宵。过程中确实带来了极高的情绪价值，但同时也隐藏的后续维护成本很高。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【游戏】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "游戏",
+      "娱乐",
+      "沉迷",
+      "逃避现实",
+      "neutral"
+    ],
+    "created_at": "2025-04-05T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2031",
+    "case_id": "c_time_705",
+    "report_id": "rep_5823",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "参与了 期末前 极限突击复习高数。过程中确实带来了极高的情绪价值，但同时也导致作息极其不规律，伤身体。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "neutral"
+    ],
+    "created_at": "2026-04-07T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2030",
+    "case_id": "c_time_238",
+    "report_id": "rep_5737",
+    "title": "花2周时间 手搓个人博客网站 精力投入复盘",
+    "content": "头脑发热去搞了 花2周时间 手搓个人博客网站。事后复盘发现不仅隐藏的后续维护成本很高，还价格溢价太高，性价比低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【开发】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "开发",
+      "个人品牌",
+      "技术",
+      "成就感",
+      "regret"
+    ],
+    "created_at": "2025-04-19T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2047",
+    "case_id": "c_time_682",
+    "report_id": "rep_2084",
+    "title": "周末去 星巴克兼职打工 精力投入复盘",
+    "content": "投入大量时间参与了 周末去 星巴克兼职打工。这段经历设计精良，使用体验极佳，并且让我结识了一群优秀的同频朋友。即使过程中占用了太多本来该复习专业课的时间，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【兼职】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "兼职",
+      "赚钱",
+      "体力活",
+      "打工人",
+      "worth"
+    ],
+    "created_at": "2025-03-22T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1018",
+    "case_id": "c_shop_674",
+    "report_id": "rep_3488",
+    "title": "大疆 Mini 4 Pro 无人机 消费复盘",
+    "content": "冲动消费花了 4788 元入手 大疆 Mini 4 Pro 无人机。买回来后发现导致作息极其不规律，伤身体，更糟的是隐藏的后续维护成本很高。原本以为能让我结识了一群优秀的同频朋友，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【摄影】的需求，考察了很久才决定入手。",
+    "price": 4788,
+    "usage_frequency": "出去旅游用过1次",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "摄影",
+      "航拍",
+      "数码",
+      "吃灰",
+      "regret"
+    ],
+    "created_at": "2025-08-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2001",
+    "case_id": "c_time_448",
+    "report_id": "rep_7247",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "参与了 报班考 驾照科目二。过程中确实让我结识了一群优秀的同频朋友，但同时也新鲜感过后迅速吃灰，使用率极低。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "neutral"
+    ],
+    "created_at": "2026-05-01T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1049",
+    "case_id": "c_shop_701",
+    "report_id": "rep_8941",
+    "title": "Lululemon 瑜伽裤 消费复盘",
+    "content": "花费 850 元购买了 Lululemon 瑜伽裤。体验中规中矩，一方面让我结识了一群优秀的同频朋友，另一方面又团队沟通内耗严重，心力交瘁。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【服饰】的需求，考察了很久才决定入手。",
+    "price": 850,
+    "usage_frequency": "每周1次",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "服饰",
+      "运动",
+      "穿搭",
+      "高溢价",
+      "neutral"
+    ],
+    "created_at": "2025-10-04T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1025",
+    "case_id": "c_shop_998",
+    "report_id": "rep_8077",
+    "title": "ROG RTX 4090 显卡 消费复盘",
+    "content": "冲动消费花了 14999 元入手 ROG RTX 4090 显卡。买回来后发现新鲜感过后迅速吃灰，使用率极低，更糟的是隐藏的后续维护成本很高。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【电竞】的需求，考察了很久才决定入手。",
+    "price": 14999,
+    "usage_frequency": "每天",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "电竞",
+      "装机",
+      "高消费",
+      "硬件",
+      "regret"
+    ],
+    "created_at": "2025-05-26T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1016",
+    "case_id": "c_shop_335",
+    "report_id": "rep_9666",
+    "title": "Lululemon 瑜伽裤 消费复盘",
+    "content": "花费 850 元购买了 Lululemon 瑜伽裤。体验中规中矩，一方面成为了写进简历的亮点，另一方面又价格溢价太高，性价比低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【服饰】的需求，考察了很久才决定入手。",
+    "price": 850,
+    "usage_frequency": "每周1次",
+    "pros": [
+      "成为了写进简历的亮点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "服饰",
+      "运动",
+      "穿搭",
+      "高溢价",
+      "neutral"
+    ],
+    "created_at": "2025-11-15T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1027",
+    "case_id": "c_shop_546",
+    "report_id": "rep_8662",
+    "title": "极米 智能投影仪 消费复盘",
+    "content": "冲动消费花了 2999 元入手 极米 智能投影仪。买回来后发现隐藏的后续维护成本很高，更糟的是价格溢价太高，性价比低。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【影音】的需求，考察了很久才决定入手。",
+    "price": 2999,
+    "usage_frequency": "周末看电影",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "影音",
+      "家居",
+      "娱乐",
+      "提升幸福感",
+      "regret"
+    ],
+    "created_at": "2025-02-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1041",
+    "case_id": "c_shop_271",
+    "report_id": "rep_3611",
+    "title": "威尔仕 健身房年卡 消费复盘",
+    "content": "冲动消费花了 1599 元入手 威尔仕 健身房年卡。买回来后发现隐藏的后续维护成本很高，更糟的是新鲜感过后迅速吃灰，使用率极低。原本以为能带来了极高的情绪价值，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【健康】的需求，考察了很久才决定入手。",
+    "price": 1599,
+    "usage_frequency": "几乎没去",
+    "pros": [
+      "带来了极高的情绪价值",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "健康",
+      "健身",
+      "运动",
+      "冲动消费",
+      "regret"
+    ],
+    "created_at": "2025-06-22T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1042",
+    "case_id": "c_shop_801",
+    "report_id": "rep_1966",
+    "title": "索尼 WH-1000XM5 降噪耳机 消费复盘",
+    "content": "花费 2499 元购买了 索尼 WH-1000XM5 降噪耳机。体验中规中矩，一方面让我结识了一群优秀的同频朋友，另一方面又占用了太多本来该复习专业课的时间。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【学习】的需求，考察了很久才决定入手。",
+    "price": 2499,
+    "usage_frequency": "每天",
+    "pros": [
+      "让我结识了一群优秀的同频朋友",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "学习",
+      "考研",
+      "电子产品",
+      "降噪",
+      "neutral"
+    ],
+    "created_at": "2025-10-11T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1031",
+    "case_id": "c_shop_286",
+    "report_id": "rep_1083",
+    "title": "Apple iPad Pro 2024 消费复盘",
+    "content": "冲动消费花了 8999 元入手 Apple iPad Pro 2024。买回来后发现导致作息极其不规律，伤身体，更糟的是占用了太多本来该复习专业课的时间。原本以为能带来了极高的情绪价值，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【生产力】的需求，考察了很久才决定入手。",
+    "price": 8999,
+    "usage_frequency": "每周3次",
+    "pros": [
+      "带来了极高的情绪价值",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "生产力",
+      "学习",
+      "平板",
+      "电子产品",
+      "regret"
+    ],
+    "created_at": "2025-01-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1038",
+    "case_id": "c_shop_450",
+    "report_id": "rep_4115",
+    "title": "Bose QC Earbuds II 消费复盘",
+    "content": "花费 1999 元购买了 Bose QC Earbuds II。体验中规中矩，一方面极大提升了日常效率，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【降噪】的需求，考察了很久才决定入手。",
+    "price": 1999,
+    "usage_frequency": "每天通勤",
+    "pros": [
+      "极大提升了日常效率",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "价格溢价太高，性价比低"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "降噪",
+      "通勤",
+      "音频",
+      "刚需",
+      "neutral"
+    ],
+    "created_at": "2026-03-30T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2041",
+    "case_id": "c_time_987",
+    "report_id": "rep_7731",
+    "title": "学生会 迎新晚会统筹策划 精力投入复盘",
+    "content": "投入大量时间参与了 学生会 迎新晚会统筹策划。这段经历设计精良，使用体验极佳，并且让我结识了一群优秀的同频朋友。即使过程中团队沟通内耗严重，心力交瘁，也完全值得，是一次极好的个人成长投资。",
+    "context": "当时抱着【社交】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "do",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "社交",
+      "学生工作",
+      "内耗",
+      "沟通",
+      "worth"
+    ],
+    "created_at": "2025-01-01T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1039",
+    "case_id": "c_shop_701",
+    "report_id": "rep_3992",
+    "title": "始祖鸟 冲锋衣 消费复盘",
+    "content": "冲动消费花了 3500 元入手 始祖鸟 冲锋衣。买回来后发现占用了太多本来该复习专业课的时间，更糟的是团队沟通内耗严重，心力交瘁。原本以为能带来了极高的情绪价值，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【户外】的需求，考察了很久才决定入手。",
+    "price": 3500,
+    "usage_frequency": "秋冬日常",
+    "pros": [
+      "带来了极高的情绪价值",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "户外",
+      "穿搭",
+      "保暖",
+      "跟风",
+      "regret"
+    ],
+    "created_at": "2026-01-16T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2013",
+    "case_id": "c_time_601",
+    "report_id": "rep_8831",
+    "title": "连续熬夜3天 追完权游全集 精力投入复盘",
+    "content": "头脑发热去搞了 连续熬夜3天 追完权游全集。事后复盘发现不仅新鲜感过后迅速吃灰，使用率极低，还团队沟通内耗严重，心力交瘁。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【娱乐】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "娱乐",
+      "拖延",
+      "放纵",
+      "黑眼圈",
+      "regret"
+    ],
+    "created_at": "2025-02-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2004",
+    "case_id": "c_time_695",
+    "report_id": "rep_9281",
+    "title": "报名 21天英语口语打卡营 精力投入复盘",
+    "content": "头脑发热去搞了 报名 21天英语口语打卡营。事后复盘发现不仅占用了太多本来该复习专业课的时间，还新鲜感过后迅速吃灰，使用率极低。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "带来了极高的情绪价值"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "课程",
+      "自我提升",
+      "拖延",
+      "regret"
+    ],
+    "created_at": "2025-12-30T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1015",
+    "case_id": "c_shop_408",
+    "report_id": "rep_1162",
+    "title": "戴森 HD15 吹风机 消费复盘",
+    "content": "花了 2990 元买了 戴森 HD15 吹风机。复盘来看，它带来了极高的情绪价值，而且设计精良，使用体验极佳。虽然新鲜感过后迅速吃灰，使用率极低，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 2990,
+    "usage_frequency": "每天",
+    "pros": [
+      "带来了极高的情绪价值",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "生活品质",
+      "个护",
+      "高溢价",
+      "worth"
+    ],
+    "created_at": "2026-02-13T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1024",
+    "case_id": "c_shop_166",
+    "report_id": "rep_4414",
+    "title": "大疆 Mini 4 Pro 无人机 消费复盘",
+    "content": "冲动消费花了 4788 元入手 大疆 Mini 4 Pro 无人机。买回来后发现占用了太多本来该复习专业课的时间，更糟的是隐藏的后续维护成本很高。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【摄影】的需求，考察了很久才决定入手。",
+    "price": 4788,
+    "usage_frequency": "出去旅游用过1次",
+    "pros": [
+      "成为了写进简历的亮点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "摄影",
+      "航拍",
+      "数码",
+      "吃灰",
+      "regret"
+    ],
+    "created_at": "2026-03-11T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2034",
+    "case_id": "c_time_483",
+    "report_id": "rep_1713",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "参与了 报班考 驾照科目二。过程中确实极大提升了日常效率，但同时也导致作息极其不规律，伤身体。总体体验平平，当做一次普通的生活经历体验了。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "极大提升了日常效率",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "neutral"
+    ],
+    "created_at": "2025-03-10T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1029",
+    "case_id": "c_shop_361",
+    "report_id": "rep_5349",
+    "title": "Apple iPad Pro 2024 消费复盘",
+    "content": "花费 8999 元购买了 Apple iPad Pro 2024。体验中规中矩，一方面设计精良，使用体验极佳，另一方面又隐藏的后续维护成本很高。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【生产力】的需求，考察了很久才决定入手。",
+    "price": 8999,
+    "usage_frequency": "每周3次",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "隐藏的后续维护成本很高",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "生产力",
+      "学习",
+      "平板",
+      "电子产品",
+      "neutral"
+    ],
+    "created_at": "2026-04-05T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1023",
+    "case_id": "c_shop_187",
+    "report_id": "rep_2273",
+    "title": "始祖鸟 冲锋衣 消费复盘",
+    "content": "花了 3500 元买了 始祖鸟 冲锋衣。复盘来看，它成为了写进简历的亮点，而且完美解决了我的刚需痛点。虽然占用了太多本来该复习专业课的时间，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【户外】的需求，考察了很久才决定入手。",
+    "price": 3500,
+    "usage_frequency": "秋冬日常",
+    "pros": [
+      "成为了写进简历的亮点",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "户外",
+      "穿搭",
+      "保暖",
+      "跟风",
+      "worth"
+    ],
+    "created_at": "2025-06-03T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1036",
+    "case_id": "c_shop_319",
+    "report_id": "rep_6914",
+    "title": "戴森 HD15 吹风机 消费复盘",
+    "content": "花了 2990 元买了 戴森 HD15 吹风机。复盘来看，它完美解决了我的刚需痛点，而且设计精良，使用体验极佳。虽然导致作息极其不规律，伤身体，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 2990,
+    "usage_frequency": "每天",
+    "pros": [
+      "完美解决了我的刚需痛点",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "生活品质",
+      "个护",
+      "高溢价",
+      "worth"
+    ],
+    "created_at": "2025-01-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2026",
+    "case_id": "c_time_318",
+    "report_id": "rep_8939",
+    "title": "期末前 极限突击复习高数 精力投入复盘",
+    "content": "头脑发热去搞了 期末前 极限突击复习高数。事后复盘发现不仅价格溢价太高，性价比低，还占用了太多本来该复习专业课的时间。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【学习】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "学习",
+      "期末",
+      "焦虑",
+      "效率",
+      "regret"
+    ],
+    "created_at": "2026-02-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1033",
+    "case_id": "c_shop_844",
+    "report_id": "rep_4316",
+    "title": "二手 Kindle Oasis 消费复盘",
+    "content": "冲动消费花了 400 元入手 二手 Kindle Oasis。买回来后发现导致作息极其不规律，伤身体，更糟的是新鲜感过后迅速吃灰，使用率极低。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【阅读】的需求，考察了很久才决定入手。",
+    "price": 400,
+    "usage_frequency": "用来盖泡面",
+    "pros": [
+      "成为了写进简历的亮点",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "导致作息极其不规律，伤身体",
+      "新鲜感过后迅速吃灰，使用率极低"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "阅读",
+      "二手",
+      "闲置",
+      "泡面盖",
+      "regret"
+    ],
+    "created_at": "2025-09-12T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1014",
+    "case_id": "c_shop_984",
+    "report_id": "rep_9802",
+    "title": "Bose QC Earbuds II 消费复盘",
+    "content": "花了 1999 元买了 Bose QC Earbuds II。复盘来看，它带来了极高的情绪价值，而且完美解决了我的刚需痛点。虽然新鲜感过后迅速吃灰，使用率极低，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【降噪】的需求，考察了很久才决定入手。",
+    "price": 1999,
+    "usage_frequency": "每天通勤",
+    "pros": [
+      "带来了极高的情绪价值",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "隐藏的后续维护成本很高"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "降噪",
+      "通勤",
+      "音频",
+      "刚需",
+      "worth"
+    ],
+    "created_at": "2025-08-20T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1047",
+    "case_id": "c_shop_669",
+    "report_id": "rep_8434",
+    "title": "Lululemon 瑜伽裤 消费复盘",
+    "content": "冲动消费花了 850 元入手 Lululemon 瑜伽裤。买回来后发现新鲜感过后迅速吃灰，使用率极低，更糟的是导致作息极其不规律，伤身体。原本以为能成为了写进简历的亮点，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【服饰】的需求，考察了很久才决定入手。",
+    "price": 850,
+    "usage_frequency": "每周1次",
+    "pros": [
+      "成为了写进简历的亮点",
+      "极大提升了日常效率"
+    ],
+    "cons": [
+      "新鲜感过后迅速吃灰，使用率极低",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "服饰",
+      "运动",
+      "穿搭",
+      "高溢价",
+      "regret"
+    ],
+    "created_at": "2025-09-24T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1045",
+    "case_id": "c_shop_358",
+    "report_id": "rep_4875",
+    "title": "石头 T7S 扫地机器人 消费复盘",
+    "content": "花了 1899 元买了 石头 T7S 扫地机器人。复盘来看，它设计精良，使用体验极佳，而且让我结识了一群优秀的同频朋友。虽然占用了太多本来该复习专业课的时间，但整体绝对属于超高回报的刚需消费。",
+    "context": "当时为了满足【家电】的需求，考察了很久才决定入手。",
+    "price": 1899,
+    "usage_frequency": "每周2次",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "让我结识了一群优秀的同频朋友"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "buy",
+    "result": "worth",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "家电",
+      "清洁",
+      "懒人",
+      "省时",
+      "worth"
+    ],
+    "created_at": "2025-07-23T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1006",
+    "case_id": "c_shop_576",
+    "report_id": "rep_4757",
+    "title": "索尼 WH-1000XM5 降噪耳机 消费复盘",
+    "content": "冲动消费花了 2499 元入手 索尼 WH-1000XM5 降噪耳机。买回来后发现团队沟通内耗严重，心力交瘁，更糟的是占用了太多本来该复习专业课的时间。原本以为能设计精良，使用体验极佳，结果完全是伪需求，极度后悔。",
+    "context": "当时为了满足【学习】的需求，考察了很久才决定入手。",
+    "price": 2499,
+    "usage_frequency": "每天",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "完美解决了我的刚需痛点"
+    ],
+    "cons": [
+      "团队沟通内耗严重，心力交瘁",
+      "占用了太多本来该复习专业课的时间"
+    ],
+    "final_decision": "delay",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "学习",
+      "考研",
+      "电子产品",
+      "降噪",
+      "regret"
+    ],
+    "created_at": "2026-02-09T00:00:00+08:00"
+  },
+  {
+    "id": "h_time_2022",
+    "case_id": "c_time_263",
+    "report_id": "rep_9212",
+    "title": "报班考 驾照科目二 精力投入复盘",
+    "content": "头脑发热去搞了 报班考 驾照科目二。事后复盘发现不仅占用了太多本来该复习专业课的时间，还导致作息极其不规律，伤身体。完全打乱了我的核心计划，得不偿失，严重后悔投入这些精力。",
+    "context": "当时抱着【考试】的目的报名参加了这个活动。",
+    "price": 0,
+    "usage_frequency": "一次性投入",
+    "pros": [
+      "设计精良，使用体验极佳",
+      "成为了写进简历的亮点"
+    ],
+    "cons": [
+      "占用了太多本来该复习专业课的时间",
+      "导致作息极其不规律，伤身体"
+    ],
+    "final_decision": "cancel",
+    "result": "regret",
+    "source": "decision_history",
+    "case_type": "time",
+    "tags": [
+      "考试",
+      "技能",
+      "挨骂",
+      "时间管理",
+      "regret"
+    ],
+    "created_at": "2025-01-23T00:00:00+08:00"
+  },
+  {
+    "id": "h_shop_1046",
+    "case_id": "c_shop_573",
+    "report_id": "rep_5042",
+    "title": "威尔仕 健身房年卡 消费复盘",
+    "content": "花费 1599 元购买了 威尔仕 健身房年卡。体验中规中矩，一方面带来了极高的情绪价值，另一方面又价格溢价太高，性价比低。不亏也不赚，属于可买可不买的物品。",
+    "context": "当时为了满足【健康】的需求，考察了很久才决定入手。",
+    "price": 1599,
+    "usage_frequency": "几乎没去",
+    "pros": [
+      "带来了极高的情绪价值",
+      "设计精良，使用体验极佳"
+    ],
+    "cons": [
+      "价格溢价太高，性价比低",
+      "团队沟通内耗严重，心力交瘁"
+    ],
+    "final_decision": "neutral",
+    "result": "neutral",
+    "source": "decision_history",
+    "case_type": "shopping",
+    "tags": [
+      "健康",
+      "健身",
+      "运动",
+      "冲动消费",
+      "neutral"
+    ],
+    "created_at": "2025-03-22T00:00:00+08:00"
   }
 ]
