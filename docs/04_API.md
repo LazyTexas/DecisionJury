@@ -395,7 +395,7 @@ GET /api/health
   "success": true,
   "data": {
     "status": "ok",
-    "version": "0.2"
+    "version": "1.0.0"
   },
   "message": ""
 }
@@ -433,24 +433,13 @@ POST /api/cases
 {
   "success": true,
   "data": {
-    "case": {
-      "case_id": "case_001",
-      "user_id": "u001",
-      "case_type": "shopping",
-      "title": "是否购买降噪耳机",
-      "description": "我想买一副 1299 元的降噪耳机，最近学习需要安静。",
-      "status": "collecting",
-      "collected_fields": {
-        "price": 1299,
-        "purpose": "学习"
-      },
-      "missing_fields": ["monthly_budget_left", "owned_alternatives"],
-      "final_decision": null,
-      "report_id": null,
-      "created_at": "2026-07-01T10:00:00+08:00",
-      "updated_at": "2026-07-01T10:00:00+08:00"
+    "case_id": "case_xxxxxxxx",
+    "case_status": "collecting",
+    "collected_fields": {
+      "description": "我想买一副1299元的降噪耳机，最近学习需要安静。"
     },
-    "next_question": "你本月预算还剩多少？是否已经有类似耳机？"
+    "missing_fields": ["monthly_budget_left", "owned_alternatives"],
+    "next_question": "你本月预算还剩多少？"
   },
   "message": "case created"
 }
@@ -507,53 +496,14 @@ PATCH /api/cases/{case_id}
 
 ```json
 {
-  "user_id": "u001",
-  "title": "是否购买降噪耳机",
-  "description": "我想买一副 1299 元的降噪耳机。",
+  "title": "更新后的标题",
   "collected_fields": {
-    "monthly_budget_left": 2000,
-    "owned_alternatives": "普通耳机"
+    "monthly_budget_left": 3000
   }
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| title | string | 否 | 新标题 |
-| description | string | 否 | 新描述 |
-| collected_fields | object | 否 | 用户补充的结构化字段 |
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "case": {
-      "case_id": "case_001",
-      "user_id": "u001",
-      "case_type": "shopping",
-      "title": "是否购买降噪耳机",
-      "description": "我想买一副 1299 元的降噪耳机。",
-      "status": "ready_for_debate",
-      "collected_fields": {
-        "price": 1299,
-        "monthly_budget_left": 2000,
-        "owned_alternatives": "普通耳机"
-      },
-      "missing_fields": [],
-      "final_decision": null,
-      "report_id": null,
-      "created_at": "2026-07-01T10:00:00+08:00",
-      "updated_at": "2026-07-01T10:05:00+08:00"
-    }
-  },
-  "message": "case updated"
-}
-```
-
-`case` 必须使用完整公共结构 `Case`，不能返回空对象。
+返回：更新后的完整案件信息，格式与 `GET /api/cases/{case_id}` 一致。
 
 ### 8.4 多轮补充信息
 
@@ -581,7 +531,7 @@ POST /api/cases/{case_id}/messages
 {
   "success": true,
   "data": {
-    "reply": "信息已补充。当前案件信息已经完整，可以进入正反方分析。",
+    "reply": "信息已补充完整，可以进入正反方分析。",
     "case_status": "ready_for_debate",
     "collected_fields": {
       "monthly_budget_left": 2000,
@@ -619,15 +569,15 @@ POST /api/cases/{case_id}/debate
 {
   "success": true,
   "data": {
-    "case_id": "case_001",
+    "case_id": "case_xxxxxxxx",
     "case_status": "completed",
     "steps": [
       {
         "agent": "input_parser",
         "status": "completed",
         "summary": "识别为 shopping，信息完整。",
-        "confidence": 0.92,
-        "arguments": ["识别到商品价格、预算和替代品"],
+        "confidence": 0.95,
+        "arguments": [],
         "used_rag_ids": [],
         "used_tool_names": [],
         "error": null
@@ -635,9 +585,9 @@ POST /api/cases/{case_id}/debate
       {
         "agent": "pro_agent",
         "status": "completed",
-        "summary": "该耳机能改善学习环境，存在明确使用场景。",
+        "summary": "...",
         "confidence": 0.7,
-        "arguments": ["学习场景明确", "降噪功能与目标相关"],
+        "arguments": [],
         "used_rag_ids": [],
         "used_tool_names": [],
         "error": null
@@ -645,100 +595,41 @@ POST /api/cases/{case_id}/debate
       {
         "agent": "con_agent",
         "status": "completed",
-        "summary": "价格占剩余预算比例较高，且已有普通耳机。",
-        "confidence": 0.82,
-        "arguments": ["预算压力中等", "存在已有替代品"],
-        "used_rag_ids": ["history_001"],
+        "summary": "...",
+        "confidence": 0.8,
+        "arguments": [],
+        "used_rag_ids": [],
         "used_tool_names": ["cost_analyzer"],
         "error": null
       },
       {
         "agent": "judge_agent",
         "status": "completed",
-        "summary": "建议暂缓 3 天后再决定。",
-        "confidence": 0.75,
-        "arguments": ["预算占比 65%", "历史存在电子产品闲置记录"],
-        "used_rag_ids": ["history_001"],
+        "summary": "建议暂缓购买3天。",
+        "confidence": 0.85,
+        "arguments": [],
+        "used_rag_ids": [],
         "used_tool_names": ["cost_analyzer", "cooling_reminder"],
         "error": null
       }
     ],
-    "rag_evidence": [
-      {
-        "id": "history_001",
-        "title": "历史闲置记录",
-        "content": "用户曾购买蓝牙键盘后使用频率较低。",
-        "score": 0.82,
-        "source": "decision_history",
-        "case_type": "shopping",
-        "tags": ["electronics", "idle"],
-        "created_at": "2026-06-20T12:00:00+08:00"
-      }
-    ],
-    "tool_results": [
-      {
-        "tool_name": "cost_analyzer",
-        "status": "success",
-        "summary": "该商品占剩余预算约 65%，预算压力中等。",
-        "risk_level": "medium",
-        "metrics": {
-          "budget_ratio": 0.65,
-          "budget_left_after_purchase": 701
-        },
-        "error": null
-      },
-      {
-        "tool_name": "cooling_reminder",
-        "status": "success",
-        "summary": "已创建 3 天冷静期提醒。",
-        "risk_level": null,
-        "metrics": {
-          "reminder_id": "reminder_001",
-          "cooling_days": 3,
-          "due_at": "2026-07-04T20:00:00+08:00",
-          "watch_items": ["是否仍然需要", "是否有低价替代品"]
-        },
-        "error": null
-      }
-    ],
+    "rag_evidence": [...],
+    "tool_results": [...],
     "report": {
-      "report_id": "report_001",
-      "case_id": "case_001",
+      "report_id": "report_xxxxxxxx",
       "case_type": "shopping",
       "final_decision": "delay",
-      "confidence": 0.75,
-      "summary": "本案建议暂缓购买 3 天。",
-      "case_summary": "用户想购买 1299 元降噪耳机用于学习。",
-      "pro_points": ["存在学习降噪场景，可能提高专注度。"],
-      "con_points": ["价格占剩余预算较高，且已有普通耳机。"],
-      "rag_evidence": [
-        {
-          "id": "history_001",
-          "title": "历史闲置记录",
-          "content": "用户曾购买蓝牙键盘后使用频率较低。",
-          "score": 0.82,
-          "source": "decision_history",
-          "case_type": "shopping",
-          "tags": ["electronics", "idle"],
-          "created_at": "2026-06-20T12:00:00+08:00"
-        }
-      ],
-      "tool_results": [
-        {
-          "tool_name": "cost_analyzer",
-          "status": "success",
-          "summary": "该商品占剩余预算约 65%，预算压力中等。",
-          "risk_level": "medium",
-          "metrics": {
-            "budget_ratio": 0.65,
-            "budget_left_after_purchase": 701
-          },
-          "error": null
-        }
-      ],
-      "next_actions": ["加入观察清单，3 天后复盘。"],
-      "created_at": "2026-07-01T10:10:00+08:00"
-    }
+      "confidence": 0.85,
+      "summary": "本案建议暂缓购买3天。",
+      "case_summary": "用户想购买1299元降噪耳机用于学习。",
+      "pro_points": ["购买目的较明确：降噪", "预期使用频率为每天，可能支撑长期价值"],
+      "con_points": ["价格占剩余预算约43%，风险等级为medium", "已有替代品"],
+      "rag_evidence": [...],
+      "tool_results": [...],
+      "next_actions": ["加入观察清单，3天后复盘"],
+      "created_at": "..."
+    },
+    "trace": [...]
   },
   "message": "debate completed"
 }
@@ -983,6 +874,8 @@ GET /api/cases/{case_id}/report
 
 返回：
 
+返回 C 模块生成的真实 `report`，结构同 `report` 字段。
+
 ```json
 {
   "success": true,
@@ -1019,29 +912,19 @@ GET /api/cases/{case_id}/trace
 {
   "success": true,
   "data": {
-    "case_id": "case_001",
+    "case_id": "case_xxxxxxxx",
     "trace": [
       {
-        "trace_id": "trace_001",
+        "trace_id": "trace_xxxxxxxx",
         "step": 1,
         "type": "agent",
         "name": "input_parser",
-        "input_summary": "用户想购买降噪耳机",
-        "output_summary": "识别为 shopping，缺少预算和替代品信息",
-        "duration_ms": 900,
+        "input_summary": "...",
+        "output_summary": "...",
+        "duration_ms": 100,
         "status": "completed",
-        "error": null
-      },
-      {
-        "trace_id": "trace_002",
-        "step": 2,
-        "type": "rag_search",
-        "name": "rag_search",
-        "input_summary": "降噪耳机 学习 电子产品",
-        "output_summary": "召回 1 条历史记录",
-        "duration_ms": 120,
-        "status": "completed",
-        "error": null
+        "error": null,
+        "created_at": "..."
       }
     ]
   },
@@ -1065,15 +948,21 @@ GET /api/history?user_id=u001
   "data": {
     "items": [
       {
-        "history_id": "history_001",
-        "user_id": "u001",
+        "history_id": "history_xxxxxxxx",
+        "user_id": "local_user",
         "case_type": "shopping",
-        "summary": "上个月购买蓝牙键盘后使用频率较低。",
-        "result": "regret",
-        "tags": ["electronics", "idle"],
-        "created_at": "2026-06-20T12:00:00+08:00"
+        "title": "降噪耳机",
+        "summary": "用户复盘：购买降噪耳机，实际行为：bought，满意度：4★",
+        "result": "worth",
+        "tags": [],
+        "case_id": "case_xxxxxxxx",
+        "report_id": "report_xxxxxxxx",
+        "created_at": "..."
       }
-    ]
+    ],
+    "total": 1,
+    "page": 1,
+    "page_size": 10
   },
   "message": ""
 }
@@ -1085,15 +974,18 @@ GET /api/history?user_id=u001
 POST /api/history
 ```
 
-请求：
-
 ```json
 {
-  "user_id": "u001",
+  "user_id": "local_user",
   "case_type": "shopping",
-  "summary": "购买蓝牙键盘后使用频率较低。",
-  "result": "regret",
-  "tags": ["electronics", "idle"]
+  "summary": "购买降噪耳机，建议暂缓3天",
+  "result": "neutral",
+  "tags": ["electronics"],
+  "title": "索尼降噪耳机",
+  "price": 1299,
+  "context": "考研期间每天学习需要降噪",
+  "case_id": "case_xxxxxxxx",
+  "report_id": "report_xxxxxxxx"
 }
 ```
 
@@ -1103,7 +995,7 @@ POST /api/history
 {
   "success": true,
   "data": {
-    "history_id": "history_002"
+    "history_id": "history_xxxxxxxx"
   },
   "message": "history created"
 }
@@ -1176,17 +1068,22 @@ POST /api/cases/{case_id}/feedback
 
 ## 15. 错误码
 
-| 错误码 | 含义 | 处理方式 |
-|---|---|---|
-| CASE_NOT_FOUND | 案件不存在 | 检查 `case_id` |
-| MISSING_FIELDS | 案件信息不完整 | 前端继续追问用户 |
-| UNSUPPORTED_CASE_TYPE | 不支持的案件类型 | 只允许 `shopping` 或 `time` |
-| HIGH_RISK_DECISION | 高风险决策 | 拒绝裁决并提示范围边界 |
-| LLM_ERROR | 大模型调用失败 | 提示重试，可使用 mock |
-| LLM_JSON_PARSE_ERROR | LLM 输出无法解析 | 保留原始输出并提示重试 |
-| RAG_ERROR | 检索失败 | 允许无历史依据继续 |
-| TOOL_ERROR | 工具调用失败 | 标记工具结果缺失 |
-| VALIDATION_ERROR | 请求字段错误 | 检查请求参数 |
+| 错误码 | 含义 | HTTP 状态码 |
+| --- | --- | --- |
+| CASE_NOT_FOUND | 案件不存在 | 200（业务错误） |
+| MISSING_FIELDS | 案件信息不完整 | 200（业务错误） |
+| UNSUPPORTED_CASE_TYPE | 不支持的案件类型 | 200（业务错误） |
+| HIGH_RISK_DECISION | 高风险决策 | 200（业务错误） |
+| REPORT_NOT_FOUND | 判决书不存在 | 200（业务错误） |
+| CASE_NOT_COMPLETED | 案件未完成 | 200（业务错误） |
+| LLM_ERROR | 大模型调用失败 | 500 |
+| RAG_ERROR | 检索失败 | 500 |
+| TOOL_ERROR | 工具调用失败 | 500 |
+| VALIDATION_ERROR | 请求字段错误 | 422 |
+| DATABASE_ERROR | 数据库错误 | 500 |
+| INTERNAL_SERVER_ERROR | 服务器内部错误 | 500 |
+| INVALID_JSON_FORMAT | JSON 格式错误 | 400 |
+| INTEGRITY_ERROR | 数据库完整性错误 | 400 |
 
 ## 16. 联调要求
 
