@@ -97,3 +97,48 @@ def test_explanation_contains_chinese():
 
     result2 = analyze_time(hours_required=16, free_hours_this_week=20, urgent_tasks=2)
     assert "占用本周" in result2["explanation"]
+
+
+def test_shopping_negative_price_raises():
+    """negative price is invalid -> ValueError"""
+    try:
+        analyze_shopping(price=-10, monthly_budget_left=2000)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_shopping_negative_budget_raises():
+    """negative remaining budget is invalid -> ValueError"""
+    try:
+        analyze_shopping(price=100, monthly_budget_left=-1)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_time_negative_hours_raises():
+    """negative required hours is invalid -> ValueError"""
+    try:
+        analyze_time(hours_required=-4, free_hours_this_week=20, urgent_tasks=1)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_time_negative_free_hours_raises():
+    """negative free hours is invalid -> ValueError"""
+    try:
+        analyze_time(hours_required=4, free_hours_this_week=-5, urgent_tasks=1)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
+
+
+def test_time_negative_urgent_tasks_raises():
+    """negative urgent_tasks is invalid -> ValueError"""
+    try:
+        analyze_time(hours_required=4, free_hours_this_week=20, urgent_tasks=-1)
+        assert False, "expected ValueError"
+    except ValueError:
+        pass

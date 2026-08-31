@@ -53,3 +53,20 @@ def client(db_engine):
     with TestClient(app) as c:
         yield c
     app.dependency_overrides.clear()
+
+
+@pytest.fixture()
+def db_session(db_engine):
+    """共享内存数据库的会话，供路由测试直接读写数据。
+
+    与 client 共用同一个 db_engine，因此在测试里通过 db_session
+    写入的案例/提醒，能通过 HTTP 接口读出来。
+    """
+    TestSessionLocal = sessionmaker(
+        autocommit=False, autoflush=False, bind=db_engine
+    )
+    db = TestSessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
