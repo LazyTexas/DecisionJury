@@ -459,9 +459,9 @@ backend、tests 和 mcp_tools 编译检查通过
 - `cooling_reminder` 失败时主流程不中断。
 - C-E MCP adapter 能将 E 模块 `cost_analyzer` 原始结果转换为 `ToolResult`。
 - C-E MCP adapter 能将 E 模块 `cooling_reminder` 成功、业务失败和异常场景转换为稳定的 `ToolResult`。
-- DeepSeek LLM client 在有 `DEEPSEEK_API_KEY` 时使用真实 client，模型固定为 `deepseek-v4-pro`。
+- DeepSeek LLM client 在有 `DEEPSEEK_API_KEY` 时使用真实 client，模型固定为 `deepseek-v4-flash`。
 - 未配置 Key、API 异常、超时、非 JSON、字段缺失或字段类型错误时，会 fallback 到 mock。
-- DeepSeek 请求体会带上固定模型、5 秒 timeout 和 Authorization 头模板。
+- DeepSeek 请求体会带上固定模型、默认 30 秒 timeout（可由 `DEEPSEEK_TIMEOUT_SECONDS` 覆盖）和 Authorization 头模板。
 - trace 能展示 Agent、RAG、MCP 工具调用顺序。
 
 尚未覆盖场景：

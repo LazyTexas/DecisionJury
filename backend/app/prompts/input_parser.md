@@ -33,9 +33,9 @@ If the input contains words like "buy" but the actual topic is medicine, funds, 
 
 Return one JSON object only. Do not wrap it in Markdown code fences. Do not add explanations before or after the JSON.
 
-The JSON must be directly mappable to `ParserResult`, and `agent_step` must be directly mappable to `AgentStep`.
+The model response is an internal parsing result. The application computes `merged_fields`, `missing_fields`, `case_status`, and `agent_step` locally after validating this response.
 
-Use English `snake_case` for JSON field names. Use Simplified Chinese for user-facing text values such as `summary`, `arguments`, and `next_question`.
+Use English `snake_case` for JSON field names. Use Simplified Chinese for user-facing text values such as `next_question`.
 
 ## Inputs
 
@@ -46,6 +46,10 @@ Case information:
 Conversation history:
 
 {{conversation_history}}
+
+Current user message:
+
+{{current_message}}
 
 Existing collected fields:
 
@@ -70,17 +74,20 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 ## Rules
 
 1. Check for high-risk input before extracting shopping fields.
-2. High-risk input must output `is_high_risk = true` and `case_status = "rejected"`.
+2. High-risk input must output `is_high_risk = true`; the application sets the rejected status locally.
 3. High-risk input must not generate a follow-up question or enter pro/con debate.
-4. If any required shopping field is missing, `case_status` must be `collecting`.
-5. If all required fields are complete, `case_status` must be `ready_for_debate`.
+4. The application computes missing fields after validating and merging the model response.
+5. The application derives the final case status locally; do not include `case_status` in the model response.
 6. Do not ask again for fields that were already clearly answered.
 7. Ask for at most 2 to 3 key fields in one follow-up question.
 8. Do not invent price, budget, alternatives, usage frequency, or purchase motivation.
 9. Treat vague answers such as "maybe", "not sure", "probably", or "I don't know" as missing for the relevant field.
 10. Use `snake_case` for all field names.
-11. Keep `summary`, `arguments`, and `next_question` concise and suitable for display in the MVP UI.
+11. Keep `next_question` concise and suitable for display in the MVP UI.
 12. If the case is rejected, explain that DecisionJury only supports low-risk daily shopping decisions.
+13. Understand natural and colloquial Chinese, but extract only facts clearly stated by the user.
+14. Put explicitly corrected values in `correction_fields`; ordinary additions belong in `extracted_fields`.
+15. Do not use `correction_fields` for guesses or ambiguous statements.
 
 ## Output JSON Schema
 
@@ -98,35 +105,21 @@ Before a shopping case can enter debate, collect these fields as much as possibl
     "expected_usage_frequency": null,
     "trigger_reason": null
   },
-  "merged_fields": {},
-  "missing_fields": [],
+  "correction_fields": {},
   "next_question": null,
-  "case_status": "collecting",
-  "agent_step": {
-    "agent": "input_parser",
-    "status": "completed",
-    "summary": "",
-    "confidence": 0.0,
-    "arguments": [],
-    "used_rag_ids": [],
-    "used_tool_names": [],
-    "error": null
-  }
+  "confidence": 0.0
 }
 
 ## Output Constraints
 
 - `case_type` can only be `"shopping"` or `null`.
-- `case_status` can only be `"collecting"`, `"ready_for_debate"`, or `"rejected"`.
+- `is_supported` is optional for compatibility; when omitted, the application derives it from `case_type` and `is_high_risk`.
+- The application, rather than the model, computes `case_status` from the validated merged fields.
 - If `is_high_risk` is `true`:
   - `case_type` must be `null`
-  - `is_supported` must be `false`
+  - `is_supported` is derived as `false` by the application
   - `reject_reason` must be `"high_risk_domain"`
-  - `missing_fields` must be an empty array
   - `next_question` must be `null`
 - If the input is not a shopping scenario and not high-risk:
-  - `is_supported` must be `false`
+  - `is_supported` is derived as `false` by the application
   - `reject_reason` must be `"unsupported_case_type"`
-- `agent_step.agent` is always `"input_parser"`.
-- `agent_step.used_rag_ids` is always an empty array.
-- `agent_step.used_tool_names` is always an empty array.

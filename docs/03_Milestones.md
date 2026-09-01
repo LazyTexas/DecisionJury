@@ -226,7 +226,7 @@
 
 - 完成 `input_parser`、`pro_agent`、`con_agent`、`judge_agent` 四个 Agent 的基础实现。
 - 完成购物法庭多 Agent 编排流程。
-- 完成 DeepSeek 真实 LLM API 接入，模型固定为 `deepseek-v4-pro`，未配置 Key 或 API 失败时自动 fallback 到 mock。
+- 完成 DeepSeek 真实 LLM API 接入，模型固定为 `deepseek-v4-flash`，未配置 Key 或 API 失败时自动 fallback 到 mock。
 - 完成 mock RAG 接入位置。
 - 完成 C-E MCP adapter，当前主流程已通过 `backend/app/services/mcp_adapter.py` 调用 E 模块 `cost_analyzer` 和 `cooling_reminder`。
 - 完成 C-B 后端 adapter，当前通过 `backend/app/orchestrator/adapter.py` 向 B 后端提供 `run_case_decision_flow` 调用入口。

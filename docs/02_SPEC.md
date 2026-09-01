@@ -438,7 +438,7 @@ SQLite / Vector Store
 | Agent 编排 | 本地 Python 编排函数 | 已实现购物主流程 | 当前由 `backend/app/orchestrator/decision_flow.py` 串联输入解析、RAG、MCP 工具、正反方 Agent 和法官 Agent。 |
 | Agent 输出结构 | Python 数据类/Schema | 已使用 | 当前使用 `ParserResult`、`AgentStep`、`RagEvidence`、`ToolResult`、`DecisionReport`、`TraceItem`、`DebateResult` 等结构化对象。 |
 | Prompt 管理 | Markdown Prompt 文件 | 已使用 | Prompt 存放在 `backend/app/prompts/`，包括 `input_parser.md`、`pro_agent.md`、`con_agent.md`、`judge_agent.md`。 |
-| LLM 调用 | DeepSeek + mock fallback | 已接入真实 LLM | 当前使用 `backend/app/services/llm_client.py` 接入 DeepSeek `deepseek-v4-pro`；未配置 `DEEPSEEK_API_KEY`、API 异常、超时或输出不合法时自动 fallback 到 `MockLLMClient`。 |
+| LLM 调用 | DeepSeek + mock fallback | 已接入真实 LLM | 当前使用 `backend/app/services/llm_client.py` 接入 DeepSeek `deepseek-v4-flash`；未配置 `DEEPSEEK_API_KEY`、API 异常、超时或输出不合法时自动 fallback 到 `MockLLMClient`。 |
 | RAG 接入 | mock RAG 检索 + D 模块 BM25 服务待对接 | C 主流程仍为 mock，D 模块已提供初版 | 当前 C 主流程仍使用 `backend/app/services/mock_rag.py`；D 模块已在 `rag/` 下提供 BM25 检索服务雏形，下一步需要通过 C-D adapter 或 HTTP 调用替换当前 mock RAG。 |
 | MCP 工具调用 | E 模块本地工具 + C 适配层 | 已接入 | 当前通过 `backend/app/services/mcp_adapter.py` 调用 `mcp_tools.cost_analyzer` 和 `mcp_tools.cooling_reminder`，并统一转换为 C 对外稳定的 `ToolResult`。 |
 | 后端对接入口 | C-B adapter | 已接入 | 当前通过 `backend/app/orchestrator/adapter.py` 向 B 后端提供 `run_case_decision_flow` 调用入口。 |
@@ -456,7 +456,7 @@ uv run python -m compileall backend tests mcp_tools
 C 模块当前边界：
 
 - 当前已跑通购物决策 `shopping` 的 Agent 主流程，并已完成与 B 后端 adapter、E MCP 工具 adapter 的集成。
-- 当前已接入 DeepSeek 真实 LLM API，模型为 `deepseek-v4-pro`，并保留 mock fallback。
+- 当前已接入 DeepSeek 真实 LLM API，模型为 `deepseek-v4-flash`，并保留 mock fallback。
 - 当前尚未完成 C-D 真实 RAG 检索联调；D 模块已有 BM25 检索服务雏形，但 C 主流程仍在调用 `mock_rag`。
 - 当前 MCP 工具已通过 C 侧 adapter 接入 E 模块本地工具；后续如改为 HTTP/MCP Server 形式，需要保持 `ToolResult` 输出结构不变。
 - 当前前端完整链路展示仍需等待 A/B 完成真实接口联调后再验收。
