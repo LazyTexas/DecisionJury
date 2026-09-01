@@ -259,3 +259,60 @@ def test_messages_empty_message(client, db_session):
     body = response.json()
     assert body["success"] is True
     assert body["data"]["case_status"] == CaseStatus.COLLECTING
+
+def test_messages_price_correction(client, db_session):
+    """测试价格纠正"""
+    case = Case(
+        id="case_correction",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机，1299元",
+        status=CaseStatus.COLLECTING,
+        collected_fields={"price": 1299, "product_name": "降噪耳机"},
+        missing_fields=["monthly_budget_left", "owned_alternatives"]
+    )
+    db_session.add(case)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/cases/case_correction/messages",
+        json={
+            "user_id": "u001",
+            "message": "刚才价格说错了，不是1299，是999。"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["collected_fields"]["price"] == 999
+
+
+def test_messages_budget_correction(client, db_session):
+    """测试预算纠正"""
+    case = Case(
+        id="case_budget_correction",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机，1299元",
+        status=CaseStatus.COLLECTING,
+        collected_fields={"price": 1299, "monthly_budget_left": 3000},
+        missing_fields=["owned_alternatives"]
+    )
+    db_session.add(case)
+    db_session.commit()
+
+    response = client.post(
+        f"/api/cases/case_budget_correction/messages",
+        json={
+            "user_id": "u001",
+            "message": "预算不是3000，是2500。"
+        }
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["data"]["collected_fields"]["monthly_budget_left"] == 2500
+    # 确保 price 没有被错误覆盖
+    assert data["data"]["collected_fields"]["price"] == 1299
