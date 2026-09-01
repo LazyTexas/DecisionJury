@@ -75,7 +75,10 @@ def create_cooling_reminder(
                 "watch_items": watch_items or [],
             },
         )
-        return _to_tool_result(raw_result, "cooling_reminder")
+        tool_result = _to_tool_result(raw_result, "cooling_reminder")
+        if tool_result.status == "failed":
+            tool_result.summary = "冷静期提醒创建失败，建议用户手动设置复盘提醒。"
+        return tool_result
     except Exception as exc:
         return _failed_tool_result(
             tool_name="cooling_reminder",
