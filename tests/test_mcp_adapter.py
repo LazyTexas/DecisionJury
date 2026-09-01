@@ -68,7 +68,7 @@ def test_adapter_uses_unified_mcp_entrypoint(monkeypatch: Any) -> None:
             "status": "failed",
             "summary": "工具调用失败，主流程继续。",
             "risk_level": None,
-            "metrics": {},
+            "metrics": {"status": "failed"},
             "error": "TOOL_ERROR: tool down",
         }
 
@@ -83,6 +83,7 @@ def test_adapter_uses_unified_mcp_entrypoint(monkeypatch: Any) -> None:
     assert result.tool_name == "cooling_reminder"
     assert result.status == "failed"
     assert result.summary == "冷静期提醒创建失败，建议用户手动设置复盘提醒。"
+    assert result.metrics == {"status": "failed"}
     assert result.error == "TOOL_ERROR: tool down"
     assert captured["name"] == "cooling_reminder"
     assert captured["arguments"]["watch_items"] == []
