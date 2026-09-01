@@ -38,7 +38,7 @@ def test_get_llm_client_uses_deepseek_when_key_exists(monkeypatch: Any) -> None:
     client = llm_client.get_llm_client()
 
     assert isinstance(client, llm_client.DeepSeekLLMClient)
-    assert client.model == "deepseek-v4-pro"
+    assert client.model == "deepseek-v4-flash"
     assert client.base_url == "https://api.deepseek.com"
 
 
@@ -155,7 +155,7 @@ def test_valid_json_response_is_parsed(monkeypatch: Any) -> None:
     }
 
 
-def test_request_body_uses_fixed_deepseek_v4_pro_model(monkeypatch: Any) -> None:
+def test_request_body_uses_fixed_deepseek_v4_flash_model(monkeypatch: Any) -> None:
     captured: dict[str, Any] = {}
 
     class FakeResponse:
@@ -190,8 +190,8 @@ def test_request_body_uses_fixed_deepseek_v4_pro_model(monkeypatch: Any) -> None
     raw = client._request_completion("pro_agent", sample_payload())
 
     assert json.loads(raw) == {"summary": "ok", "arguments": ["a"], "confidence": 0.5}
-    assert captured["body"]["model"] == "deepseek-v4-pro"
-    assert captured["timeout"] == 5
+    assert captured["body"]["model"] == "deepseek-v4-flash"
+    assert captured["timeout"] == 30
     assert captured["authorization"] == "Bearer test-key"
 
 
@@ -231,3 +231,170 @@ def test_user_prompt_keeps_rag_and_failed_tool_details() -> None:
     assert prompt_data["rag_evidence"][0]["content"] == "用户曾购买同类电子产品后闲置。"
     assert prompt_data["tool_results"][0]["status"] == "failed"
     assert prompt_data["tool_results"][0]["error"] == "REMINDER_CREATE_FAILED"
+
+
+def test_parser_result_is_validated() -> None:
+    raw = json.dumps(
+        {
+            "case_type": "shopping",
+            "is_supported": True,
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {"price": "999"},
+            "correction_fields": {},
+            "next_question": "还剩多少预算？",
+            "confidence": 0.9,
+        },
+        ensure_ascii=False,
+    )
+    result = llm_client._validate_parser_result(json.loads(raw))
+
+    assert result["extracted_fields"]["price"] == 999.0
+    assert result["next_question"] == "还剩多少预算？"
+
+
+def test_parser_result_rejects_unknown_field() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_high_risk": False,
+        "extracted_fields": {"unknown": "value"},
+        "correction_fields": {},
+        "confidence": 0.9,
+    }
+
+    try:
+        llm_client._validate_parser_result(value)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("unknown parser field should fail validation")
+
+
+def test_parser_result_requires_all_top_level_fields() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {},
+        "correction_fields": {},
+        "next_question": None,
+    }
+
+    try:
+        llm_client._validate_parser_result(value)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("missing confidence should fail validation")
+
+
+def test_parser_result_derives_missing_is_supported() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 0.9,
+    }
+
+    result = llm_client._validate_parser_result(value)
+
+    assert result["is_supported"] is True
+
+
+def test_parser_result_rejects_inconsistent_supported_case_type() -> None:
+    value = {
+        "case_type": None,
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 0.9,
+    }
+
+    try:
+        llm_client._validate_parser_result(value)
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("supported parser result must require shopping case_type")
+
+
+def test_parser_result_rejects_non_object_fields() -> None:
+    base = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 0.9,
+    }
+
+    for invalid in (
+        {**base, "extracted_fields": []},
+        {**base, "extracted_fields": "not an object"},
+        {**base, "correction_fields": []},
+    ):
+        try:
+            llm_client._validate_parser_result(invalid)
+        except ValueError:
+            continue
+        raise AssertionError("non-object parser fields should fail validation")
+
+
+def test_timeout_can_be_configured(monkeypatch: Any) -> None:
+    monkeypatch.setenv("DEEPSEEK_TIMEOUT_SECONDS", "45")
+
+    client = llm_client.DeepSeekLLMClient(api_key="test-key")
+
+    assert client.timeout_seconds == 45
+
+
+def test_parser_result_rejects_invalid_amount_and_confidence() -> None:
+    base = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 0.9,
+    }
+
+    for invalid in (
+        {**base, "extracted_fields": {"price": "nan"}},
+        {**base, "extracted_fields": {"price": -1}},
+        {**base, "extracted_fields": {"price": True}},
+        {**base, "confidence": 2},
+    ):
+        try:
+            llm_client._validate_parser_result(invalid)
+        except ValueError:
+            continue
+        raise AssertionError("invalid parser result should fail validation")
+
+
+def test_parser_validation_does_not_mutate_input() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {"price": "999"},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 0.9,
+    }
+
+    result = llm_client._validate_parser_result(value)
+
+    assert value["extracted_fields"]["price"] == "999"
+    assert result["extracted_fields"]["price"] == 999.0

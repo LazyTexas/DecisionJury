@@ -1,7 +1,9 @@
 # tests/test_input_parser.py
 """Input Parser 单元测试 —— 纯逻辑，无外部依赖"""
 
+from backend.app.agents import input_parser
 from backend.app.agents.input_parser import parse_input
+from backend.app.services.llm_client import DeepSeekLLMClient
 
 
 # ========== 高风险检测 ==========
@@ -116,6 +118,7 @@ def test_product_name_keeps_taishiji():
     result = parse_input("我想买一台台式机")
 
     assert result.extracted_fields.get("product_name") == "台式机"
+    assert "price" not in result.extracted_fields
 
 
 def test_extract_chinese_budget_and_alternative_message():
@@ -133,6 +136,21 @@ def test_budget_message_does_not_become_price():
 
     assert result.extracted_fields.get("monthly_budget_left") == 3000.0
     assert result.extracted_fields.get("price") is None
+
+
+def test_extract_chinese_number_budget():
+    """本地 fallback 应能识别常见中文数字预算。"""
+    result = parse_input("预算大概还有三千左右")
+
+    assert result.extracted_fields.get("monthly_budget_left") == 3000.0
+    assert "price" not in result.extracted_fields
+
+
+def test_negative_frequency_uses_later_frequency():
+    """否定“每天”后出现更具体的“一周两次”时，不能返回被否定的频率。"""
+    result = parse_input("我不是每天用，大概一周两次")
+
+    assert result.extracted_fields.get("expected_usage_frequency") == "一周两次"
 
 
 # ========== 缺失字段与状态判断 ==========
@@ -168,6 +186,36 @@ def test_merge_with_existing_fields():
     result = parse_input("预算还剩 800 元", existing_collected_fields=existing)
     assert result.merged_fields["monthly_budget_left"] == 800.0
     assert result.merged_fields["purpose"] == "学习"
+
+
+def test_local_parser_explicit_price_correction():
+    """本地 fallback 应支持明确的金额纠正。"""
+    result = parse_input(
+        "不是1299，是999",
+        existing_collected_fields={"price": 1299, "product_name": "耳机"},
+    )
+
+    assert result.merged_fields["price"] == 999.0
+
+
+def test_local_parser_common_price_corrections():
+    existing = {"price": 1299, "product_name": "耳机"}
+
+    corrected_statement = parse_input("刚才说错了，价格是999", existing_collected_fields=existing)
+    changed_statement = parse_input("价格改成999", existing_collected_fields=existing)
+
+    assert corrected_statement.merged_fields["price"] == 999.0
+    assert changed_statement.merged_fields["price"] == 999.0
+
+
+def test_local_parser_budget_correction_does_not_set_price():
+    result = parse_input(
+        "预算不是3000，是2500",
+        existing_collected_fields={"monthly_budget_left": 3000, "product_name": "耳机"},
+    )
+
+    assert result.merged_fields["monthly_budget_left"] == 2500.0
+    assert "price" not in result.extracted_fields
 
 
 def test_chinese_message_merge_and_missing_fields():
@@ -218,3 +266,77 @@ def test_parser_result_agent_step():
     result = parse_input("想买个耳机")
     assert result.agent_step.agent == "input_parser"
     assert result.agent_step.status == "completed"
+
+
+def test_llm_parser_result_is_used(monkeypatch):
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(
+        client,
+        "complete_parser_json",
+        lambda payload: {
+            "case_type": "shopping",
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {
+                "product_name": "降噪耳机",
+                "price": 999,
+                "purpose": "备考",
+                "monthly_budget_left": 3000,
+                "owned_alternatives": "普通耳机",
+                "expected_usage_frequency": "每天",
+                "trigger_reason": "刚需",
+            },
+            "correction_fields": {},
+            "next_question": None,
+            "confidence": 0.92,
+        },
+    )
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input("最近备考特别吵，想弄个能安静点的耳机")
+
+    assert result.merged_fields["price"] == 999.0
+    assert result.case_status == "ready_for_debate"
+    assert result.agent_step.confidence == 0.92
+
+
+def test_llm_parser_explicit_correction_updates_merged_fields(monkeypatch):
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(
+        client,
+        "complete_parser_json",
+        lambda payload: {
+            "case_type": "shopping",
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {},
+            "correction_fields": {"price": 999},
+            "next_question": "还想了解一下预计使用频率。",
+            "confidence": 0.88,
+        },
+    )
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input(
+        "刚才说错了，不是1299，是999",
+        existing_collected_fields={"price": 1299, "product_name": "耳机"},
+    )
+
+    assert result.extracted_fields == {}
+    assert result.merged_fields["price"] == 999.0
+    assert result.next_question == "还想了解一下预计使用频率。"
+
+
+def test_llm_parser_failure_falls_back_to_local_rules(monkeypatch):
+    client = DeepSeekLLMClient(api_key="test-key")
+
+    def raise_error(payload):
+        raise TimeoutError("parser timeout")
+
+    monkeypatch.setattr(client, "complete_parser_json", raise_error)
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input("我想买一个399元的台灯")
+
+    assert result.extracted_fields["price"] == 399.0
+    assert result.extracted_fields["product_name"] == "台灯"
