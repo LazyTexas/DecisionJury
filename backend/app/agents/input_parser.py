@@ -305,6 +305,7 @@ def _extract_price(text: str, budget_span: tuple[int, int] | None) -> float | No
     patterns = [
         rf"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)(?:(?:一|1|两|二|三|四|五|六|七|八|九)\s*)?(?:个|件|副|台|盏|份|部|张|只|套)?\s*[^\d零〇一二两三四五六七八九十百千万亿]{{0,6}}({amount})\s*(?:元|块|rmb|RMB)",
         rf"({amount})\s*(?:元|块|rmb|RMB)\s*的",
+        rf"(?:价格|商品价|售价|金额)\s*(?:是|为|大约是|约为|大概是)?\s*({amount})\s*(?:元|块|rmb|RMB)",
     ]
     for pattern in patterns:
         for match in re.finditer(pattern, text):

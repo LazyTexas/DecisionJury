@@ -44,6 +44,17 @@ def test_extract_price():
     assert result.extracted_fields.get("price") == 299.0
 
 
+def test_extract_explicit_price_statement():
+    """明确价格补充消息应提取 price，供 /messages 多轮纠正和补充使用。"""
+    for message, expected in (
+        ("价格是2500元。", 2500.0),
+        ("商品价约为三千元", 3000.0),
+        ("售价大约是 1299 元", 1299.0),
+    ):
+        result = parse_input(message)
+        assert result.extracted_fields.get("price") == expected
+
+
 def test_extract_budget():
     """"预算还剩 1000 元" → monthly_budget_left=1000.0。"""
     result = parse_input("预算还剩 1000 元")
