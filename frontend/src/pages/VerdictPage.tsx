@@ -13,6 +13,8 @@ import {
   Descriptions,
   List,
   Collapse,
+  Timeline,
+  Result,
 } from 'antd';
 import {
   ArrowLeftOutlined,
@@ -23,18 +25,27 @@ import {
   SwapOutlined,
   ToolOutlined,
   HistoryOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
 import { DecisionReport, RagEvidence, ToolResult, TraceItem } from '../types';
 import { getReport, getTrace } from '../api';
+import { DECISION_META, TRACE_NAME_LABEL, TRACE_TYPE_LABEL } from '../constants';
+import { formatDateTime } from '../utils/format';
 import FeedbackModal from '../components/FeedbackModal';
 
-const finalDecisionMeta: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
-  buy: { label: '建议购买', color: 'success', icon: <CheckCircleOutlined /> },
-  accept: { label: '建议接受', color: 'success', icon: <CheckCircleOutlined /> },
-  partial_accept: { label: '建议部分接受', color: 'processing', icon: <CheckCircleOutlined /> },
-  delay: { label: '建议暂缓', color: 'warning', icon: <MinusCircleOutlined /> },
-  reject: { label: '建议不购买/拒绝', color: 'error', icon: <CloseCircleOutlined /> },
-  alternative: { label: '建议寻找替代方案', color: 'default', icon: <SwapOutlined /> },
+const decisionIcon: Record<string, React.ReactNode> = {
+  buy: <CheckCircleOutlined />,
+  accept: <CheckCircleOutlined />,
+  partial_accept: <CheckCircleOutlined />,
+  delay: <MinusCircleOutlined />,
+  reject: <CloseCircleOutlined />,
+  alternative: <SwapOutlined />,
+};
+
+const traceTypeColor: Record<string, string> = {
+  agent: 'blue',
+  rag_search: 'purple',
+  tool_call: 'orange',
 };
 
 export default function VerdictPage() {
@@ -80,28 +91,27 @@ export default function VerdictPage() {
     );
   }
 
-  if (error) {
+  if (error || !report) {
     return (
-      <div style={{ textAlign: 'center', paddingTop: 120 }}>
-        <Typography.Text type="danger">{error}</Typography.Text>
-        <br />
-        <Space style={{ marginTop: 16 }}>
-          <Button onClick={() => navigate('/')}>返回首页</Button>
-          <Button type="primary" onClick={() => navigate(`/chat/${caseId}`)}>回到对话</Button>
-        </Space>
-      </div>
+      <Result
+        status="info"
+        title="暂无判决书"
+        subTitle={error || '该案件尚未生成判决书，可能还在信息收集中。'}
+        style={{ paddingTop: 60 }}
+        extra={
+          <Space>
+            <Button onClick={() => navigate('/')}>返回首页</Button>
+            <Button type="primary" onClick={() => navigate(`/chat/${caseId}`)}>回到对话</Button>
+          </Space>
+        }
+      />
     );
   }
 
-  if (!report) {
-    return (
-      <Empty description="暂无判决书" style={{ paddingTop: 120 }}>
-        <Button onClick={() => navigate('/')}>返回首页</Button>
-      </Empty>
-    );
-  }
-
-  const decision = finalDecisionMeta[report.final_decision] ?? { label: report.final_decision, color: 'default', icon: null };
+  const meta = DECISION_META[report.final_decision] ?? {
+    label: report.final_decision,
+    color: 'default',
+  };
 
   return (
     <div>
@@ -110,15 +120,15 @@ export default function VerdictPage() {
         <Typography.Text type="secondary">返回首页</Typography.Text>
       </Space>
 
-      {/* 头部 */}
+      {/* 头部：裁决徽标 */}
       <Card style={{ borderRadius: 8, marginBottom: 24 }}>
         <div style={{ textAlign: 'center' }}>
           <Tag
-            icon={decision.icon}
-            color={decision.color}
+            icon={decisionIcon[report.final_decision]}
+            color={meta.color}
             style={{ padding: '4px 16px', fontSize: 16, borderRadius: 20, marginBottom: 16 }}
           >
-            {decision.label}
+            {meta.label}
           </Tag>
           <Typography.Title level={3} style={{ marginBottom: 8 }}>
             {report.case_summary}
@@ -174,18 +184,20 @@ export default function VerdictPage() {
       </Card>
 
       {/* 后续动作 */}
-      <Card title="后续建议" style={{ borderRadius: 8, marginBottom: 24 }}>
-        <List
-          dataSource={report.next_actions}
-          renderItem={(item) => (
-            <List.Item style={{ padding: '8px 0' }}>
-              <Typography.Text>👉 {item}</Typography.Text>
-            </List.Item>
-          )}
-        />
-      </Card>
+      {report.next_actions.length > 0 && (
+        <Card title="后续建议" style={{ borderRadius: 8, marginBottom: 24 }}>
+          <List
+            dataSource={report.next_actions}
+            renderItem={(item) => (
+              <List.Item style={{ padding: '8px 0' }}>
+                <Typography.Text>👉 {item}</Typography.Text>
+              </List.Item>
+            )}
+          />
+        </Card>
+      )}
 
-      {/* RAG 证据和工具结果（折叠） */}
+      {/* 证据与工具（折叠） */}
       <Collapse
         style={{ marginBottom: 24, borderRadius: 8 }}
         items={[
@@ -230,44 +242,63 @@ export default function VerdictPage() {
         ]}
       />
 
-      {/* Agent 执行轨迹 */}
+      {/* Agent 执行轨迹：有序时间线 */}
       {steps.length > 0 && (
-        <Collapse
-          style={{ marginBottom: 24, borderRadius: 8 }}
-          items={[{
-            key: 'trace',
-            label: <span>Agent 执行轨迹</span>,
-            children: (
-              <List
-                dataSource={steps}
-                renderItem={(item: any) => (
-                  <List.Item style={{ padding: '8px 0' }}>
-                    <Space>
-                      <Tag color={item.status === 'completed' ? 'success' : 'error'}>
-                        {item.type}: {item.name}
+        <Card
+          style={{ borderRadius: 8, marginBottom: 24 }}
+          title={
+            <Space>
+              <RobotOutlined />
+              Agent 执行轨迹
+            </Space>
+          }
+        >
+          <Timeline
+            items={steps.map((item) => {
+              const ok = item.status === 'completed';
+              return {
+                color: ok ? 'green' : 'red',
+                children: (
+                  <div style={{ paddingBottom: 8 }}>
+                    <Space wrap size={8}>
+                      <Tag color={traceTypeColor[item.type] ?? 'default'}>
+                        {TRACE_TYPE_LABEL[item.type] ?? item.type}
                       </Tag>
-                      <Typography.Text type="secondary">{item.duration_ms}ms</Typography.Text>
+                      <Typography.Text strong>
+                        {TRACE_NAME_LABEL[item.name] ?? item.name}
+                      </Typography.Text>
+                      <Tag color={ok ? 'success' : 'error'}>
+                        {ok ? '完成' : '失败'}
+                      </Tag>
+                      {typeof item.duration_ms === 'number' && (
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {item.duration_ms}ms
+                        </Typography.Text>
+                      )}
                     </Space>
-                    <div>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    <div style={{ marginTop: 4 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 13 }}>
                         {item.input_summary} → {item.output_summary}
                       </Typography.Text>
                     </div>
-                  </List.Item>
-                )}
-              />
-            ),
-          }]}
-        />
+                    {item.error && (
+                      <Typography.Text type="danger" style={{ fontSize: 12 }}>
+                        {item.error}
+                      </Typography.Text>
+                    )}
+                  </div>
+                ),
+              };
+            })}
+          />
+        </Card>
       )}
 
       {/* 元信息 */}
       <Card style={{ borderRadius: 8, marginBottom: 24 }}>
         <Descriptions size="small" column={{ xs: 1, sm: 2 }}>
           <Descriptions.Item label="判决书 ID">{report.report_id}</Descriptions.Item>
-          <Descriptions.Item label="生成时间">
-            {new Date(report.created_at).toLocaleString('zh-CN')}
-          </Descriptions.Item>
+          <Descriptions.Item label="生成时间">{formatDateTime(report.created_at)}</Descriptions.Item>
           <Descriptions.Item label="案件类型">{report.case_type}</Descriptions.Item>
         </Descriptions>
       </Card>
