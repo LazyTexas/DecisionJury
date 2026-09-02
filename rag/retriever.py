@@ -1,9 +1,10 @@
+# -*- coding: utf-8 -*-
 from fastapi import FastAPI
 from pydantic import BaseModel
 from typing import Optional
 import jieba
 from rank_bm25 import BM25Okapi
-from data_loader import load_history_data  # 导入你刚刚写好的数据加载模块
+from data_loader import load_history_data  # 静态种子 + B 后端实时历史合并
 
 app = FastAPI()
 
@@ -17,14 +18,17 @@ class RagRequest(BaseModel):
     top_k: Optional[int] = 3
 
 
-# 2. 服务启动时，加载真实的 JSON 历史数据
-ALL_RECORDS = load_history_data()
-
-
 @app.post("/api/rag/search")
 async def rag_search(request: RagRequest):
+    # 每次检索实时取数：静态种子 + 当前用户在后端新写入的历史记录（联动）
+    all_records = load_history_data(request.user_id)
+
     # 步骤 A：数据隔离 (根据 shopping 还是 time 进行初步过滤)
-    filtered_records = [r for r in ALL_RECORDS if r["case_type"] == request.case_type]
+    filtered_records = [
+        r for r in all_records
+        if r.get("case_type") == request.case_type
+        and (r.get("title") or "") and (r.get("content") or "")
+    ]
 
     # 如果该场景下完全没有历史记录，直接按规范返回空数组
     if not filtered_records:
@@ -34,7 +38,7 @@ async def rag_search(request: RagRequest):
     corpus = []
     for record in filtered_records:
         # 把标题和内容拼起来一起切分，增加召回率
-        text_to_cut = record["title"] + " " + record["content"]
+        text_to_cut = record.get("title", "") + " " + record.get("content", "")
         # 改用搜索引擎专用的分词方法，把长词切得更细，提升召回率
         corpus.append(jieba.lcut_for_search(text_to_cut))
 
@@ -59,7 +63,7 @@ async def rag_search(request: RagRequest):
 
     # 步骤 F：根据 score 从大到小排序，并截取前 top_k 个
     matched_results.sort(key=lambda x: x["score"], reverse=True)
-    final_results = matched_results[:request.top_k]
+    final_results = matched_results[: request.top_k]
 
     # 3. 严格返回契约要求的结构
     return {
