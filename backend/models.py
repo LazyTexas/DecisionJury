@@ -8,7 +8,7 @@ class Case(Base):
     __tablename__ = "cases"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     case_type = Column(String)  # shopping / time
     title = Column(String)
     description = Column(Text)
@@ -47,7 +47,7 @@ class History(Base):
     __tablename__ = "histories"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     case_type = Column(String)  # shopping / time
     summary = Column(Text)
     result = Column(String)  # worth / regret / neutral
@@ -96,7 +96,7 @@ class Reminder(Base):
     __tablename__ = "reminders"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
     case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
     title = Column(String, nullable=False)
     reason = Column(String, nullable=True)
@@ -107,3 +107,12 @@ class Reminder(Base):
     __table_args__ = (
         Index("ix_reminders_user_id_status", "user_id", "status"),
     )
+
+class User(Base):
+    """用户信息表"""
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())

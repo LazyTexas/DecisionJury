@@ -8,7 +8,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError, IntegrityError
 from backend.database import engine, Base
 from backend import models
-from backend.routers import cases, chat, debate, tools, watchlist, history
+from backend.routers import cases, chat, debate, tools, watchlist, history, auth
 from pydantic import ValidationError
 import traceback
 import json
@@ -287,6 +287,7 @@ async def json_decode_error_handler(request: Request, exc: json.JSONDecodeError)
     )
 
 # ===== 注册路由 =====
+app.include_router(auth.router)
 app.include_router(cases.router)
 app.include_router(chat.router)
 app.include_router(debate.router)
