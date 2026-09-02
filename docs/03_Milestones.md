@@ -271,18 +271,20 @@ uv run python -m compileall backend tests mcp_tools
 - 使用 `jieba` 分词和 `rank_bm25` 实现 BM25 检索。
 - 请求结构与 `docs/04_API.md` 中的 RAG 检索接口基本对齐，包括 `user_id`、`case_id`、`case_type`、`query`、`top_k`。
 - 返回结构采用 `success / data.results / message` 形式，目标是返回 `RagEvidence[]`。
+- `data/history_records.json` 已扩充到 **500 条**（购物 250 + 时间 250），每条含 `id/title/content/context/pros/cons/tags` 等字段；`rag/build_history_data.py` 可确定性复现该数据集。
 
-当前限制：
+当前进度 / 已确认：
 
-- C 模块已通过 `backend/app/services/rag_adapter.py` 以 HTTP 调用 D 的 `/api/rag/search`，RAG 失败时 fallback 为空数组、不中断主流程；真实 RAG 服务需在本机单独启动（端口 8001）。
-- `data/history_records.json` 已随仓库提交，含 10 条购物 + 10 条时间历史记录，`rag/data_loader.py` 可直接读取。
-- `rag/retriever.py` 当前更像独立 FastAPI 服务，C 需要和 D 确认最终是通过 HTTP 调用，还是提供 Python 函数/adapter 供 C 直接调用。
-- RAG 依赖记录在 `rag/requirements.txt`，但是否纳入项目统一 `pyproject.toml` / `uv` 环境仍需确认。
+- C 模块已通过 `backend/app/services/rag_adapter.py` 以 HTTP 调用 D 的 `/api/rag/search`（端口 8001），RAG 失败时 fallback 为空数组、不中断主流程；调用入口已确认走 HTTP，不再需要 mock。
+- `rag/data_loader.py` 现已**联动 B 后端**：默认拉取 `GET /api/history` 的实时历史记录并与静态种子合并。前端新提交的决策复盘（feedback → history）会进入 RAG 检索候选；后端不可用时自动回退到静态 JSON，可用环境变量 `RAG_LIVE_RECORDS=0` 关闭。
+- `rag/retriever.py` 每次检索会按请求里的 `user_id` 拉取该用户的实时历史，保证前端新数据立即可检索。
+- RAG 依赖记录在 `rag/requirements.txt`（fastapi/uvicorn/jieba/rank_bm25）；联动使用 Python 标准库 `urllib`，未新增第三方依赖；`pyproject.toml` 已包含 jieba/rank_bm25。
+- RAG 单元测试：`tests/test_rag.py`（检索/防幻觉/隔离/500 条数据/时间场景）、`tests/test_rag_data_loader.py`（字段映射/合并/回退/开关）、`tests/test_rag_adapter.py`（C-D adapter 契约）。
 
 下一步计划：
 
-- C 与 D 对齐 RAG 调用入口、返回字段、异常行为和启动方式。
-- C 新增 RAG adapter，将 D 返回结果转换为 C 侧稳定的 `RagEvidence[]`。
+- 与 C 联调完整链路：启动 8001 RAG 后跑购物/时间案件，确认法官 `rag_evidence` 出现真实命中、trace 里 `rag_search completed`。
+- 补 RAG 评测指标（top_k 命中、命中类型、是否进入法官上下文），作为答辩证据。
 - 保留 RAG 失败时 fallback 为 `[]` 的行为，确保 Agent 主流程不中断且不编造历史证据。
 
 ### 9.4 E 模块 MCP 工具与工程化进度
