@@ -1,32 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, Form, Input, Button, Typography, message, Space } from 'antd';
+import { Card, Form, Input, Select, Button, Typography, message, Space } from 'antd';
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import { CaseType } from '../types';
-import { createCase, appendLocalAssistantMessage, isMockMode } from '../api';
+import { createCase } from '../api';
 
 export default function CreateCasePage() {
   const navigate = useNavigate();
   const [form] = Form.useForm();
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (values: { title: string; description: string }) => {
+  const handleSubmit = async (values: { title: string; case_type: CaseType; description: string }) => {
     setSubmitting(true);
     try {
-      // 当前 MVP 仅支持购物决策（后端辩论引擎只支持 shopping）。
-      // 未来 time 上线后，重新开放 case_type 选择即可。
       const res = await createCase({
-        case_type: CaseType.SHOPPING,
+        case_type: values.case_type,
         title: values.title,
         description: values.description,
       });
       message.success('案件创建成功！');
-      // 后端返回首个追问 next_question：作为对话首条助手引导持久化，
-      // 进入 ChatPage 后用户一上来就知道该补充什么。
-      // 仅真实模式需要（mock 模式自带欢迎语；本地缓存由服务端数据驱动）。
-      if (res.case_id && res.next_question && !isMockMode) {
-        appendLocalAssistantMessage(res.case_id, res.next_question);
-      }
       navigate(`/chat/${res.case_id}`);
     } catch (err: any) {
       message.error(err.message || '创建失败，请重试');
@@ -53,6 +45,7 @@ export default function CreateCasePage() {
           layout="vertical"
           onFinish={handleSubmit}
           requiredMark={false}
+          initialValues={{ case_type: CaseType.SHOPPING }}
         >
           <Form.Item
             name="title"
@@ -62,7 +55,19 @@ export default function CreateCasePage() {
             <Input placeholder="例：是否购买降噪耳机" maxLength={100} showCount />
           </Form.Item>
 
-          <Form.Item name="description"
+          <Form.Item
+            name="case_type"
+            label="决策类别"
+            rules={[{ required: true, message: '请选择决策类别' }]}
+          >
+            <Select>
+              <Select.Option value={CaseType.SHOPPING}>🛒 购物决策</Select.Option>
+              <Select.Option value={CaseType.TIME}>⏰ 时间/日程决策</Select.Option>
+            </Select>
+          </Form.Item>
+
+          <Form.Item
+            name="description"
             label="详细描述"
             rules={[{ required: true, message: '请描述你的决策背景' }]}
           >

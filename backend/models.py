@@ -1,5 +1,5 @@
 # backend/models.py
-from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index, Float
+from sqlalchemy import Column, String, DateTime, JSON, Text, Integer, Index, Float, ForeignKey
 from sqlalchemy.sql import func
 from backend.database import Base
 
@@ -8,7 +8,7 @@ class Case(Base):
     __tablename__ = "cases"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     case_type = Column(String)  # shopping / time
     title = Column(String)
     description = Column(Text)
@@ -32,7 +32,7 @@ class Message(Base):
     __tablename__ = "messages"
 
     id = Column(String, primary_key=True, index=True)
-    case_id = Column(String, index=True)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True)
     role = Column(String)  # user / assistant / pro_agent / con_agent / judge
     content = Column(Text)
     message_type = Column(String, default="text")  # text / question / argument / verdict / system
@@ -47,7 +47,7 @@ class History(Base):
     __tablename__ = "histories"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True)
     case_type = Column(String)  # shopping / time
     summary = Column(Text)
     result = Column(String)  # worth / regret / neutral
@@ -75,7 +75,7 @@ class Trace(Base):
     __tablename__ = "traces"
 
     id = Column(String, primary_key=True, index=True)
-    case_id = Column(String, index=True, nullable=False)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
     step = Column(Integer, nullable=False)
     type = Column(String, nullable=False)  # agent / rag_search / tool_call
     name = Column(String, nullable=False)  # input_parser / pro_agent / rag_search / cost_analyzer 等
@@ -96,8 +96,8 @@ class Reminder(Base):
     __tablename__ = "reminders"
 
     id = Column(String, primary_key=True, index=True)
-    user_id = Column(String, index=True, nullable=False)
-    case_id = Column(String, index=True, nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=False)
+    case_id = Column(String, ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
     title = Column(String, nullable=False)
     reason = Column(String, nullable=True)
     due_at = Column(DateTime, nullable=False)
@@ -107,3 +107,12 @@ class Reminder(Base):
     __table_args__ = (
         Index("ix_reminders_user_id_status", "user_id", "status"),
     )
+
+class User(Base):
+    """用户信息表"""
+    __tablename__ = "users"
+
+    id = Column(String, primary_key=True, index=True)
+    name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    created_at = Column(DateTime, server_default=func.now())

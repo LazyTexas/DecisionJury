@@ -30,9 +30,9 @@ if not existing:
     )
     db.add(case)
     db.commit()
-    print("✅ 测试案件创建成功: case_feedback_test")
+    print("[OK] 测试案件创建成功: case_feedback_test")
 else:
-    print("ℹ️ 测试案件已存在")
+    print("[INFO] 测试案件已存在")
 
 db.close()
 

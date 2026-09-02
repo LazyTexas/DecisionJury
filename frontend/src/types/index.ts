@@ -193,15 +193,13 @@ export interface HistoryItem {
   created_at: string;
 }
 
-/** 观察清单项（对应后端 GET /api/watchlist 返回的 reminder） */
+/** 观察清单项 */
 export interface WatchlistItem {
-  reminder_id?: string;
   case_id: string;
   title: string;
   reason: string;
   due_at: string;
-  status: 'waiting' | 'reviewed' | 'cancelled';
-  created_at?: string | null;
+  status: 'waiting' | 'completed' | 'expired';
 }
 
 // ---- 请求 / 响应 DTO ----
@@ -371,18 +369,4 @@ export interface PaginatedResponse<T> {
   total: number;
   page: number;
   page_size: number;
-}
-
-// ---- 用户 / 认证 ----
-
-/** 当前登录用户（后端 auth 接口扁平返回 user_id + name，无 token） */
-export interface AuthUser {
-  user_id: string;
-  name: string;
-}
-
-/** 登录响应（兼容后端两种风格：扁平 {success,user_id,name} 或信封 {success,data:{...}}） */
-export interface AuthResponse {
-  user_id: string;
-  name: string;
 }

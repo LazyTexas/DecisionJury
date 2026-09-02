@@ -54,14 +54,25 @@ def test_create_reminder_error_maps_to_failed_tool_result() -> None:
     assert result.status == "failed"
     assert result.risk_level is None
     assert result.metrics == {}
-    assert result.error == "user_id and case_id are required"
+    assert result.error == "MISSING_ARGS"
 
 
-def test_create_reminder_exception_maps_to_failed_tool_result(monkeypatch: Any) -> None:
-    def raise_error(*args: Any, **kwargs: Any) -> dict[str, Any]:
-        raise RuntimeError("tool down")
+def test_adapter_uses_unified_mcp_entrypoint(monkeypatch: Any) -> None:
+    captured: dict[str, Any] = {}
 
-    monkeypatch.setattr("backend.app.services.mcp_adapter.create_reminder", raise_error)
+    def fake_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        captured["name"] = name
+        captured["arguments"] = arguments
+        return {
+            "tool_name": name,
+            "status": "failed",
+            "summary": "工具调用失败，主流程继续。",
+            "risk_level": None,
+            "metrics": {"status": "failed"},
+            "error": "TOOL_ERROR: tool down",
+        }
+
+    monkeypatch.setattr("backend.app.services.mcp_adapter.call_tool", fake_call_tool)
 
     result = mcp_adapter.create_cooling_reminder(
         user_id="u001",
@@ -71,4 +82,25 @@ def test_create_reminder_exception_maps_to_failed_tool_result(monkeypatch: Any) 
 
     assert result.tool_name == "cooling_reminder"
     assert result.status == "failed"
-    assert result.error == "REMINDER_CREATE_FAILED: tool down"
+    assert result.summary == "冷静期提醒创建失败，建议用户手动设置复盘提醒。"
+    assert result.metrics == {"status": "failed"}
+    assert result.error == "TOOL_ERROR: tool down"
+    assert captured["name"] == "cooling_reminder"
+    assert captured["arguments"]["watch_items"] == []
+
+
+def test_analyze_time_cost_maps_to_tool_result() -> None:
+    """time 场景成本工具映射为 ToolResult。"""
+    result = mcp_adapter.analyze_time_cost(
+        hours_required=16,
+        free_hours_this_week=20,
+        urgent_tasks=2,
+    )
+
+    assert result.tool_name == "cost_analyzer"
+    assert result.status == "success"
+    assert result.risk_level == "high"
+    assert result.metrics["time_ratio"] == 0.8
+    assert result.metrics["urgent_tasks"] == 2
+    assert result.summary
+    assert result.error is None

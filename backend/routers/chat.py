@@ -40,6 +40,7 @@ def send_message(
             existing_collected_fields=case.collected_fields or {},
         )
         result_dict = to_dict(result)
+        print(f"[DEBUG] parse_input 返回: {result_dict.get('extracted_fields', {})}")
     except Exception as e:
         print(f"[WARN] input_parser 调用失败: {e}")
         return ApiResponse(
@@ -48,48 +49,33 @@ def send_message(
             message="PARSE_ERROR"
         )
 
-    # 4. 增量更新 collected_fields
-    safe_fields = case.collected_fields or {}
-    print(f"[DEBUG] BEFORE: {safe_fields}")
-
-    for key, value in result_dict.get("extracted_fields", {}).items():
-        if value is None or value == "":
-            continue
-        # 关键：已有字段不覆盖，只填缺失字段
-        if key not in safe_fields:
-            safe_fields[key] = value
-
-    print(f"[DEBUG] AFTER: {safe_fields}")
-
-    # 5. 更新案件
+    # ===== 4. 直接使用 C 计算好的 merged_fields =====
+    # 不再遍历 extracted_fields，而是直接使用 merged_fields
+    safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
+    case.missing_fields = result_dict.get("missing_fields", [])
+    case.status = result_dict.get("case_status", CaseStatus.COLLECTING)
 
-    # 6. 重新计算缺失字段
-    if case.case_type == "shopping":
-        still_missing = [
-            f for f in SHOPPING_REQUIRED_FIELDS
-            if f not in safe_fields or safe_fields.get(f) in [None, ""]
-        ]
-    else:
-        still_missing = []
-    case.missing_fields = still_missing
-
-    # 7. 更新状态
+    # 5. 根据状态生成回复
     if result_dict.get("is_high_risk"):
         case.status = CaseStatus.REJECTED
         reply = result_dict.get("reject_reason", "该决策超出系统支持范围。")
-    elif not still_missing:
-        case.status = CaseStatus.READY_FOR_DEBATE
+    elif case.status == CaseStatus.READY_FOR_DEBATE:
         reply = "信息已补充完整，可以进入正反方分析。"
     else:
-        case.status = CaseStatus.COLLECTING
+        # 优先使用 C 的 next_question
         next_question = result_dict.get("next_question")
         if next_question:
-            reply = f"还需要补充以下信息：{', '.join(still_missing)}。{next_question}"
+            reply = next_question
         else:
-            reply = f"还需要补充以下信息：{', '.join(still_missing)}。请继续补充。"
+            # 兜底：如果 next_question 为空，列出缺失字段
+            missing = case.missing_fields or []
+            if missing:
+                reply = f"还需要补充以下信息：{', '.join(missing)}。请继续补充。"
+            else:
+                reply = "信息仍在收集中，请继续补充相关细节。"
 
-    # 8. 保存助手消息
+    # 6. 保存助手消息
     assistant_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -99,14 +85,14 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 9. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    # 7. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')
     except Exception as e:
         print(f"[WARN] flag_modified 失败: {e}")
 
-    # 10. 提交事务
+    # 8. 提交事务
     db.commit()
     print(f"[DEBUG] COMMIT 成功，case_id={case_id}")
 
@@ -116,7 +102,7 @@ def send_message(
             "reply": reply,
             "case_status": case.status,
             "collected_fields": safe_fields,
-            "missing_fields": still_missing,
+            "missing_fields": case.missing_fields,
         },
         message=""
     )

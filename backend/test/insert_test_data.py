@@ -15,7 +15,7 @@ db = SessionLocal()
 # 检查是否已存在测试数据
 existing = db.query(Reminder).filter(Reminder.id == "reminder_test").first()
 if existing:
-    print("⚠️ 测试数据已存在，跳过插入")
+    print("[WARN] 测试数据已存在，跳过插入")
 else:
     reminder = Reminder(
         id="reminder_test",
@@ -28,6 +28,6 @@ else:
     )
     db.add(reminder)
     db.commit()
-    print("✅ 测试数据插入成功！")
+    print("[OK] 测试数据插入成功！")
 
 db.close()

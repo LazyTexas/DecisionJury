@@ -2,10 +2,14 @@ import asyncio
 import os
 import sys
 
+# 关闭实时后端联动，让单测/离线环境不依赖 B 后端服务和网络，保证快速、确定性。
+# 联动逻辑本身由 tests/test_rag_data_loader.py 单独用 mock 覆盖。
+os.environ.setdefault("RAG_LIVE_RECORDS", "0")
+
 # 1. 把 rag 目录临时加入 Python 系统路径，确保能顺利找到 retriever 代码
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "rag")))
 
-from retriever import RagRequest, rag_search
+from retriever import RagRequest, rag_search  # noqa: E402
 
 
 def call_rag_search(payload):
@@ -16,6 +20,10 @@ def call_rag_search(payload):
     路由层本身由 FastAPI 管理，C-D adapter 联调时再通过真实 HTTP 服务覆盖。
     """
     return asyncio.run(rag_search(RagRequest(**payload)))
+
+
+def results_for(payload):
+    return call_rag_search(payload)["data"]["results"]
 
 
 def test_rag_search_hit():
@@ -69,3 +77,43 @@ def test_rag_case_type_isolation():
     data = call_rag_search(payload)
     assert len(data["data"]["results"]) == 0, "数据隔离失效！在 time 场景下召回了 shopping 的记录！"
     print("\n✅ 用例三通过：case_type 跨场景数据隔离测试成功！")
+
+
+def test_rag_dataset_has_500_records():
+    """
+    新增验收：RAG 历史数据集应达到 500 条，购物/时间各 250，且字段齐全。
+    """
+    from data_loader import load_history_data
+    records = load_history_data("u001")
+    assert len(records) >= 500, f"数据集应不少于 500 条，当前 {len(records)}"
+    shopping = sum(1 for r in records if r["case_type"] == "shopping")
+    time_n = sum(1 for r in records if r["case_type"] == "time")
+    assert shopping >= 250, f"购物记录应不少于 250 条，当前 {shopping}"
+    assert time_n >= 250, f"时间记录应不少于 250 条，当前 {time_n}"
+
+    required = {"id", "title", "content", "source", "case_type", "tags", "created_at"}
+    for record in records:
+        assert required.issubset(record.keys()), f"记录缺字段: {required - record.keys()}"
+        assert isinstance(record.get("tags"), list), "tags 必须为列表"
+        assert record.get("content"), "content 不能为空"
+
+
+def test_rag_time_scenario_hit():
+    """
+    新增验收：时间决策场景（如“参加技术分享/社团活动”）应能正常召回且类型隔离正确。
+    """
+    for query in ["参加技术分享", "参加社团活动"]:
+        payload = {
+            "user_id": "u001",
+            "case_id": "case_004",
+            "case_type": "time",
+            "query": query,
+            "top_k": 3
+        }
+        results = results_for(payload)
+        assert len(results) > 0, f"时间检索 '{query}' 未命中历史记录"
+        assert all(r["case_type"] == "time" for r in results), "检索结果混入了非时间类型"
+        for r in results:
+            for key in ("id", "title", "content", "score", "source", "case_type", "tags"):
+                assert key in r, f"检索结果缺少 RagEvidence 字段 {key}"
+        print(f"\n✅ 时间检索 '{query}' 命中 {len(results)} 条")

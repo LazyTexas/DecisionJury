@@ -23,7 +23,7 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
             existing_collected_fields={},
         )
         parser_dict = to_dict(parser_result)
-        initial_collected = parser_dict.get("extracted_fields", {})
+        initial_collected = parser_dict.get("merged_fields", {})
         initial_missing = parser_dict.get("missing_fields", [])
         initial_status = parser_dict.get("case_status", CaseStatus.COLLECTING)
     except Exception as e:

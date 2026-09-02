@@ -57,3 +57,49 @@ DecisionJury/
 ### 手动启动
 - 后端：`uvicorn backend.main:app --reload`
 - 前端：`npm run dev`
+
+## 环境配置
+
+项目通过 `ENV` 环境变量区分开发环境和生产环境，默认值为 `development`。
+
+### 环境变量说明
+
+| 环境 | `ENV` 值 | 数据库行为 |
+|------|:---:|-----------|
+| 开发环境（默认） | `development` | 检测到结构不一致时**自动重建**数据库 |
+| 生产环境 | `production` | 检测到结构不一致时**执行迁移**，保留数据 |
+
+### 配置方式
+
+**方式一：使用 `.env` 文件**
+
+在项目根目录或 `backend/.env` 中添加：
+
+```env
+ENV=production
+```
+
+**方式二：命令行临时设置**
+
+```bash
+# Linux / Mac
+ENV=production uvicorn backend.main:app --reload
+
+# Windows (CMD)
+set ENV=production && uvicorn backend.main:app --reload
+
+# Windows (PowerShell)
+$env:ENV="production"; uvicorn backend.main:app --reload
+```
+
+### 启动命令
+
+无论开发还是生产环境，启动命令一致：
+
+```bash
+uvicorn backend.main:app --reload
+```
+
+只需通过 .env 文件或环境变量控制 ENV 的值。
+
+⚠️ 注意： 生产环境请勿设置 ENV=development，否则数据库结构变化时会自动重建，导致数据丢失。

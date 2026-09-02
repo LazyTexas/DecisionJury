@@ -1,29 +1,11 @@
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Layout, Typography, Button, Space, Dropdown, Avatar } from 'antd';
-import { PlusOutlined, HomeOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons';
-import { useAuth } from '../auth/AuthContext';
+import { Layout, Typography, Button, Space } from 'antd';
+import { PlusOutlined, HomeOutlined } from '@ant-design/icons';
 
 const { Header, Content } = Layout;
 
 export default function AppLayout() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
-
-  const handleLogout = () => {
-    logout();
-    navigate('/login', { replace: true });
-  };
-
-  const userMenu = {
-    items: [
-      {
-        key: 'logout',
-        icon: <LogoutOutlined />,
-        label: '退出登录',
-        onClick: handleLogout,
-      },
-    ],
-  };
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
@@ -51,21 +33,9 @@ export default function AppLayout() {
             DecisionJury
           </Typography.Title>
         </Space>
-        <Space size="middle">
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/create')}>
-            新建决策
-          </Button>
-          {user && (
-            <Dropdown menu={userMenu} placement="bottomRight">
-              <Space style={{ cursor: 'pointer' }}>
-                <Avatar size="small" style={{ background: '#1677ff' }} icon={<UserOutlined />} />
-                <Typography.Text style={{ maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user.name || user.user_id}
-                </Typography.Text>
-              </Space>
-            </Dropdown>
-          )}
-        </Space>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/create')}>
+          新建决策
+        </Button>
       </Header>
       <Content style={{ padding: '24px', maxWidth: 960, width: '100%', margin: '0 auto' }}>
         <Outlet />

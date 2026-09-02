@@ -4,6 +4,7 @@ import re
 from typing import Any
 
 from backend.app.schemas.decision import AgentStep, ParserResult
+from backend.app.services.llm_client import DeepSeekLLMClient, get_llm_client
 
 
 REQUIRED_SHOPPING_FIELDS = [
@@ -99,6 +100,25 @@ def parse_input(
             agent_step=step,
         )
 
+    local_result = _build_rule_result(normalized_input, existing)
+    client = get_llm_client()
+    if isinstance(client, DeepSeekLLMClient):
+        try:
+            llm_result = client.complete_parser_json(
+                {
+                    "current_message": normalized_input,
+                    "existing_collected_fields": existing,
+                    "existing_missing_fields": local_result.missing_fields,
+                }
+            )
+            return _build_llm_result(llm_result, existing)
+        except Exception:
+            # 真实解析失败时保留已有本地规则结果，保证多轮收集不中断。
+            return local_result
+    return local_result
+
+
+def _build_rule_result(normalized_input: str, existing: dict[str, Any]) -> ParserResult:
     extracted = _extract_shopping_fields(normalized_input)
     merged = {**existing, **{key: value for key, value in extracted.items() if value not in (None, "")}}
     missing_fields = [field for field in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(field))]
@@ -129,6 +149,90 @@ def parse_input(
     )
 
 
+def _build_llm_result(
+    llm_result: dict[str, Any],
+    existing: dict[str, Any],
+) -> ParserResult:
+    if llm_result["is_high_risk"]:
+        step = AgentStep(
+            agent="input_parser",
+            status="completed",
+            summary="输入命中高风险领域，已拒绝进入购物法庭辩论。",
+            confidence=llm_result["confidence"],
+            arguments=["当前项目仅支持购物和时间类低风险日常决策。"],
+            error=None,
+        )
+        return ParserResult(
+            case_type=None,
+            is_supported=False,
+            is_high_risk=True,
+            reject_reason=llm_result.get("reject_reason") or "high_risk_domain",
+            extracted_fields={},
+            merged_fields={},
+            missing_fields=[],
+            next_question=None,
+            case_status="rejected",
+            agent_step=step,
+        )
+
+    if not llm_result.get("is_supported", True):
+        step = AgentStep(
+            agent="input_parser",
+            status="completed",
+            summary="输入不属于当前支持的购物决策范围。",
+            confidence=llm_result["confidence"],
+            arguments=["当前项目仅支持购物类低风险日常决策。"],
+            error=None,
+        )
+        return ParserResult(
+            case_type=None,
+            is_supported=False,
+            is_high_risk=False,
+            reject_reason=llm_result.get("reject_reason") or "unsupported_case_type",
+            extracted_fields={},
+            merged_fields={},
+            missing_fields=[],
+            next_question=None,
+            case_status="rejected",
+            agent_step=step,
+        )
+
+    extracted = {
+        key: value
+        for key, value in llm_result["extracted_fields"].items()
+        if value not in (None, "")
+    }
+    corrections = {
+        key: value
+        for key, value in llm_result["correction_fields"].items()
+        if value not in (None, "")
+    }
+    merged = {**existing, **extracted, **corrections}
+    missing = [field for field in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(field))]
+    status = "ready_for_debate" if not missing else "collecting"
+    next_question = None if not missing else (llm_result.get("next_question") or _build_next_question(missing))
+    step = AgentStep(
+        agent="input_parser",
+        status="completed",
+        summary=f"识别为 shopping，缺失字段：{', '.join(missing) if missing else '无'}。",
+        confidence=llm_result["confidence"],
+        arguments=[f"已收集字段：{', '.join(sorted(merged.keys())) or '无'}"],
+        error=None,
+    )
+    return ParserResult(
+        case_type="shopping",
+        is_supported=True,
+        is_high_risk=False,
+        reject_reason=None,
+        extracted_fields=extracted,
+        merged_fields=merged,
+        missing_fields=missing,
+        next_question=next_question,
+        case_status=status,
+        agent_step=step,
+    )
+
+
 def _is_high_risk(text: str) -> bool:
     return any(keyword in text for keyword in HIGH_RISK_KEYWORDS)
 
@@ -140,11 +244,13 @@ def _extract_shopping_fields(text: str) -> dict[str, Any]:
     # 这里必须先识别预算语义，再决定某个金额能不能当作商品价格，
     # 否则“本月预算还剩3000元”这类补充消息会被错误写进 price。
     budget_match = _extract_budget_match(text)
-    budget = budget_match[0] if budget_match else None
+    correction_budget = _extract_budget_correction(text)
+    budget = correction_budget if correction_budget is not None else (budget_match[0] if budget_match else None)
     if budget is not None:
         fields["monthly_budget_left"] = budget
 
-    price = _extract_price(text, budget_match[1] if budget_match else None)
+    correction_price = _extract_price_correction(text)
+    price = correction_price if correction_price is not None else _extract_price(text, budget_match[1] if budget_match else None)
     if price is not None:
         fields["price"] = price
 
@@ -182,21 +288,24 @@ def _normalize_text(text: str) -> str:
 
 
 def _extract_budget_match(text: str) -> tuple[float, tuple[int, int]] | None:
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
     patterns = [
-        r"(?:本月|这个月)?(?:预算|生活费|可支配预算|可支配金额|剩余预算)[^\d]{0,8}(?:还剩|剩余|还有|有)?\s*(\d+(?:\.\d+)?)\s*(?:元|块)?",
-        r"(?:本月|这个月)?(?:还剩|剩余|还有)\s*(\d+(?:\.\d+)?)\s*(?:元|块)?[^\n，。；;]{0,8}(?:预算|生活费|可支配)",
+        rf"(?:本月|这个月)?(?:预算|生活费|可支配预算|可支配金额|剩余预算)[^\d零〇一二两三四五六七八九十百千万亿]{{0,8}}(?:还剩|剩余|还有|有)?\s*({amount})\s*(?:元|块)?",
+        rf"(?:本月|这个月)?(?:还剩|剩余|还有)\s*({amount})\s*(?:元|块)?[^\n，。；;]{{0,8}}(?:预算|生活费|可支配)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            return float(match.group(1)), match.span(1)
+            return _parse_amount(match.group(1)), match.span(1)
     return None
 
 
 def _extract_price(text: str, budget_span: tuple[int, int] | None) -> float | None:
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
     patterns = [
-        r"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)[^\d]{0,6}(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)?",
-        r"(\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)\s*的",
+        rf"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)(?:(?:一|1|两|二|三|四|五|六|七|八|九)\s*)?(?:个|件|副|台|盏|份|部|张|只|套)?\s*[^\d零〇一二两三四五六七八九十百千万亿]{{0,6}}({amount})\s*(?:元|块|rmb|RMB)",
+        rf"({amount})\s*(?:元|块|rmb|RMB)\s*的",
+        rf"(?:价格|商品价|售价|金额)\s*(?:是|为|大约是|约为|大概是)?\s*({amount})\s*(?:元|块|rmb|RMB)",
     ]
     for pattern in patterns:
         for match in re.finditer(pattern, text):
@@ -205,8 +314,88 @@ def _extract_price(text: str, budget_span: tuple[int, int] | None) -> float | No
                 continue
             if _is_budget_context(text, number_span):
                 continue
-            return float(match.group(1))
+            return _parse_amount(match.group(1))
     return None
+
+
+def _extract_price_correction(text: str) -> float | None:
+    """识别明确的价格纠正，避免本地 fallback 保留用户刚才说错的金额。"""
+    if any(keyword in text for keyword in BUDGET_CONTEXT_KEYWORDS) and not any(
+        keyword in text for keyword in ("价格", "商品价", "售价")
+    ):
+        return None
+
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
+    patterns = [
+        rf"(?:价格|金额)?\s*不是\s*{amount}\s*(?:元|块)?[，,\s]*?(?:是|应为|应该是|改为|改成)\s*({amount})",
+        rf"刚才说错了[，,\s]*(?:价格|金额)?\s*(?:是|改为|改成)\s*({amount})",
+        rf"(?:价格|金额)\s*(?:改为|改成)\s*({amount})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return _parse_amount(match.group(1))
+    return None
+
+
+def _extract_budget_correction(text: str) -> float | None:
+    """预算纠正必须独立解析，避免新预算被误写进商品价格。"""
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
+    patterns = [
+        rf"(?:预算|生活费|可支配预算|可支配金额|剩余预算)\s*不是\s*{amount}\s*(?:元|块)?[，,\s]*?(?:是|应为|应该是|改为|改成)\s*({amount})",
+        rf"刚才说错了[，,\s]*(?:预算|生活费|可支配金额)\s*(?:是|改为|改成)\s*({amount})",
+        rf"(?:预算|生活费|可支配金额)\s*(?:改为|改成)\s*({amount})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return _parse_amount(match.group(1))
+    return None
+
+
+def _parse_amount(value: str) -> float:
+    """把阿拉伯数字或常见中文数字金额转换为浮点数。"""
+    value = value.strip()
+    if not value:
+        raise ValueError("amount is empty")
+    if re.fullmatch(r"\d+(?:\.\d+)?", value):
+        return float(value)
+
+    if not re.fullmatch(r"[零〇一二两三四五六七八九十百千万亿]+", value):
+        raise ValueError("amount contains invalid Chinese numerals")
+
+    digits = {"零": 0, "〇": 0, "一": 1, "二": 2, "两": 2, "三": 3, "四": 4,
+              "五": 5, "六": 6, "七": 7, "八": 8, "九": 9}
+    normalized = value.replace("两", "二")
+    if normalized in digits:
+        return float(digits[normalized])
+
+    # 口语中的“三千五”通常表示三千五百，优先处理这个简写。
+    shorthand = re.fullmatch(r"([一二三四五六七八九])([千百])([一二三四五六七八九])", normalized)
+    if shorthand:
+        multiplier = {"千": 1000, "百": 100}[shorthand.group(2)]
+        return float(digits[shorthand.group(1)] * multiplier + digits[shorthand.group(3)] * multiplier // 10)
+
+    units = {"十": 10, "百": 100, "千": 1000, "万": 10000, "亿": 100000000}
+    total = 0
+    section = 0
+    number = 0
+    for char in normalized:
+        if char in digits:
+            number = digits[char]
+        elif char in units:
+            unit = units[char]
+            if unit >= 10000:
+                section += number
+                total += section * unit
+                section = 0
+            else:
+                section += (number or 1) * unit
+            number = 0
+    result = total + section + number
+    if result <= 0:
+        raise ValueError("amount must be positive")
+    return float(result)
 
 
 def _is_budget_context(text: str, span: tuple[int, int]) -> bool:
@@ -261,13 +450,12 @@ def _extract_alternatives(text: str) -> str | None:
 
 
 def _extract_frequency(text: str) -> str | None:
-    patterns = [
-        r"(?:预计|大概|可能|平时|基本|一般)?\s*(每天|每日|每周\d+次|一周\d+次|每周|每月\d+次|偶尔|经常|高频|低频)\s*(?:使用|会用)?",
-    ]
-    for pattern in patterns:
-        match = re.search(pattern, text)
-        if match:
-            return match.group(1)
+    pattern = r"(每周[\d一二两三四五六七八九十]+次|一周[\d一二两三四五六七八九十]+次|每月[\d一二两三四五六七八九十]+次|每天|每日|每周|偶尔|经常|高频|低频)"
+    for match in re.finditer(pattern, text):
+        preceding = text[max(0, match.start() - 8):match.start()]
+        if re.search(r"(?:不是|不会|并非|不)\s*$", preceding):
+            continue
+        return match.group(1)
     return None
 
 
