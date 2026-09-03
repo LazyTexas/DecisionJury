@@ -72,21 +72,23 @@ tests/test_rag.py                 检索命中/防幻觉/类型隔离/500 条数
 tests/test_rag_data_loader.py     字段映射/静态+实时合并/回退/联动开关/响应解包
 tests/test_rag_adapter.py         C-D adapter 契约（成功/空结果/失败/缺字段/URL/body）
 tests/test_dialogue_quality_metrics.py  对话质量指标计算（检索命中/进上下文/判决书引用/关键词接地）
+tests/test_rag_standard_metrics.py      标准版指标纯函数（Precision/Recall/MRR/NDCG/忠实度/答案相关性）
 ```
 
 验证命令：
 ```bash
-uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py tests/test_dialogue_quality_metrics.py
+uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py tests/test_dialogue_quality_metrics.py tests/test_rag_standard_metrics.py
 uv run python -m compileall -q rag tests
 ```
 
-当前结果：`26 passed`。
+当前结果：`29 passed`。
 
 ### 3.6 联调与评测脚本
 ```text
 rag/evaluate_rag.py                RAG 检索评测：跑 docs/05_TestPlan.md §5.1 标准查询，输出 top_k/类型/预期命中/分数
 rag/e2e_verify.py                  端到端联调验证：创建购物案件 → debate → rag_evidence/trace/report/无命中检查
 rag/evaluate_dialogue_quality.py   对话质量量化：检索命中数/进入法官上下文/判决书引用证据/关键词接地(token_overlap)
+rag/evaluate_rag_standard.py       标准版 RAG 评估：检索侧 Precision/Recall/MRR/NDCG + 生成侧忠实度/答案相关性/延迟
 ```
 
 ## 4. 下一步该做什么（按优先级）
@@ -95,6 +97,10 @@ rag/evaluate_dialogue_quality.py   对话质量量化：检索命中数/进入�
 - ✅ **端到端联调**：`uv run python rag/e2e_verify.py`（需 8000/8001）。结果：购物案件 `rag_evidence` 命中 3 条、trace `rag_search completed`、无命中返回空、report.final_decision=delay。
 - ✅ **RAG 评测脚本/指标**：`uv run python rag/evaluate_rag.py --out data/rag_eval_result.json`。优化前 `参加社团活动` 为 False；优化后 4 个标准查询 **全部 expected_hit=True**。
 - ✅ **对话质量量化指标**：`uv run python rag/evaluate_dialogue_quality.py --out data/rag_dialogue_quality_result.json`（需 8000/8001）。实测：`retrieval_hits=3`、`evidence_in_judge_context=True`、`report_cites_evidence=True`、`grounded_keyword_hit=True`、`token_overlap=16`。`tests/test_dialogue_quality_metrics.py` 覆盖该指标计算。
+- ✅ **标准版 RAG 评估指标**：`uv run python rag/evaluate_rag_standard.py --out data/rag_std_full.json`（离线算检索侧；`--live` 追加生成侧）。
+  - 检索侧（top_k=5）：降噪耳机 P=0.4/R=0.33/MRR=1.0/NDCG=0.55；学习用品 P=0.8/R=0.14/MRR=1.0/NDCG=0.85；社团活动 P=0.6/R=0.25/MRR=0.5/NDCG=0.53；技术分享 P=0.4/R=0.25/MRR=1.0/NDCG=0.55。
+  - 生成侧（购物）：降噪耳机 faithfulness=0.18/answer_relevancy=1.0/延迟≈1.06s；学习用品 faithfulness=0.11/answer_relevancy=0.5/延迟≈0.13s；time 场景生成侧暂不可算（C 未实现 time 流程）。
+  - 结论：检索 recall 偏低（top_k=5 相对相关池偏小，可调 top_k/混合检索）；生成 faithfulness 偏低（判决书措辞对证据接地不足，需优化 Prompt）。
 
 ### P1（建议完成）
 - ✅ 已完成：契约裁剪。`rag/retriever.py` 返回结果只保留 `RagEvidence` 所需字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，并补充“仅契约字段”单测。
@@ -154,6 +160,8 @@ python rag/build_history_data.py
   - `4c35073 feat: 优化 RAG 检索质量（查询分词/标签索引/标题去重）并补标准查询断言`
   - `1c9b032 docs: 更新 RAG 检索质量优化与完成度`
   - `beb33cc feat: 新增对话质量量化评估指标（检索命中/进上下文/判决书引用/关键词接地）`
+  - `157f199 docs: 补充对话质量量化指标与提交记录`
+  - `cbde8e8 feat: 新增标准版 RAG 评估指标（Precision/Recall/MRR/NDCG + 忠实度/答案相关性）`
 - 状态：**已推送远程**，待通过 PR 合并到 `dev`。
 
 ## 9. 一次性进度小结（2020-07 更新）
@@ -162,6 +170,7 @@ python rag/build_history_data.py
 - P0 已完成：端到端联调验证通过（购物案例命中 3 条证据、trace completed、无命中返回空）；RAG 评测脚本产出 `data/rag_eval_result.json`。
 - P1 检索质量优化已完成：query/语料统一用 `lcut_for_search`、语料加 tags、按 title 去重；4 组标准查询在 top_k=5 内均命中预期关键词。
 - 对话质量量化指标已完成：`rag/evaluate_dialogue_quality.py` 输出检索命中/进上下文/判决书引用/关键词接地（token_overlap），实测 `grounded_keyword_hit=True`。
-- 当前估算完成度 **约 94%**。
-- 剩余重点：等 C 完成 time 流程后做 time 端到端联调；补答辩检索/判决书引用截图；可选接 LLM 做更细的“回答相关性/一致性”打分。
-- 未提交：`data/rag_eval_result.json`、`data/rag_dialogue_quality_result.json`（评测结果，本地留作答辩证据）。
+- 标准版 RAG 评估指标已完成：`rag/evaluate_rag_standard.py`（检索侧 Precision/Recall/MRR/NDCG + 生成侧忠实度/答案相关性/延迟）。真实发现：检索 recall 偏低（top_k=5 相对相关池偏小）、生成 faithfulness 偏低（判决书对证据接地不足）、time 生成侧暂不可算。
+- 当前估算完成度 **约 95%**。
+- 剩余重点：调优 top_k/混合检索以提升 recall；优化法官 Prompt 提升 faithfulness；等 C 完成 time 流程后补 time 生成侧；补答辩检索/判决书引用截图；可选接 LLM 做更细的“回答相关性/一致性”打分。
+- 未提交：`data/rag_eval_result.json`、`data/rag_dialogue_quality_result.json`、`data/rag_std_retrieval.json`、`data/rag_std_full.json`（评测结果，本地留作答辩证据）。
