@@ -1,21 +1,22 @@
-import { useEffect, useRef } from 'react';
+// ============================================================
+// 分析过程状态卡
+// 用于展示真实的异步等待状态（消息分析 / 辩论执行）。
+// 后端无 SSE，无法推送逐步进度，这里只做如实文案 + loading，
+// 不做伪造的"流式思考"动画。
+// ============================================================
+
 import { Card, Typography, Space, Spin } from 'antd';
-import { LoadingOutlined, CheckCircleOutlined, MessageOutlined } from '@ant-design/icons';
-import { StreamStatus } from '../api/chat-stream';
+import { LoadingOutlined } from '@ant-design/icons';
 
 interface ThinkingOverlayProps {
-  status: StreamStatus;
-  replyHistory: string[];
+  /** 是否可见（有异步任务在跑） */
+  active: boolean;
+  title?: string;
+  description?: string;
 }
 
-export default function ThinkingOverlay({ status, replyHistory }: ThinkingOverlayProps) {
-  const endRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [replyHistory]);
-
-  if (status === 'idle' || status === 'completed') return null;
+export default function ThinkingOverlay({ active, title, description }: ThinkingOverlayProps) {
+  if (!active) return null;
 
   return (
     <Card
@@ -27,29 +28,19 @@ export default function ThinkingOverlay({ status, replyHistory }: ThinkingOverla
         marginBottom: 16,
       }}
     >
-      <Space style={{ marginBottom: 12 }}>
-        <Spin indicator={<LoadingOutlined spin />} />
-        <Typography.Text strong style={{ color: '#1677ff' }}>
-          {status === 'sending' ? '正在发送…' : '决策助手正在思考'}
-        </Typography.Text>
-      </Space>
-
-      {replyHistory.map((text, i) => (
-        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'flex-start' }}>
-          <CheckCircleOutlined style={{ color: '#52c41a', marginTop: 4 }} />
-          <Typography.Text style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{text}</Typography.Text>
-        </div>
-      ))}
-
-      {status === 'streaming' && (
+      <Space direction="vertical" size={4} style={{ width: '100%' }}>
         <Space>
-          <MessageOutlined style={{ color: '#1677ff' }} />
-          <Typography.Text type="secondary" style={{ fontSize: 13 }} italic>
-            正在生成回复…
+          <Spin indicator={<LoadingOutlined spin />} />
+          <Typography.Text strong style={{ color: '#1677ff' }}>
+            {title ?? '处理中…'}
           </Typography.Text>
         </Space>
-      )}
-      <div ref={endRef} />
+        {description && (
+          <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+            {description}
+          </Typography.Text>
+        )}
+      </Space>
     </Card>
   );
 }
