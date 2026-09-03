@@ -46,6 +46,7 @@
 - 按 `case_type` 做购物/时间类型隔离。
 - 返回结构：`{ "success": true, "data": { "results": [RagEvidence...] }, "message": "" }`。
 - 每条结果仅返回 `RagEvidence` 契约字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，`score` 保留 4 位小数。
+- 检索质量优化：query 与语料统一用 `jieba.lcut_for_search`（解决“社团活动/学习用品”被切成整词导致无法命中）；语料加入 `tags`；返回前按 `title` 去重，避免重复记录挤占 top-k。
 - 无命中返回空数组 `[]`，不编造历史。
 
 ### 3.3 后端联动（新输入的数据入库）
@@ -67,7 +68,7 @@
 
 ### 3.5 测试覆盖
 ```text
-tests/test_rag.py                 检索命中/防幻觉/类型隔离/500 条数据/时间场景/RagEvidence 字段/仅契约字段
+tests/test_rag.py                 检索命中/防幻觉/类型隔离/500 条数据/时间场景/RagEvidence 字段/仅契约字段/4 组标准查询命中
 tests/test_rag_data_loader.py     字段映射/静态+实时合并/回退/联动开关/响应解包
 tests/test_rag_adapter.py         C-D adapter 契约（成功/空结果/失败/缺字段/URL/body）
 ```
@@ -78,7 +79,7 @@ uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_ada
 uv run python -m compileall -q rag tests
 ```
 
-当前结果：`23 passed`。
+当前结果：`24 passed`。
 
 ### 3.6 联调与评测脚本
 ```text
@@ -90,18 +91,12 @@ rag/e2e_verify.py       端到端联调验证：创建购物案件 → debate �
 
 ### P0（已完成）
 - ✅ **端到端联调**：`uv run python rag/e2e_verify.py`（需 8000/8001）。结果：购物案件 `rag_evidence` 命中 3 条、trace `rag_search completed`、无命中返回空、report.final_decision=delay。
-- ✅ **RAG 评测脚本/指标**：`uv run python rag/evaluate_rag.py --out data/rag_eval_result.json`。结果：4 个标准查询中 `想买降噪耳机`/`想买学习用品`/`参加技术分享` 为 expected_hit=True，`参加社团活动` 为 False（召回质量待提升）。
+- ✅ **RAG 评测脚本/指标**：`uv run python rag/evaluate_rag.py --out data/rag_eval_result.json`。优化前 `参加社团活动` 为 False；优化后 4 个标准查询 **全部 expected_hit=True**。
 
 ### P1（建议完成）
 - ✅ 已完成：契约裁剪。`rag/retriever.py` 返回结果只保留 `RagEvidence` 所需字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，并补充“仅契约字段”单测。
-1. **优化两处检索质量并补 4 组标准查询命中断言**：
-   - 评测显示 `想买学习用品` 的 top 命中偏题（围巾等），`参加社团活动` 未命中预期关键词（`社团/活动`）。
-   - 建议：调整 query 分词/对 `title+tags` 加权、给关键记录补充更强关键词，然后补断言：
-     - 降噪耳机 → 电子/闲置/预算记录。
-     - 学习用品 → 学习台灯/值得购买记录。
-     - 社团活动 → 作业延期/社团记录。
-     - 技术分享 → 低时间成本记录。
-2. **time 场景检索验证**：C 完成 time 流程后会以 `case_type=time` 调用，D 先确认时间记录检索正常。
+- ✅ **已完成：检索质量优化 + 4 组标准查询命中**。`rag/retriever.py` 统一 query/语料分词、语料加入 tags、按 title 去重；`tests/test_rag.py` 新增 `test_rag_standard_query_expected_hits`，4 组查询（降噪耳机/学习用品/社团活动/技术分享）在 top_k=5 内均命中预期关键词。
+- 剩余：**time 场景检索验证**：C 完成 time 流程后会以 `case_type=time` 调用，D 先确认时间记录检索正常；补答辩检索/引用截图。
 
 ### P2（可选 / 依赖其他角色）
 6. **BM25 → 混合检索**（BM25 + 向量，可选加分）。
@@ -152,12 +147,14 @@ python rag/build_history_data.py
   - `6b95b43 feat: 扩充 RAG 历史数据至 500 条并联动后端历史入库`
   - `8ab0b21 refactor: RAG 检索结果裁剪为 RagEvidence 契约字段并补充测试`
   - `344a29a test: 补充 RAG 评测脚本与端到端联调验证脚本，更新 D 进度文档`
-- 状态：3 个提交**均已推送远程**，待通过 PR 合并到 `dev`。
+  - `4c35073 feat: 优化 RAG 检索质量（查询分词/标签索引/标题去重）并补标准查询断言`
+- 状态：**已推送远程**，待通过 PR 合并到 `dev`。
 
 ## 9. 一次性进度小结（2020-07 更新）
 
 - RAG 主链路（500 条数据、BM25 检索、契约字段、后端历史联动）已完成。
 - P0 已完成：端到端联调验证通过（购物案例命中 3 条证据、trace completed、无命中返回空）；RAG 评测脚本产出 `data/rag_eval_result.json`。
-- 当前估算完成度 **约 92%**。
-- 剩余重点（P1）：优化 `参加社团活动` / `想买学习用品` 的检索质量并补 4 组标准查询命中断言；等 C 完成 time 流程后做 time 端到端联调。
+- P1 检索质量优化已完成：query/语料统一用 `lcut_for_search`、语料加 tags、按 title 去重；4 组标准查询在 top_k=5 内均命中预期关键词。
+- 当前估算完成度 **约 93%**。
+- 剩余重点：等 C 完成 time 流程后做 time 端到端联调；补答辩检索/判决书引用截图。
 - 未提交：`data/rag_eval_result.json`（评测结果，本地留作答辩证据）。
