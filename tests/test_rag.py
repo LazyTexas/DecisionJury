@@ -117,3 +117,27 @@ def test_rag_time_scenario_hit():
             for key in ("id", "title", "content", "score", "source", "case_type", "tags"):
                 assert key in r, f"检索结果缺少 RagEvidence 字段 {key}"
         print(f"\n✅ 时间检索 '{query}' 命中 {len(results)} 条")
+
+
+def test_rag_results_only_rag_evidence_fields():
+    """
+    检索结果必须只暴露 RagEvidence 契约字段（docs/04_API.md §5.4），
+    不允许泄漏 case_id/report_id/price/pros/cons 等内部字段。
+    """
+    payload = {
+        "user_id": "u001",
+        "case_id": "case_005",
+        "case_type": "shopping",
+        "query": "降噪耳机 学习",
+        "top_k": 3,
+    }
+    results = results_for(payload)
+    assert len(results) > 0, "应至少命中一条购物记录"
+
+    expected = {"id", "title", "content", "score", "source", "case_type", "tags", "created_at"}
+    for r in results:
+        assert set(r.keys()) == expected, f"返回字段与 RagEvidence 契约不一致: {sorted(r.keys())}"
+        assert isinstance(r["tags"], list), "tags 必须为列表"
+        assert all(isinstance(t, str) for t in r["tags"]), "tags 必须全部为字符串"
+        assert isinstance(r["score"], (int, float)), "score 必须为数值"
+        assert r["created_at"] is None or isinstance(r["created_at"], str), "created_at 必须为字符串或 null"
