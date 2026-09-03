@@ -381,6 +381,8 @@ completed
 | POST | `/api/tools/cost-analyzer` | 成本计算 | E | C |
 | POST | `/api/tools/cooling-reminder` | 冷静期提醒 | E | C |
 | GET | `/api/watchlist?user_id=u001` | 查询观察清单 | B/E | A |
+| POST | `/auth/register` | 用户注册 | B | A |
+| POST | `/auth/login` | 用户登录 | B | A |
 
 ## 7. 健康检查
 
@@ -540,6 +542,103 @@ POST /api/cases/{case_id}/messages
     "missing_fields": []
   },
   "message": ""
+}
+```
+### 8.5 用户注册
+
+```text
+POST /auth/register
+```
+
+请求：
+
+```json
+{
+  "user_id": "test_user",
+  "name": "测试用户",
+  "password": "123456"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| user_id | string | 是 | 用户 ID |
+| name | string | 是 | 用户昵称 |
+| password | string | 是 | 用户密码 |
+
+返回（成功）：
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "test_user",
+    "name": "测试用户"
+  },
+  "message": "注册成功"
+}
+```
+
+返回（失败-用户已存在）：
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "用户已存在"
+}
+```
+
+### 8.6 用户登录
+
+```text
+POST /auth/login
+```
+
+请求：
+
+```json
+{
+  "user_id": "test_user",
+  "password": "123456"
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| user_id | string | 是 | 用户 ID |
+| password | string | 是 | 用户密码 |
+
+返回（成功）：
+
+```json
+{
+  "success": true,
+  "data": {
+    "user_id": "test_user",
+    "name": "测试用户"
+  },
+  "message": "登录成功"
+}
+```
+
+返回（失败-用户不存在）：
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "用户不存在"
+}
+```
+
+返回（失败-密码错误）：
+
+```json
+{
+  "success": false,
+  "data": null,
+  "message": "密码错误"
 }
 ```
 
