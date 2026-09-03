@@ -117,3 +117,64 @@ def test_rag_time_scenario_hit():
             for key in ("id", "title", "content", "score", "source", "case_type", "tags"):
                 assert key in r, f"检索结果缺少 RagEvidence 字段 {key}"
         print(f"\n✅ 时间检索 '{query}' 命中 {len(results)} 条")
+
+
+def test_rag_results_only_rag_evidence_fields():
+    """
+    检索结果必须只暴露 RagEvidence 契约字段（docs/04_API.md §5.4），
+    不允许泄漏 case_id/report_id/price/pros/cons 等内部字段。
+    """
+    payload = {
+        "user_id": "u001",
+        "case_id": "case_005",
+        "case_type": "shopping",
+        "query": "降噪耳机 学习",
+        "top_k": 3,
+    }
+    results = results_for(payload)
+    assert len(results) > 0, "应至少命中一条购物记录"
+
+    expected = {"id", "title", "content", "score", "source", "case_type", "tags", "created_at"}
+    for r in results:
+        assert set(r.keys()) == expected, f"返回字段与 RagEvidence 契约不一致: {sorted(r.keys())}"
+        assert isinstance(r["tags"], list), "tags 必须为列表"
+        assert all(isinstance(t, str) for t in r["tags"]), "tags 必须全部为字符串"
+        assert isinstance(r["score"], (int, float)), "score 必须为数值"
+        assert r["created_at"] is None or isinstance(r["created_at"], str), "created_at 必须为字符串或 null"
+
+
+def test_rag_standard_query_expected_hits():
+    """
+    补 4 组标准查询命中断言（docs/05_TestPlan.md §5.1）。
+    要求：检索结果非空、类型正确、且 top_k 内至少命中一个预期关键词。
+    """
+    cases = [
+        ("shopping", "想买降噪耳机", ["耳机", "降噪"]),
+        ("shopping", "想买学习用品", ["学习", "台灯", "平板"]),
+        ("time", "参加社团活动", ["社团"]),
+        ("time", "参加技术分享", ["技术", "分享"]),
+    ]
+    for case_type, query, keywords in cases:
+        payload = {
+            "user_id": "u001",
+            "case_id": "case_std",
+            "case_type": case_type,
+            "query": query,
+            "top_k": 5,
+        }
+        results = results_for(payload)
+        assert len(results) > 0, f"'{query}' 未命中任何历史记录"
+        assert all(r["case_type"] == case_type for r in results), f"'{query}' 混入了其他类型"
+        hit = False
+        for r in results:
+            text = " ".join(
+                [
+                    str(r.get("title", "")),
+                    str(r.get("content", "")),
+                    " ".join(r.get("tags", []) or []),
+                ]
+            )
+            if any(k in text for k in keywords):
+                hit = True
+                break
+        assert hit, f"'{query}' 的 top_k 结果未命中预期关键词 {keywords}，实际 titles={[r['title'] for r in results]}"
