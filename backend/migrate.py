@@ -36,6 +36,28 @@ def migrate_cases():
     else:
         print("[INFO] cases 表无需迁移")
 
+def migrate_users():
+    """迁移 users 表"""
+    try:
+        columns = get_existing_columns("users")
+    except Exception:
+        print("[INFO] users 表不存在，跳过迁移")
+        return
+
+    additions = []
+    if "name" not in columns:
+        additions.append("ADD COLUMN name TEXT")
+    if "hashed_password" not in columns:
+        additions.append("ADD COLUMN hashed_password TEXT")
+    if "created_at" not in columns:
+        additions.append("ADD COLUMN created_at DATETIME")
+
+    if additions:
+        with engine.connect() as conn:
+            for stmt in additions:
+                conn.execute(text(f"ALTER TABLE users {stmt}"))
+            conn.commit()
+            print("[OK] users 表迁移完成")
 
 def migrate_histories():
     """迁移 histories 表"""
@@ -143,6 +165,7 @@ def migrate_indexes():
 def run_all_migrations():
     """执行所有字段迁移（不包含索引）"""
     print("[INFO] 开始执行数据库迁移...")
+    migrate_users()
     migrate_cases()
     migrate_histories()
     migrate_traces()
@@ -154,7 +177,7 @@ def backup_data():
     """备份所有表数据到 JSON 文件"""
     db = SessionLocal()
     data = {}
-    tables = ["cases", "messages", "histories", "traces", "reminders"]
+    tables = ["users", "cases", "messages", "histories", "traces", "reminders"]
 
     for table_name in tables:
         try:
@@ -193,6 +216,7 @@ def restore_data(backup_path):
 
     db = SessionLocal()
     model_tables = {
+        "users": models.User,
         "cases": models.Case,
         "messages": models.Message,
         "histories": models.History,
@@ -201,7 +225,7 @@ def restore_data(backup_path):
     }
 
     # 按依赖顺序插入
-    insert_order = ["cases", "messages", "histories", "traces", "reminders"]
+    insert_order = ["users", "cases", "messages", "histories", "traces", "reminders"]
 
     # 临时关闭外键检查，避免恢复时约束冲突
     with engine.connect() as conn:
