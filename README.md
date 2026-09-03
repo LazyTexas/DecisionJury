@@ -58,6 +58,15 @@ DecisionJury/
 - 后端：`uvicorn backend.main:app --reload`
 - 前端：`npm run dev`
 
+### Ubuntu / 服务器部署（screen 方案）
+单台 Linux 服务器请使用 `deploy/` 下的脚本，详细步骤见 `deploy/README.md`：
+
+```bash
+bash deploy/install.sh   # 装依赖 + 生成 .env
+bash deploy/start.sh     # screen 起 后端(8000)/RAG(8001)/前端(5173)
+bash deploy/stop.sh      # 关闭三个 screen + 端口兜底
+```
+
 ## 环境配置
 
 项目通过 `ENV` 环境变量区分开发环境和生产环境，默认值为 `development`。
