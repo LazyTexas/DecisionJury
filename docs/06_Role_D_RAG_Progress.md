@@ -71,20 +71,22 @@
 tests/test_rag.py                 检索命中/防幻觉/类型隔离/500 条数据/时间场景/RagEvidence 字段/仅契约字段/4 组标准查询命中
 tests/test_rag_data_loader.py     字段映射/静态+实时合并/回退/联动开关/响应解包
 tests/test_rag_adapter.py         C-D adapter 契约（成功/空结果/失败/缺字段/URL/body）
+tests/test_dialogue_quality_metrics.py  对话质量指标计算（检索命中/进上下文/判决书引用/关键词接地）
 ```
 
 验证命令：
 ```bash
-uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py
+uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py tests/test_dialogue_quality_metrics.py
 uv run python -m compileall -q rag tests
 ```
 
-当前结果：`24 passed`。
+当前结果：`26 passed`。
 
 ### 3.6 联调与评测脚本
 ```text
-rag/evaluate_rag.py     RAG 评测：跑 docs/05_TestPlan.md §5.1 标准查询，输出 top_k/类型/预期命中/分数
-rag/e2e_verify.py       端到端联调验证：创建购物案件 → debate → rag_evidence/trace/report/无命中检查
+rag/evaluate_rag.py                RAG 检索评测：跑 docs/05_TestPlan.md §5.1 标准查询，输出 top_k/类型/预期命中/分数
+rag/e2e_verify.py                  端到端联调验证：创建购物案件 → debate → rag_evidence/trace/report/无命中检查
+rag/evaluate_dialogue_quality.py   对话质量量化：检索命中数/进入法官上下文/判决书引用证据/关键词接地(token_overlap)
 ```
 
 ## 4. 下一步该做什么（按优先级）
@@ -92,6 +94,7 @@ rag/e2e_verify.py       端到端联调验证：创建购物案件 → debate �
 ### P0（已完成）
 - ✅ **端到端联调**：`uv run python rag/e2e_verify.py`（需 8000/8001）。结果：购物案件 `rag_evidence` 命中 3 条、trace `rag_search completed`、无命中返回空、report.final_decision=delay。
 - ✅ **RAG 评测脚本/指标**：`uv run python rag/evaluate_rag.py --out data/rag_eval_result.json`。优化前 `参加社团活动` 为 False；优化后 4 个标准查询 **全部 expected_hit=True**。
+- ✅ **对话质量量化指标**：`uv run python rag/evaluate_dialogue_quality.py --out data/rag_dialogue_quality_result.json`（需 8000/8001）。实测：`retrieval_hits=3`、`evidence_in_judge_context=True`、`report_cites_evidence=True`、`grounded_keyword_hit=True`、`token_overlap=16`。`tests/test_dialogue_quality_metrics.py` 覆盖该指标计算。
 
 ### P1（建议完成）
 - ✅ 已完成：契约裁剪。`rag/retriever.py` 返回结果只保留 `RagEvidence` 所需字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，并补充“仅契约字段”单测。
@@ -143,11 +146,14 @@ python rag/build_history_data.py
 ## 8. 当前提交分支
 
 - 分支：`feature/rag-500-linkage`
-- 提交记录：
+- 提交记录（append 到 origin/dev 之上）：
   - `6b95b43 feat: 扩充 RAG 历史数据至 500 条并联动后端历史入库`
   - `8ab0b21 refactor: RAG 检索结果裁剪为 RagEvidence 契约字段并补充测试`
   - `344a29a test: 补充 RAG 评测脚本与端到端联调验证脚本，更新 D 进度文档`
+  - `3277999 docs: 更新 D RAG 进度小结与提交记录`
   - `4c35073 feat: 优化 RAG 检索质量（查询分词/标签索引/标题去重）并补标准查询断言`
+  - `1c9b032 docs: 更新 RAG 检索质量优化与完成度`
+  - `beb33cc feat: 新增对话质量量化评估指标（检索命中/进上下文/判决书引用/关键词接地）`
 - 状态：**已推送远程**，待通过 PR 合并到 `dev`。
 
 ## 9. 一次性进度小结（2020-07 更新）
@@ -155,6 +161,7 @@ python rag/build_history_data.py
 - RAG 主链路（500 条数据、BM25 检索、契约字段、后端历史联动）已完成。
 - P0 已完成：端到端联调验证通过（购物案例命中 3 条证据、trace completed、无命中返回空）；RAG 评测脚本产出 `data/rag_eval_result.json`。
 - P1 检索质量优化已完成：query/语料统一用 `lcut_for_search`、语料加 tags、按 title 去重；4 组标准查询在 top_k=5 内均命中预期关键词。
-- 当前估算完成度 **约 93%**。
-- 剩余重点：等 C 完成 time 流程后做 time 端到端联调；补答辩检索/判决书引用截图。
-- 未提交：`data/rag_eval_result.json`（评测结果，本地留作答辩证据）。
+- 对话质量量化指标已完成：`rag/evaluate_dialogue_quality.py` 输出检索命中/进上下文/判决书引用/关键词接地（token_overlap），实测 `grounded_keyword_hit=True`。
+- 当前估算完成度 **约 94%**。
+- 剩余重点：等 C 完成 time 流程后做 time 端到端联调；补答辩检索/判决书引用截图；可选接 LLM 做更细的“回答相关性/一致性”打分。
+- 未提交：`data/rag_eval_result.json`、`data/rag_dialogue_quality_result.json`（评测结果，本地留作答辩证据）。
