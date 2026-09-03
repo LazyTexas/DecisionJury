@@ -29,7 +29,7 @@ import {
 } from '@ant-design/icons';
 import { DecisionReport, RagEvidence, ToolResult, TraceItem } from '../types';
 import { getReport, getTrace } from '../api';
-import { DECISION_META, TRACE_NAME_LABEL, TRACE_TYPE_LABEL } from '../constants';
+import { DECISION_META, CASE_TYPE_META, TRACE_NAME_LABEL, TRACE_TYPE_LABEL } from '../constants';
 import { formatDateTime } from '../utils/format';
 import FeedbackModal from '../components/FeedbackModal';
 
@@ -299,7 +299,9 @@ export default function VerdictPage() {
         <Descriptions size="small" column={{ xs: 1, sm: 2 }}>
           <Descriptions.Item label="判决书 ID">{report.report_id}</Descriptions.Item>
           <Descriptions.Item label="生成时间">{formatDateTime(report.created_at)}</Descriptions.Item>
-          <Descriptions.Item label="案件类型">{report.case_type}</Descriptions.Item>
+          <Descriptions.Item label="案件类型">
+            {CASE_TYPE_META[report.case_type as keyof typeof CASE_TYPE_META]?.label ?? report.case_type}
+          </Descriptions.Item>
         </Descriptions>
       </Card>
 
