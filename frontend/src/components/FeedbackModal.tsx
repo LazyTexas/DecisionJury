@@ -31,7 +31,7 @@ export default function FeedbackModal({ caseId, open, onClose }: FeedbackModalPr
       open={open}
       onCancel={onClose}
       footer={null}
-      destroyOnClose
+      destroyOnHidden
     >
       <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
         <Form.Item name="actual_action" label="你最终做了什么？" rules={[{ required: true, message: '请选择' }]}>

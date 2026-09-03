@@ -9,34 +9,12 @@ import {
 } from '@ant-design/icons';
 import { CaseSummary, CaseType, CaseStatus, HistoryItem, HistoryResult } from '../types';
 import { getCaseList, getHistory } from '../api';
+import { CASE_STATUS_META, CASE_TYPE_META, HISTORY_RESULT_META } from '../constants';
+import { formatDate } from '../utils/format';
 
-const caseTypeConfig: Record<CaseType, { label: string; color: string; icon: React.ReactNode }> = {
-  [CaseType.SHOPPING]: { label: '购物', color: 'blue', icon: <ShoppingCartOutlined /> },
-  [CaseType.TIME]: { label: '时间决策', color: 'orange', icon: <ClockCircleOutlined /> },
-};
-
-const statusLabel: Record<CaseStatus, string> = {
-  [CaseStatus.COLLECTING]: '信息收集中',
-  [CaseStatus.READY_FOR_DEBATE]: '待辩论',
-  [CaseStatus.DEBATING]: '辩论中',
-  [CaseStatus.COMPLETED]: '已判决',
-  [CaseStatus.REJECTED]: '已拒绝',
-  [CaseStatus.ARCHIVED]: '已归档',
-};
-
-const statusColor: Record<CaseStatus, string> = {
-  [CaseStatus.COLLECTING]: 'processing',
-  [CaseStatus.READY_FOR_DEBATE]: 'default',
-  [CaseStatus.DEBATING]: 'warning',
-  [CaseStatus.COMPLETED]: 'success',
-  [CaseStatus.REJECTED]: 'error',
-  [CaseStatus.ARCHIVED]: 'default',
-};
-
-const resultMeta: Record<HistoryResult, { label: string; color: string }> = {
-  [HistoryResult.WORTH]: { label: '满意', color: 'green' },
-  [HistoryResult.REGRET]: { label: '后悔', color: 'red' },
-  [HistoryResult.NEUTRAL]: { label: '中立', color: 'default' },
+const caseTypeIcon: Record<CaseType, React.ReactNode> = {
+  [CaseType.SHOPPING]: <ShoppingCartOutlined />,
+  [CaseType.TIME]: <ClockCircleOutlined />,
 };
 
 export default function HomePage() {
@@ -81,8 +59,8 @@ export default function HomePage() {
       ) : (
         <Row gutter={[16, 16]} style={{ marginBottom: 32 }}>
           {cases.map((c) => {
-            const cat = caseTypeConfig[c.case_type];
-            const st = statusColor[c.status];
+            const cat = CASE_TYPE_META[c.case_type];
+            const st = CASE_STATUS_META[c.status];
             return (
               <Col xs={24} sm={12} key={c.case_id}>
                 <Card hoverable onClick={() => {
@@ -91,8 +69,8 @@ export default function HomePage() {
                 }} style={{ borderRadius: 8 }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <div>
-                      <Tag icon={cat.icon} color={cat.color}>{cat.label}</Tag>
-                      <Tag color={st}>{statusLabel[c.status]}</Tag>
+                      <Tag icon={caseTypeIcon[c.case_type]} color={cat.color}>{cat.label}</Tag>
+                      <Tag color={st.color}>{st.label}</Tag>
                     </div>
                     <Typography.Text strong style={{ fontSize: 16 }}>{c.title}</Typography.Text>
                     <Typography.Paragraph type="secondary" ellipsis={{ rows: 2 }} style={{ margin: 0, fontSize: 13 }}>
@@ -100,7 +78,7 @@ export default function HomePage() {
                     </Typography.Paragraph>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        {c.message_count} 条消息 · {c.updated_at ? new Date(c.updated_at).toLocaleDateString('zh-CN') : '—'}
+                        {c.message_count} 条消息 · {formatDate(c.updated_at)}
                       </Typography.Text>
                       <RightOutlined style={{ color: '#ccc', fontSize: 12 }} />
                     </div>
@@ -127,22 +105,22 @@ export default function HomePage() {
         <List
           dataSource={historyItems}
           renderItem={(item) => {
-            const r = resultMeta[item.result] ?? { label: item.result, color: 'default' };
+            const r = HISTORY_RESULT_META[item.result as HistoryResult] ?? { label: item.result, color: 'default', icon: '📝' };
             return (
               <List.Item
                 style={{ cursor: 'pointer', padding: '12px 8px', borderRadius: 6 }}
                 onClick={() => {
                   if (item.report_id) navigate(`/verdict/${item.case_id}`);
-                  else navigate(`/chat/${item.case_id}`);
+                  else if (item.case_id) navigate(`/chat/${item.case_id}`);
                 }}
               >
                 <Space direction="vertical" size={2} style={{ flex: 1 }}>
                   <Space>
-                    <Tag color={r.color}>{r.label}</Tag>
+                    <Tag color={r.color}>{r.icon} {r.label}</Tag>
                     <Typography.Text strong style={{ fontSize: 14 }}>{item.title}</Typography.Text>
                   </Space>
                   <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                    {item.summary} · {new Date(item.created_at).toLocaleDateString('zh-CN')}
+                    {item.summary} · {formatDate(item.created_at)}
                   </Typography.Text>
                 </Space>
                 <RightOutlined style={{ color: '#ccc' }} />
