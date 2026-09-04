@@ -300,13 +300,13 @@ uv run python -m compileall backend tests mcp_tools
 - 新增 `mcp_tools/mcp.py`：MCP 工具契约层，定义两个工具的 inputSchema，并支持 `call_tool(name, arguments)` 统一分发，为后续封装 MCP Server 做准备。
 - 新增 `mcp_tools/demo.py`：`python -m mcp_tools.demo` 可一键展示 cost_analyzer（购物+时间）与 cooling_reminder 的调用及日志。
 - 测试：已补齐工具边界测试、MCP 契约层测试、HTTP 接口联调测试，并在 `tests/conftest.py` 补充共享 `db_session` 夹具，供各路由测试复用同一内存数据库。
+- `mcp_tools/decision_score.py`：决策评分工具（纯规则，不依赖 LLM），输出 0~100 综合分与 low/medium/high 风险等级；已接入 `call_tool` 与 `POST /api/tools/decision-score`，并补充单元测试与 HTTP 联调测试。
 
 尚未完成：
 
 - time 决策主流程接入（`analyze_time_cost` 已实现，但 `decision_flow.py` 仍只走 shopping，需等 C 模块的 time 流程）。
 - Docker 部署（可选加分项，M12；当前已有 `start_all.bat` 一键启动三端）。
 - 真实 RAG 与后端全链路联调（依赖 D/C 侧联调整体推进）。
-- `decision_score` 可选工具（时间紧可砍）。
 
 ### 9.5 B模块 P0 任务完成情况
 

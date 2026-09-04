@@ -6,7 +6,7 @@
 - POST /api/tools/cooling-reminder
 """
 
-from backend.models import Reminder
+from backend.models import Reminder, User
 
 
 def test_cost_analyzer_shopping_success(client):
@@ -77,6 +77,10 @@ def test_cost_analyzer_unsupported_case_type(client):
 
 def test_cooling_reminder_success_persists_to_db(client, db_session):
     """创建冷静期提醒成功，并写入 reminders 表（观察清单可查到）。"""
+    # cases.user_id 外键指向 users.id，需先插入用户
+    db_session.add(User(id="u001", name="测试用户", hashed_password="not-used"))
+    db_session.commit()
+
     # 先创建案件，满足 reminders.case_id 外键约束
     create_resp = client.post(
         "/api/cases",
@@ -137,3 +141,42 @@ def test_cooling_reminder_missing_user_id(client):
     # 按 docs/04_API.md §11 约定，失败时 error 统一为错误码，具体原因在 summary。
     assert data["error"] == "REMINDER_CREATE_FAILED"
     assert "user_id" in data["summary"]
+
+
+def test_decision_score_endpoint_success(client):
+    """决策评分接口成功返回 score 与 risk_level。"""
+    resp = client.post(
+        "/api/tools/decision-score",
+        json={
+            "case_type": "shopping",
+            "cost_risk_level": "low",
+            "history_risk": 0.2,
+            "usage_value": 0.9,
+            "impulse_trigger": False,
+        },
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    data = body["data"]
+    assert data["tool_name"] == "decision_score"
+    assert data["status"] == "success"
+    assert data["risk_level"] == "low"
+    assert data["metrics"]["score"] == 90
+    assert "dimensions" in data["metrics"]
+    assert data["error"] is None
+
+
+def test_decision_score_endpoint_invalid_case_type(client):
+    """非法 case_type 返回 failed ToolResult。"""
+    resp = client.post(
+        "/api/tools/decision-score",
+        json={"case_type": "medical"},
+    )
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["success"] is True
+    data = body["data"]
+    assert data["tool_name"] == "decision_score"
+    assert data["status"] == "failed"
+    assert data["error"] == "TOOL_ERROR: case_type 只能是 shopping 或 time，收到: medical"

@@ -14,6 +14,7 @@ from backend.database import get_db
 from backend.models import Reminder
 from backend.schemas import ApiResponse
 from mcp_tools.cost_analyzer import analyze_shopping, analyze_time
+from mcp_tools.decision_score import score_decision
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -37,6 +38,14 @@ class CoolingReminderRequest(BaseModel):
     cooling_days: int = 3
     reason: str = ""
     watch_items: list[str] = []
+
+
+class DecisionScoreRequest(BaseModel):
+    case_type: str
+    cost_risk_level: str = "medium"
+    history_risk: float = 0.5
+    usage_value: float = 0.5
+    impulse_trigger: bool = False
 
 
 # ==================== cost_analyzer ====================
@@ -176,6 +185,54 @@ def cooling_reminder_endpoint(req: CoolingReminderRequest, db: Session = Depends
                 "risk_level": None,
                 "metrics": {},
                 "error": f"REMINDER_CREATE_FAILED: {exc}",
+            },
+            message="",
+        )
+
+
+# ==================== decision_score ====================
+
+@router.post("/decision-score", response_model=ApiResponse)
+def decision_score_endpoint(req: DecisionScoreRequest):
+    """
+    决策评分工具。
+
+    综合成本压力、历史证据风险、使用价值与冲动触发，输出 0~100 综合分。
+    """
+    try:
+        raw = score_decision(
+            case_type=req.case_type,
+            cost_risk_level=req.cost_risk_level,
+            history_risk=req.history_risk,
+            usage_value=req.usage_value,
+            impulse_trigger=req.impulse_trigger,
+        )
+        return ApiResponse(
+            success=True,
+            data={
+                "tool_name": "decision_score",
+                "status": "success",
+                "summary": raw.get("suggestion", ""),
+                "risk_level": raw.get("risk_level"),
+                "metrics": {
+                    "score": raw.get("score"),
+                    "risk_level": raw.get("risk_level"),
+                    "dimensions": raw.get("dimensions", {}),
+                },
+                "error": None,
+            },
+            message="",
+        )
+    except Exception as exc:
+        return ApiResponse(
+            success=True,
+            data={
+                "tool_name": "decision_score",
+                "status": "failed",
+                "summary": "决策评分工具调用失败，主流程继续。",
+                "risk_level": None,
+                "metrics": {},
+                "error": f"TOOL_ERROR: {exc}",
             },
             message="",
         )
