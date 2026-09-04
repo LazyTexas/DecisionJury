@@ -76,31 +76,13 @@ def parse_input(
     existing = existing_collected_fields or {}
     normalized_input = _normalize_text(raw_input)
 
-    if _is_high_risk(normalized_input):
-        step = AgentStep(
-            agent="input_parser",
-            status="completed",
-            summary="输入命中高风险领域，已拒绝进入购物法庭辩论。",
-            confidence=0.95,
-            arguments=["当前项目仅支持购物和时间类低风险日常决策。"],
-            used_rag_ids=[],
-            used_tool_names=[],
-            error=None,
-        )
-        return ParserResult(
-            case_type=None,
-            is_supported=False,
-            is_high_risk=True,
-            reject_reason="high_risk_domain",
-            extracted_fields={},
-            merged_fields={},
-            missing_fields=[],
-            next_question=None,
-            case_status="rejected",
-            agent_step=step,
-        )
+    high_risk = _is_high_risk(normalized_input)
 
     local_result = _build_rule_result(normalized_input, existing)
+    if high_risk:
+        local_result.is_high_risk = True
+        local_result.reject_reason = "high_risk_domain"
+        local_result.agent_step.summary = "输入包含高风险主题标记，但本次继续按案件信息进行分析。"
     client = get_llm_client()
     # 正常购物字段统一交给 DeepSeek，只有请求失败或结果校验失败时才使用本地规则。
     if isinstance(client, DeepSeekLLMClient):
@@ -154,28 +136,6 @@ def _build_llm_result(
     llm_result: dict[str, Any],
     existing: dict[str, Any],
 ) -> ParserResult:
-    if llm_result["is_high_risk"]:
-        step = AgentStep(
-            agent="input_parser",
-            status="completed",
-            summary="输入命中高风险领域，已拒绝进入购物法庭辩论。",
-            confidence=llm_result["confidence"],
-            arguments=["当前项目仅支持购物和时间类低风险日常决策。"],
-            error=None,
-        )
-        return ParserResult(
-            case_type=None,
-            is_supported=False,
-            is_high_risk=True,
-            reject_reason=llm_result.get("reject_reason") or "high_risk_domain",
-            extracted_fields={},
-            merged_fields={},
-            missing_fields=[],
-            next_question=None,
-            case_status="rejected",
-            agent_step=step,
-        )
-
     if not llm_result.get("is_supported", True):
         step = AgentStep(
             agent="input_parser",
@@ -215,7 +175,11 @@ def _build_llm_result(
     step = AgentStep(
         agent="input_parser",
         status="completed",
-        summary=f"识别为 shopping，缺失字段：{', '.join(missing) if missing else '无'}。",
+        summary=(
+            f"识别为 shopping，包含高风险主题标记，缺失字段：{', '.join(missing) if missing else '无'}。"
+            if llm_result["is_high_risk"]
+            else f"识别为 shopping，缺失字段：{', '.join(missing) if missing else '无'}。"
+        ),
         confidence=llm_result["confidence"],
         arguments=[f"已收集字段：{', '.join(sorted(merged.keys())) or '无'}"],
         error=None,
@@ -223,8 +187,8 @@ def _build_llm_result(
     return ParserResult(
         case_type="shopping",
         is_supported=True,
-        is_high_risk=False,
-        reject_reason=None,
+        is_high_risk=llm_result["is_high_risk"],
+        reject_reason=llm_result.get("reject_reason") if llm_result["is_high_risk"] else None,
         extracted_fields=extracted,
         merged_fields=merged,
         missing_fields=missing,

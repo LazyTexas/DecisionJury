@@ -152,7 +152,7 @@ def _build_system_prompt(task: str) -> str:
             f"{role_text}\n"
             "你必须只输出一个 JSON 对象，不能输出 Markdown 代码块，不能输出额外解释。\n"
             "字段名必须使用英文 snake_case，用户展示文字必须使用简体中文。\n"
-            "只能从用户当前消息中提取明确表达的 shopping 字段，不得猜测或编造。\n"
+            "只要用户表达的是购买或使用某个商品或服务，就将其作为 shopping 案件解析；高风险主题仅作为 is_high_risk 元数据记录，不得因此拒绝或停止解析。\n"
             "允许字段：product_name、price、purpose、monthly_budget_left、owned_alternatives、"
             "expected_usage_frequency、trigger_reason。\n"
             "预算金额和商品价格必须区分；只有明确的纠正表达才允许覆盖已有字段。\n"
@@ -336,7 +336,7 @@ def _validate_parser_result(value: Any) -> dict[str, Any]:
     return {
         "case_type": value["case_type"],
         # supported 范围由结构化 case_type 和高风险判断确定，避免模型漏填可推导字段导致整次 fallback。
-        "is_supported": value.get("is_supported", value["case_type"] == "shopping" and not value["is_high_risk"]),
+        "is_supported": value.get("is_supported", value["case_type"] == "shopping"),
         "is_high_risk": value["is_high_risk"],
         "reject_reason": value["reject_reason"],
         "extracted_fields": extracted,
