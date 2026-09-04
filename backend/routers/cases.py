@@ -372,11 +372,10 @@ def delete_case(
             data=None,
             message="FORBIDDEN"
         )
-
-    # 3. 更新 histories 表：将关联该 case 的记录的 case_id 和 report_id 置空
+    
+    # 3. 软删除关联的历史记录（保留 case_id 和 report_id，RAG 仍可检索）
     db.query(History).filter(History.case_id == case_id).update({
-        "case_id": None,
-        "report_id": None
+        "is_deleted": 1,
     })
 
     # 4. 删除案件（messages/traces/reminders 因外键 CASCADE 自动删除）

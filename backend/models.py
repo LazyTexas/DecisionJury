@@ -62,11 +62,13 @@ class History(Base):
     final_decision = Column(String, nullable=True)  # buy / delay / reject / alternative
     case_id = Column(String, nullable=True)  # 关联原案件 ID
     report_id = Column(String, nullable=True)  # 关联报告 ID
+    is_deleted = Column(Integer, default=0, nullable=False)  # 0=正常, 1=已删除
 
     __table_args__ = (
         Index("ix_histories_user_id_created_at", "user_id", "created_at"),
         Index("ix_histories_user_id_case_type", "user_id", "case_type"),
         Index("ix_histories_case_id", "case_id"),
+        Index("ix_histories_is_deleted", "is_deleted"),
     )
 
 
