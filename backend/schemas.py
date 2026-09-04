@@ -113,6 +113,7 @@ class DecisionReportResponse(BaseModel):
     rag_evidence: List[Dict[str, Any]] = []
     tool_results: List[Dict[str, Any]] = []
     created_at: Optional[str] = None
+    debate_events: List[DebateEvent] = []
 
 class UpdateCaseRequest(BaseModel):
     """更新案件请求（PATCH）"""
