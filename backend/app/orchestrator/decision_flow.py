@@ -29,20 +29,6 @@ def run_decision_flow(
     )
     steps.append(parser_result.agent_step)
 
-    if parser_result.is_high_risk:
-        return DebateResult(
-            success=False,
-            message="HIGH_RISK_DECISION",
-            case_id=case_id,
-            case_status="rejected",
-            steps=steps,
-            rag_evidence=[],
-            tool_results=[],
-            report=None,
-            trace=trace,
-            reason=parser_result.reject_reason,
-        )
-
     if parser_result.case_status != "ready_for_debate":
         return DebateResult(
             success=False,

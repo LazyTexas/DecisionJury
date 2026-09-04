@@ -181,7 +181,7 @@ def test_report_final_decision_is_valid_shopping_decision(monkeypatch: Any) -> N
     assert result["report"]["final_decision"] in SHOPPING_FINAL_DECISIONS
 
 
-def test_high_risk_input_is_rejected_before_debate(monkeypatch: Any) -> None:
+def test_high_risk_input_is_marked_without_rejection(monkeypatch: Any) -> None:
     monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
     monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
 
@@ -194,8 +194,8 @@ def test_high_risk_input_is_rejected_before_debate(monkeypatch: Any) -> None:
     )
 
     assert result["success"] is False
-    assert result["message"] == "HIGH_RISK_DECISION"
-    assert result["case_status"] == "rejected"
+    assert result["message"] == "MISSING_FIELDS"
+    assert result["case_status"] == "collecting"
     assert [step["agent"] for step in result["steps"]] == ["input_parser"]
     assert [item["name"] for item in result["trace"]] == ["input_parser"]
     assert result["rag_evidence"] == []
@@ -203,6 +203,24 @@ def test_high_risk_input_is_rejected_before_debate(monkeypatch: Any) -> None:
     assert result["report"] is None
     assert result["reason"]
     assert result["debate_events"] == []
+
+
+def test_complete_high_risk_shopping_case_enters_debate(monkeypatch: Any) -> None:
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+
+    result = to_dict(
+        run_decision_flow(
+            raw_input="我想买股票",
+            user_id="u001",
+            case_id="case_high_risk_complete",
+            existing_collected_fields=complete_shopping_fields(),
+        )
+    )
+
+    assert result["success"] is True
+    assert result["case_status"] == "completed"
+    assert result["message"] == "debate completed"
 
 
 def test_missing_fields_return_next_question_or_reason(monkeypatch: Any) -> None:

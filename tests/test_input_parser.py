@@ -9,11 +9,12 @@ from backend.app.services.llm_client import DeepSeekLLMClient
 # ========== 高风险检测 ==========
 
 def test_high_risk_medical():
-    """含"吃药"→ is_high_risk=True, reject_reason="high_risk_domain"。"""
+    """含"吃药"时标记高风险，但不再因该标记直接拒绝。"""
     result = parse_input("我想吃药治疗一下")
     assert result.is_high_risk is True
     assert result.reject_reason == "high_risk_domain"
-    assert result.case_status == "rejected"
+    assert result.case_status == "collecting"
+    assert result.is_supported is True
 
 
 def test_high_risk_financial():

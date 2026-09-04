@@ -73,9 +73,9 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 
 ## Rules
 
-1. Check for high-risk input before extracting shopping fields.
-2. High-risk input must output `is_high_risk = true`; the application sets the rejected status locally.
-3. High-risk input must not generate a follow-up question or enter pro/con debate.
+1. Detect high-risk themes before extracting shopping fields, but keep parsing the shopping information.
+2. High-risk input must output `is_high_risk = true`; this is informational metadata only.
+3. High-risk shopping input may generate a follow-up question and enter pro/con debate when all required fields are present.
 4. The application computes missing fields after validating and merging the model response.
 5. The application derives the final case status locally; do not include `case_status` in the model response.
 6. Do not ask again for fields that were already clearly answered.
@@ -84,7 +84,7 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 9. Treat vague answers such as "maybe", "not sure", "probably", or "I don't know" as missing for the relevant field.
 10. Use `snake_case` for all field names.
 11. Keep `next_question` concise and suitable for display in the MVP UI.
-12. If the case is rejected, explain that DecisionJury only supports low-risk daily shopping decisions.
+12. If the input is outside shopping, explain that this flow currently parses shopping decisions.
 13. Understand natural and colloquial Chinese, but extract only facts clearly stated by the user.
 14. Put explicitly corrected values in `correction_fields`; ordinary additions belong in `extracted_fields`.
 15. Do not use `correction_fields` for guesses or ambiguous statements.
@@ -113,13 +113,9 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 ## Output Constraints
 
 - `case_type` can only be `"shopping"` or `null`.
-- `is_supported` is optional for compatibility; when omitted, the application derives it from `case_type` and `is_high_risk`.
+- `is_supported` is optional for compatibility; when omitted, the application derives it from `case_type`.
 - The application, rather than the model, computes `case_status` from the validated merged fields.
-- If `is_high_risk` is `true`:
-  - `case_type` must be `null`
-  - `is_supported` is derived as `false` by the application
-  - `reject_reason` must be `"high_risk_domain"`
-  - `next_question` must be `null`
+- If `is_high_risk` is `true` for a shopping input, keep `case_type` as `shopping`, keep `is_supported` as `true`, and continue extracting explicit fields.
 - If the input is not a shopping scenario and not high-risk:
   - `is_supported` is derived as `false` by the application
   - `reject_reason` must be `"unsupported_case_type"`
