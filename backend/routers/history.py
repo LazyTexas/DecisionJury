@@ -77,7 +77,10 @@ def get_history(
     支持分页、按案件类型和结果筛选，按创建时间倒序排列
     """
     # 1. 构建基础查询
-    query = db.query(History).filter(History.user_id == user_id)
+    query = db.query(History).filter(
+        History.user_id == user_id,
+        History.is_deleted == 0
+    )
 
     # 2. 应用筛选条件
     if case_type:
@@ -119,5 +122,93 @@ def get_history(
             "page": page,
             "page_size": page_size,
         },
+        message=""
+    )
+
+@router.delete("/history/{history_id}", response_model=ApiResponse)
+def delete_history(
+    history_id: str,
+    user_id: str = Query(..., description="用户 ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    软删除历史记录（前端删除后，数据仍保留供 RAG 检索使用）
+    """
+    # 1. 查询历史记录
+    history = db.query(History).filter(History.id == history_id).first()
+    if not history:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="HISTORY_NOT_FOUND"
+        )
+
+    # 2. 权限校验
+    if history.user_id != user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="FORBIDDEN"
+        )
+
+    # 3. 如果已经删除，返回提示
+    if history.is_deleted == 1:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="HISTORY_ALREADY_DELETED"
+        )
+
+    # 4. 软删除：标记为已删除
+    history.is_deleted = 1
+    db.commit()
+
+    return ApiResponse(
+        success=True,
+        data={"deleted": True},
+        message=""
+    )
+
+@router.patch("/history/{history_id}/restore", response_model=ApiResponse)
+def restore_history(
+    history_id: str,
+    user_id: str = Query(..., description="用户 ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    恢复已软删除的历史记录
+    """
+    # 1. 查询历史记录
+    history = db.query(History).filter(History.id == history_id).first()
+    if not history:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="HISTORY_NOT_FOUND"
+        )
+
+    # 2. 权限校验
+    if history.user_id != user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="FORBIDDEN"
+        )
+
+    # 3. 如果未被删除，返回提示
+    if history.is_deleted == 0:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="HISTORY_NOT_DELETED"
+        )
+
+    # 4. 恢复：取消软删除标记
+    history.is_deleted = 0
+    db.commit()
+
+    return ApiResponse(
+        success=True,
+        data={"restored": True},
         message=""
     )
