@@ -380,3 +380,13 @@ export async function fetchWatchlist(): Promise<{ items: WatchlistItem[] }> {
   await delay();
   return { items: mockWatchlist };
 }
+
+/** 删除案件（同步移除 mock 数据中的案件与其消息） */
+export async function deleteCase(caseId: string): Promise<{ deleted: boolean }> {
+  await delay(300);
+  const idx = mockCases.findIndex((c) => c.case_id === caseId);
+  if (idx < 0) throw new Error('CASE_NOT_FOUND');
+  mockCases.splice(idx, 1);
+  delete mockMessages[caseId];
+  return { deleted: true };
+}

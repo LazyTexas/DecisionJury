@@ -30,6 +30,7 @@ import {
   fetchTrace as mockFetchTrace,
   fetchWatchlist as mockFetchWatchlist,
   fetchHistory as mockFetchHistory,
+  deleteCase as mockDeleteCase,
 } from './mock';
 
 // Mock 开关：开发期可用 VITE_USE_MOCK=true 起 dev server 体验纯前端 demo
@@ -351,4 +352,14 @@ export async function submitFeedback(
 export async function getWatchlist(): Promise<{ items: WatchlistItem[] }> {
   if (USE_MOCK) return mockFetchWatchlist();
   return request(`/watchlist?user_id=${getCurrentUserId()}`);
+}
+
+// ---- 案件删除 ----
+// TODO(后端配合)：后端待实现 DELETE /api/cases/{case_id}（级联删除案件的消息/轨迹/提醒，
+// 并将关联 histories 的 case_id/report_id 置空，保留复盘记录）。
+export async function deleteCase(caseId: string): Promise<{ deleted: boolean }> {
+  if (USE_MOCK) return mockDeleteCase(caseId);
+  return request(`/cases/${caseId}?user_id=${getCurrentUserId()}`, {
+    method: 'DELETE',
+  });
 }
