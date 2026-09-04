@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.services import mcp_adapter
+from backend.app.schemas.decision import ToolResult
 
 
 def test_analyze_shopping_success_maps_to_tool_result() -> None:
@@ -104,3 +105,58 @@ def test_analyze_time_cost_maps_to_tool_result() -> None:
     assert result.metrics["urgent_tasks"] == 2
     assert result.summary
     assert result.error is None
+
+
+def test_score_decision_maps_to_tool_result() -> None:
+    cost_result = mcp_adapter.analyze_shopping_cost(
+        case_id="case_001",
+        case_type="shopping",
+        fields={"price": 1200, "monthly_budget_left": 2000},
+    )
+    result = mcp_adapter.score_decision(
+        case_id="case_001",
+        case_type="shopping",
+        fields={"purpose": "学习", "expected_usage_frequency": "每天", "trigger_reason": "刚需"},
+        rag_evidence=[],
+        cost_result=cost_result,
+    )
+
+    assert result.tool_name == "decision_score"
+    assert result.status == "success"
+    assert result.metrics["score"] == 66
+    assert result.metrics["risk_level"] == "medium"
+
+
+def test_score_decision_passes_c_context_to_mcp(monkeypatch: Any) -> None:
+    captured: dict[str, Any] = {}
+
+    def fake_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        captured["name"] = name
+        captured["arguments"] = arguments
+        return {
+            "tool_name": name,
+            "status": "success",
+            "summary": "score complete",
+            "risk_level": "low",
+            "metrics": {"score": 80, "dimensions": {}},
+            "error": None,
+        }
+
+    monkeypatch.setattr("backend.app.services.mcp_adapter.call_tool", fake_call_tool)
+    result = mcp_adapter.score_decision(
+        case_id="case_001",
+        case_type="shopping",
+        fields={"purpose": "学习", "expected_usage_frequency": "每天", "trigger_reason": "促销"},
+        rag_evidence=[],
+        cost_result=ToolResult("cost_analyzer", "success", "ok", "high", {}, None),
+    )
+
+    assert result.status == "success"
+    assert captured["name"] == "decision_score"
+    assert captured["arguments"] == {
+        "case_type": "shopping",
+        "cost_risk_level": "high",
+        "history_risk": 0.5,
+        "usage_value": 0.9,
+        "impulse_trigger": True,
+    }
