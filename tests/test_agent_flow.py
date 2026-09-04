@@ -125,6 +125,10 @@ def test_debate_events_have_stable_courtroom_order(monkeypatch: Any) -> None:
     assert "2000" in events[0]["content"]
     assert "basic earbuds" in events[0]["content"]
     assert "cost_analyzer" in events[0]["evidence"]
+    assert "cooling_reminder" in events[0]["evidence"]
+    assert "cooling_reminder" in events[1]["evidence"]
+    assert "cooling_reminder" in events[2]["evidence"]
+    assert "cooling_reminder" in events[3]["evidence"]
     assert "The product has a clear study use case." in events[1]["content"]
     assert "The purchase still has budget and alternative risks." in events[2]["content"]
     assert result["report"]["final_decision"] in events[3]["content"]
@@ -324,4 +328,8 @@ def test_cooling_reminder_failure_does_not_interrupt_main_flow(monkeypatch: Any)
     assert result["case_status"] == "completed"
     assert result["report"] is not None
     assert report_cooling_result["status"] == "failed"
+    assert "cooling_reminder" in result["debate_events"][0]["evidence"]
+    assert "cooling_reminder" in result["debate_events"][1]["evidence"]
+    assert "cooling_reminder" in result["debate_events"][2]["evidence"]
+    assert "cooling_reminder" in result["debate_events"][3]["evidence"]
     assert any("手动" in action or "manual" in action.lower() for action in result["report"]["next_actions"])

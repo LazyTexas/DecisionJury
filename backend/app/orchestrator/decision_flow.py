@@ -94,7 +94,6 @@ def run_decision_flow(
         lambda: run_pro_agent(case_id, fields, rag_evidence, tool_results),
     )
     steps.append(pro_step)
-    debate_events.append(_build_agent_event(pro_step, order=2, phase="opening_statement"))
 
     con_step = _record_agent_trace(
         trace,
@@ -103,7 +102,6 @@ def run_decision_flow(
         lambda: run_con_agent(case_id, fields, rag_evidence, tool_results),
     )
     steps.append(con_step)
-    debate_events.append(_build_agent_event(con_step, order=3, phase="closing_argument"))
 
     if _should_create_reminder(tool_results, fields):
         reminder = _record_trace(
@@ -137,7 +135,12 @@ def run_decision_flow(
         output_summary_builder=lambda result: f"final_decision={result[1].final_decision}, confidence={result[1].confidence}",
     )
     steps.append(judge_step)
-    debate_events.append(_build_judge_event(report, order=4))
+    debate_events = [
+        _build_clerk_event(fields, rag_evidence, tool_results),
+        _build_agent_event(pro_step, order=2, phase="opening_statement", tool_results=tool_results),
+        _build_agent_event(con_step, order=3, phase="closing_argument", tool_results=tool_results),
+        _build_judge_event(report, order=4),
+    ]
     report.debate_events = debate_events
 
     return DebateResult(
@@ -174,12 +177,17 @@ def _build_clerk_event(
             f"书记员：本案争议为是否购买{product}。商品价格为{price}元，主要用途是{purpose}，"
             f"本月剩余预算为{budget}元，已有替代品：{alternatives}。"
         ),
-        evidence=[item.id for item in rag_evidence]
-        + [item.tool_name for item in tool_results if item.status == "success"],
+        # evidence records referenced inputs; tool success/failure remains explicit in tool_results.status.
+        evidence=[item.id for item in rag_evidence] + [item.tool_name for item in tool_results],
     )
 
 
-def _build_agent_event(step: AgentStep, order: int, phase: str) -> DebateEvent:
+def _build_agent_event(
+    step: AgentStep,
+    order: int,
+    phase: str,
+    tool_results: list[ToolResult],
+) -> DebateEvent:
     speaker_label = "正方" if step.agent == "pro_agent" else "反方"
     arguments = "；".join(step.arguments)
     content = f"{speaker_label}：{step.summary}"
@@ -191,7 +199,7 @@ def _build_agent_event(step: AgentStep, order: int, phase: str) -> DebateEvent:
         speaker=step.agent,
         phase=phase,
         content=content,
-        evidence=[*step.used_rag_ids, *step.used_tool_names],
+        evidence=[*step.used_rag_ids, *[item.tool_name for item in tool_results]],
     )
 
 

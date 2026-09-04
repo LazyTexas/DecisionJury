@@ -14,7 +14,7 @@ Return one JSON object only. Do not wrap it in Markdown code fences. Do not add 
 
 The JSON must contain only `summary`, `arguments`, and `confidence`.
 
-Use English `snake_case` for JSON field names. Use Simplified Chinese for user-facing text values such as `summary`, `case_summary`, `pro_points`, `con_points`, and `next_actions`.
+Use English `snake_case` for JSON field names. Use Simplified Chinese for user-facing text values such as `summary` and the strings in `arguments`.
 
 ## Scope
 
