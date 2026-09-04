@@ -7,7 +7,7 @@ from backend.app.agents.con_agent import run_con_agent
 from backend.app.agents.input_parser import parse_input
 from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
-from backend.app.schemas.decision import AgentStep, DebateResult, ToolResult, TraceItem
+from backend.app.schemas.decision import AgentStep, DebateEvent, DebateResult, DecisionReport, ToolResult, TraceItem
 from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder
 from backend.app.services.rag_adapter import search_rag_evidence
 
@@ -58,6 +58,7 @@ def run_decision_flow(
         )
 
     fields = parser_result.merged_fields
+    debate_events: list[DebateEvent] = []
     query = _build_rag_query(fields)
     rag_evidence = _record_trace(
         trace,
@@ -84,6 +85,7 @@ def run_decision_flow(
             fallback=_failed_tool_result("cost_analyzer", "成本计算工具调用失败，主流程继续。", "TOOL_ERROR"),
         )
     ]
+    debate_events.append(_build_clerk_event(fields, rag_evidence, tool_results))
 
     pro_step = _record_agent_trace(
         trace,
@@ -133,6 +135,13 @@ def run_decision_flow(
         output_summary_builder=lambda result: f"final_decision={result[1].final_decision}, confidence={result[1].confidence}",
     )
     steps.append(judge_step)
+    debate_events = [
+        _build_clerk_event(fields, rag_evidence, tool_results),
+        _build_agent_event(pro_step, order=2, phase="opening_statement", tool_results=tool_results),
+        _build_agent_event(con_step, order=3, phase="closing_argument", tool_results=tool_results),
+        _build_judge_event(report, order=4),
+    ]
+    report.debate_events = debate_events
 
     return DebateResult(
         success=True,
@@ -145,6 +154,68 @@ def run_decision_flow(
         report=report,
         trace=trace,
         reason=None,
+        debate_events=debate_events,
+    )
+
+
+def _build_clerk_event(
+    fields: dict[str, Any],
+    rag_evidence: list[Any],
+    tool_results: list[ToolResult],
+) -> DebateEvent:
+    product = fields.get("product_name", "该商品")
+    price = fields.get("price", "未知价格")
+    purpose = fields.get("purpose", "未说明用途")
+    budget = fields.get("monthly_budget_left", "未说明")
+    alternatives = fields.get("owned_alternatives", "未说明")
+    return DebateEvent(
+        event_id="event_001",
+        order=1,
+        speaker="clerk",
+        phase="case_summary",
+        content=(
+            f"书记员：本案争议为是否购买{product}。商品价格为{price}元，主要用途是{purpose}，"
+            f"本月剩余预算为{budget}元，已有替代品：{alternatives}。"
+        ),
+        # evidence records referenced inputs; tool success/failure remains explicit in tool_results.status.
+        evidence=[item.id for item in rag_evidence] + [item.tool_name for item in tool_results],
+    )
+
+
+def _build_agent_event(
+    step: AgentStep,
+    order: int,
+    phase: str,
+    tool_results: list[ToolResult],
+) -> DebateEvent:
+    speaker_label = "正方" if step.agent == "pro_agent" else "反方"
+    arguments = "；".join(step.arguments)
+    content = f"{speaker_label}：{step.summary}"
+    if arguments:
+        content += f" 主要观点：{arguments}"
+    return DebateEvent(
+        event_id=f"event_{order:03d}",
+        order=order,
+        speaker=step.agent,
+        phase=phase,
+        content=content,
+        evidence=[*step.used_rag_ids, *[item.tool_name for item in tool_results]],
+    )
+
+
+def _build_judge_event(report: DecisionReport, order: int) -> DebateEvent:
+    actions = "；".join(report.next_actions)
+    content = f"法官：判决结果为 {report.final_decision}。{report.summary}"
+    if actions:
+        content += f" 后续行动：{actions}"
+    return DebateEvent(
+        event_id=f"event_{order:03d}",
+        order=order,
+        speaker="judge_agent",
+        phase="verdict",
+        content=content,
+        evidence=[item.id for item in report.rag_evidence]
+        + [item.tool_name for item in report.tool_results],
     )
 
 

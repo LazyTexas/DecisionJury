@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from backend.app.schemas.decision import AgentStep, DecisionReport, RagEvidence, ToolResult, now_iso
+from backend.app.services.llm_client import DeepSeekLLMClient, get_llm_client
 
 
 def run_judge_agent(
@@ -20,16 +21,27 @@ def run_judge_agent(
     price = collected_fields.get("price", "未知价格")
     purpose = collected_fields.get("purpose", "未说明用途")
 
-    summary = _summary(final_decision, product, rag_evidence)
+    local_summary = _summary(final_decision, product, rag_evidence)
     cooling_result = next((item for item in tool_results if item.tool_name == "cooling_reminder"), None)
     next_actions = _next_actions(final_decision, rag_evidence, cost_result, cooling_result)
+    local_arguments = _judge_arguments(final_decision, rag_evidence, cost_result)
+    explanation = _generate_judge_explanation(
+        final_decision,
+        collected_fields,
+        pro_step,
+        con_step,
+        rag_evidence,
+        tool_results,
+        local_summary,
+        local_arguments,
+    )
     report = DecisionReport(
         report_id=f"report_{case_id}",
         case_id=case_id,
         case_type="shopping",
         final_decision=final_decision,
         confidence=confidence,
-        summary=summary,
+        summary=explanation["summary"],
         case_summary=f"用户想购买 {price} 元的{product}，主要用途是{purpose}。",
         pro_points=pro_step.arguments,
         con_points=con_step.arguments,
@@ -41,14 +53,69 @@ def run_judge_agent(
     judge_step = AgentStep(
         agent="judge_agent",
         status="completed",
-        summary=f"综合正反方、RAG 与工具结果，建议：{final_decision}。",
+        summary=explanation["summary"],
         confidence=confidence,
-        arguments=_judge_arguments(final_decision, rag_evidence, cost_result),
+        arguments=explanation["arguments"],
         used_rag_ids=[item.id for item in rag_evidence],
         used_tool_names=[item.tool_name for item in tool_results],
         error=None,
     )
     return judge_step, report
+
+
+def _generate_judge_explanation(
+    final_decision: str,
+    collected_fields: dict[str, Any],
+    pro_step: AgentStep,
+    con_step: AgentStep,
+    rag_evidence: list[RagEvidence],
+    tool_results: list[ToolResult],
+    fallback_summary: str,
+    fallback_arguments: list[str],
+) -> dict[str, Any]:
+    client = get_llm_client()
+    if not isinstance(client, DeepSeekLLMClient):
+        return {"summary": fallback_summary, "arguments": fallback_arguments}
+
+    try:
+        response = client.complete_json(
+            "judge_agent",
+            {
+                "collected_fields": collected_fields,
+                "final_decision": final_decision,
+                "pro_agent_result": {
+                    "summary": pro_step.summary,
+                    "arguments": pro_step.arguments,
+                    "confidence": pro_step.confidence,
+                },
+                "con_agent_result": {
+                    "summary": con_step.summary,
+                    "arguments": con_step.arguments,
+                    "confidence": con_step.confidence,
+                },
+                "rag_evidence": [
+                    {"id": item.id, "title": item.title, "content": item.content, "tags": item.tags}
+                    for item in rag_evidence
+                ],
+                "tool_results": [
+                    {
+                        "tool_name": item.tool_name,
+                        "status": item.status,
+                        "summary": item.summary,
+                        "risk_level": item.risk_level,
+                        "metrics": item.metrics,
+                        "error": item.error,
+                    }
+                    for item in tool_results
+                ],
+            },
+        )
+        # complete_json uses mock output after transport failure; do not expose generic mock text as a verdict.
+        if response.get("summary") == "mock LLM returned no task-specific content":
+            raise ValueError("judge explanation fallback response")
+        return {"summary": response["summary"], "arguments": list(response["arguments"])}
+    except Exception:
+        return {"summary": fallback_summary, "arguments": fallback_arguments}
 
 
 def _decide(fields: dict[str, Any], rag_evidence: list[RagEvidence], cost_result: ToolResult | None) -> str:

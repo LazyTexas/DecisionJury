@@ -57,6 +57,17 @@ class ToolResult:
 
 
 @dataclass
+class DebateEvent:
+    event_id: str
+    order: int
+    speaker: str
+    phase: str
+    content: str
+    evidence: list[str] = field(default_factory=list)
+    status: str = "completed"
+
+
+@dataclass
 class DecisionReport:
     report_id: str
     case_id: str
@@ -71,6 +82,7 @@ class DecisionReport:
     tool_results: list[ToolResult]
     next_actions: list[str]
     created_at: str
+    debate_events: list[DebateEvent] = field(default_factory=list)
 
 
 @dataclass
@@ -112,3 +124,4 @@ class DebateResult:
     report: DecisionReport | None
     trace: list[TraceItem]
     reason: str | None = None
+    debate_events: list[DebateEvent] = field(default_factory=list)
