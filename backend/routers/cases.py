@@ -172,14 +172,18 @@ def get_report(case_id: str, db: Session = Depends(get_db)):
     if not case.debate_result:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
-    # 3. 从 debate_result 中提取 report
+    # 3. 从 debate_result 中提取 report 和 debate_events
     report_data = case.debate_result.get("report", {})
+    debate_events = case.debate_result.get("debate_events", [])
     if not report_data:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
     return ApiResponse(
         success=True,
-        data=report_data,
+        data={
+            **report_data,
+            "debate_events": debate_events
+        },
         message=""
     )
 
@@ -354,7 +358,7 @@ def delete_case(
     """
     删除案件。
     - messages/traces/reminders 因外键 CASCADE 自动级联删除
-    - histories 记录保留，但 case_id 和 report_id 置空（保留复盘语料）
+    - histories 记录软删除（is_deleted=1，RAG 仍可检索，case_id/report_id 保留）
     """
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()

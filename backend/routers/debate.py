@@ -71,7 +71,7 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
         if result.get("report", {}).get("report_id"):
             case.report_id = result["report"]["report_id"]
 
-        # ===== 新增：保存完整辩论结果 =====
+        # ===== 保存完整辩论结果 =====
         case.debate_result = result
         
         # 7. 保存 trace
@@ -103,6 +103,7 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
                 "rag_evidence": result.get("rag_evidence", []),
                 "tool_results": result.get("tool_results", []),
                 "report": result.get("report", {}),
+                "debate_events": result.get("debate_events", []),
             },
             message="debate completed"
         )
