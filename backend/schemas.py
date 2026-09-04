@@ -41,6 +41,8 @@ class CreateCaseResponse(BaseModel):
     collected_fields: Dict[str, Any] = {}
     missing_fields: List[str] = []
     next_question: Optional[str] = None
+    is_high_risk: bool = False
+    reject_reason: Optional[str] = None
 
 class CreateHistoryRequest(BaseModel):
     """创建历史记录请求"""
@@ -78,6 +80,8 @@ class SendMessageResponse(BaseModel):
     case_status: str
     collected_fields: Dict[str, Any] = {}
     missing_fields: List[str] = []
+    is_high_risk: bool = False
+    reject_reason: Optional[str] = None
 
 class DebateResponse(BaseModel):
     case_id: str

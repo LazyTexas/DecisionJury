@@ -23,14 +23,25 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
             existing_collected_fields={},
         )
         parser_dict = to_dict(parser_result)
+        is_high_risk = parser_dict.get("is_high_risk", False)
+        reject_reason = parser_dict.get("reject_reason", "")
         initial_collected = parser_dict.get("merged_fields", {})
         initial_missing = parser_dict.get("missing_fields", [])
         initial_status = parser_dict.get("case_status", CaseStatus.COLLECTING)
+
+        if is_high_risk:
+            initial_status = CaseStatus.REJECTED
+            initial_missing = []
+            # 保存拒绝原因到 collected_fields
+            initial_collected["is_high_risk"] = True
+            initial_collected["reject_reason"] = reject_reason
     except Exception as e:
         print(f"[WARN] create_case parse_input 调用失败: {e}")
         initial_collected = {}
         initial_missing = ["product_name", "price", "purpose", "monthly_budget_left", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
         initial_status = CaseStatus.COLLECTING
+        is_high_risk = False
+        reject_reason = ""
 
     # 确保 description 保留
     if "description" not in initial_collected:
@@ -51,19 +62,11 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(case)
 
-    # 生成追问
+# 生成追问
     next_question = None
-    if initial_missing:
-        # 优先使用 parse_input 返回的 next_question
-        next_question = parser_dict.get("next_question") if 'parser_dict' in locals() else None
-        if not next_question:
-            # 后备追问
-            if "monthly_budget_left" in initial_missing:
-                next_question = "你本月预算还剩多少？"
-            elif "owned_alternatives" in initial_missing:
-                next_question = "是否已经有类似的替代品？"
-            else:
-                next_question = f"还需要补充以下信息：{', '.join(initial_missing)}"
+    if not is_high_risk and initial_missing:
+        # 直接使用 C 模块返回的 next_question
+        next_question = parser_dict.get("next_question")
 
     return ApiResponse(
         success=True,
@@ -73,6 +76,8 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
             "collected_fields": initial_collected,
             "missing_fields": initial_missing,
             "next_question": next_question,
+            "is_high_risk": is_high_risk,
+            "reject_reason": reject_reason if is_high_risk else None,
         },
         message="case created"
     )

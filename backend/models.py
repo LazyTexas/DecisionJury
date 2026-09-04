@@ -20,6 +20,7 @@ class Case(Base):
     debate_result = Column(JSON, nullable=True)  # 存储完整辩论结果
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+    reject_reason = Column(String, nullable=True)  # 高风险拒绝原因
 
     __table_args__ = (
         Index("ix_cases_user_id_updated_at", "user_id", "updated_at"),
