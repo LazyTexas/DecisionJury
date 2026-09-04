@@ -102,6 +102,7 @@ def parse_input(
 
     local_result = _build_rule_result(normalized_input, existing)
     client = get_llm_client()
+    # 正常购物字段统一交给 DeepSeek，只有请求失败或结果校验失败时才使用本地规则。
     if isinstance(client, DeepSeekLLMClient):
         try:
             llm_result = client.complete_parser_json(

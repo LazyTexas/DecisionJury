@@ -386,6 +386,31 @@ def test_timeout_can_be_configured(monkeypatch: Any) -> None:
     assert client.timeout_seconds == 45
 
 
+def test_input_parser_request_uses_low_reasoning_effort(monkeypatch: Any) -> None:
+    client = llm_client.DeepSeekLLMClient(api_key="test-key")
+    captured: dict[str, Any] = {}
+
+    class FakeResponse:
+        def read(self) -> bytes:
+            return b'{"choices":[{"message":{"content":"{}"}}]}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        return FakeResponse()
+
+    monkeypatch.setattr(llm_client, "urlopen", fake_urlopen)
+
+    client._request_completion("input_parser", {"current_message": "价格是2500元"})
+
+    assert captured["body"]["reasoning_effort"] == "low"
+
+
 def test_parser_result_rejects_invalid_amount_and_confidence() -> None:
     base = {
         "case_type": "shopping",

@@ -279,6 +279,62 @@ def test_parser_result_agent_step():
     assert result.agent_step.status == "completed"
 
 
+def test_shopping_fields_use_llm_when_configured(monkeypatch):
+    """配置 DeepSeek 后，正常购物字段统一走模型解析。"""
+    called = False
+    client = DeepSeekLLMClient(api_key="test-key")
+
+    def parse_with_llm(payload):
+        nonlocal called
+        called = True
+        return {
+            "case_type": "shopping",
+            "is_supported": True,
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {"price": 2500},
+            "correction_fields": {},
+            "next_question": "还需要补充商品名称和用途。",
+            "confidence": 0.9,
+        }
+
+    monkeypatch.setattr(client, "complete_parser_json", parse_with_llm)
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input("价格是2500元")
+
+    assert called is True
+    assert result.extracted_fields["price"] == 2500.0
+
+
+def test_ambiguous_input_uses_llm_parser(monkeypatch):
+    """口语化购物输入应交给 DeepSeek 解析。"""
+    called = False
+    client = DeepSeekLLMClient(api_key="test-key")
+
+    def parse_with_llm(payload):
+        nonlocal called
+        called = True
+        return {
+            "case_type": "shopping",
+            "is_supported": True,
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {"purpose": "备考时需要安静"},
+            "correction_fields": {},
+            "next_question": "还需要补充商品、价格和预算。",
+            "confidence": 0.86,
+        }
+
+    monkeypatch.setattr(client, "complete_parser_json", parse_with_llm)
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input("最近备考特别吵，想弄个能安静点的东西")
+
+    assert called is True
+    assert result.merged_fields["purpose"] == "备考时需要安静"
+
+
 def test_llm_parser_result_is_used(monkeypatch):
     client = DeepSeekLLMClient(api_key="test-key")
     monkeypatch.setattr(
