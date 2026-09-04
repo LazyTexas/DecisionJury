@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
 from backend.database import get_db
-from backend.models import Case, Message, Reminder, History
+from backend.models import Case, Message, Reminder, History, Trace
 from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
@@ -341,5 +341,50 @@ def create_feedback(
             "saved_to_history": True,
             "history_id": history.id,
         },
+        message=""
+    )
+
+# ========== 删除案件 ==========
+@router.delete("/cases/{case_id}", response_model=ApiResponse)
+def delete_case(
+    case_id: str,
+    user_id: str = Query(..., description="用户 ID"),
+    db: Session = Depends(get_db)
+):
+    """
+    删除案件。
+    - messages/traces/reminders 因外键 CASCADE 自动级联删除
+    - histories 记录保留，但 case_id 和 report_id 置空（保留复盘语料）
+    """
+    # 1. 查询案件
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="CASE_NOT_FOUND"
+        )
+
+    # 2. 权限校验
+    if case.user_id != user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="FORBIDDEN"
+        )
+
+    # 3. 更新 histories 表：将关联该 case 的记录的 case_id 和 report_id 置空
+    db.query(History).filter(History.case_id == case_id).update({
+        "case_id": None,
+        "report_id": None
+    })
+
+    # 4. 删除案件（messages/traces/reminders 因外键 CASCADE 自动删除）
+    db.delete(case)
+    db.commit()
+
+    return ApiResponse(
+        success=True,
+        data={"deleted": True},
         message=""
     )
