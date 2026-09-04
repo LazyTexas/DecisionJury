@@ -86,6 +86,7 @@ class DebateResponse(BaseModel):
     rag_evidence: List[Dict[str, Any]] = []
     tool_results: List[Dict[str, Any]] = []
     report: Dict[str, Any] = {}
+    debate_events: List[DebateEvent] = []
 
 # 案件列表中的单个案件摘要
 class CaseSummary(BaseModel):
@@ -159,3 +160,13 @@ class ErrorResponse(BaseModel):
                 "message": "VALIDATION_ERROR"
             }
         }
+
+class DebateEvent(BaseModel):
+    """庭审事件"""
+    event_id: str
+    order: int
+    speaker: str  # clerk / pro_agent / con_agent / judge_agent
+    phase: str    # case_summary / opening_statement / closing_argument / verdict
+    content: str
+    evidence: List[str] = []
+    status: str   # completed / failed
