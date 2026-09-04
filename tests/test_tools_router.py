@@ -180,3 +180,17 @@ def test_decision_score_endpoint_invalid_case_type(client):
     assert data["tool_name"] == "decision_score"
     assert data["status"] == "failed"
     assert data["error"] == "TOOL_ERROR: case_type 只能是 shopping 或 time，收到: medical"
+
+
+def test_decision_score_http_failure_logged(client):
+    """HTTP 失败路径应补一条失败日志（且只有一条）。"""
+    from mcp_tools.logger import logger
+    logger.clear()
+
+    client.post("/api/tools/decision-score", json={"case_type": "medical"})
+
+    failed_logs = [
+        r for r in logger.get_all()
+        if r["tool_name"] == "decision_score" and r["output"].get("status") == "failed"
+    ]
+    assert len(failed_logs) == 1

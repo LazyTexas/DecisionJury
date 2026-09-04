@@ -15,6 +15,8 @@ from backend.models import Reminder
 from backend.schemas import ApiResponse
 from mcp_tools.cost_analyzer import analyze_shopping, analyze_time
 from mcp_tools.decision_score import score_decision
+from mcp_tools.logger import logger
+import time
 
 router = APIRouter(prefix="/api/tools", tags=["tools"])
 
@@ -58,6 +60,7 @@ def cost_analyzer_endpoint(req: CostAnalyzerRequest):
     - shopping 场景：传入 price, monthly_budget_left
     - time 场景：传入 hours_required, free_hours_this_week, urgent_tasks
     """
+    start = time.perf_counter()
     try:
         if req.case_type == "shopping":
             if req.price is None or req.monthly_budget_left is None:
@@ -93,18 +96,17 @@ def cost_analyzer_endpoint(req: CostAnalyzerRequest):
             message="",
         )
     except Exception as exc:
-        return ApiResponse(
-            success=True,
-            data={
-                "tool_name": "cost_analyzer",
-                "status": "failed",
-                "summary": "成本分析工具调用失败，主流程继续。",
-                "risk_level": None,
-                "metrics": {},
-                "error": f"TOOL_ERROR: {exc}",
-            },
-            message="",
-        )
+        failed_data = {
+            "tool_name": "cost_analyzer",
+            "status": "failed",
+            "summary": "成本分析工具调用失败，主流程继续。",
+            "risk_level": None,
+            "metrics": {},
+            "error": f"TOOL_ERROR: {exc}",
+        }
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.log_call("cost_analyzer", req.model_dump(), failed_data, duration_ms)
+        return ApiResponse(success=True, data=failed_data, message="")
 
 
 # ==================== cooling_reminder ====================
@@ -118,6 +120,7 @@ def cooling_reminder_endpoint(req: CoolingReminderRequest, db: Session = Depends
     """
     from mcp_tools.cooling_reminder import create_reminder
 
+    start = time.perf_counter()
     try:
         # 1. 调用 MCP 工具计算
         raw = create_reminder(
@@ -129,18 +132,17 @@ def cooling_reminder_endpoint(req: CoolingReminderRequest, db: Session = Depends
         )
 
         if raw.get("status") == "error":
-            return ApiResponse(
-                success=True,
-                data={
-                    "tool_name": "cooling_reminder",
-                    "status": "failed",
-                    "summary": raw.get("error", "冷静期提醒创建失败。"),
-                    "risk_level": None,
-                    "metrics": {},
-                    "error": "REMINDER_CREATE_FAILED",
-                },
-                message="",
-            )
+            failed_data = {
+                "tool_name": "cooling_reminder",
+                "status": "failed",
+                "summary": raw.get("error", "冷静期提醒创建失败。"),
+                "risk_level": None,
+                "metrics": {},
+                "error": "REMINDER_CREATE_FAILED",
+            }
+            duration_ms = (time.perf_counter() - start) * 1000
+            logger.log_call("cooling_reminder", req.model_dump(), failed_data, duration_ms)
+            return ApiResponse(success=True, data=failed_data, message="")
 
         # 2. 写入 Reminder 表
         effective_days = max(req.cooling_days, 1)
@@ -176,18 +178,17 @@ def cooling_reminder_endpoint(req: CoolingReminderRequest, db: Session = Depends
             message="",
         )
     except Exception as exc:
-        return ApiResponse(
-            success=True,
-            data={
-                "tool_name": "cooling_reminder",
-                "status": "failed",
-                "summary": "冷静期提醒创建失败，建议用户手动设置复盘提醒。",
-                "risk_level": None,
-                "metrics": {},
-                "error": f"REMINDER_CREATE_FAILED: {exc}",
-            },
-            message="",
-        )
+        failed_data = {
+            "tool_name": "cooling_reminder",
+            "status": "failed",
+            "summary": "冷静期提醒创建失败，建议用户手动设置复盘提醒。",
+            "risk_level": None,
+            "metrics": {},
+            "error": f"REMINDER_CREATE_FAILED: {exc}",
+        }
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.log_call("cooling_reminder", req.model_dump(), failed_data, duration_ms)
+        return ApiResponse(success=True, data=failed_data, message="")
 
 
 # ==================== decision_score ====================
@@ -199,6 +200,7 @@ def decision_score_endpoint(req: DecisionScoreRequest):
 
     综合成本压力、历史证据风险、使用价值与冲动触发，输出 0~100 综合分。
     """
+    start = time.perf_counter()
     try:
         raw = score_decision(
             case_type=req.case_type,
@@ -224,15 +226,14 @@ def decision_score_endpoint(req: DecisionScoreRequest):
             message="",
         )
     except Exception as exc:
-        return ApiResponse(
-            success=True,
-            data={
-                "tool_name": "decision_score",
-                "status": "failed",
-                "summary": "决策评分工具调用失败，主流程继续。",
-                "risk_level": None,
-                "metrics": {},
-                "error": f"TOOL_ERROR: {exc}",
-            },
-            message="",
-        )
+        failed_data = {
+            "tool_name": "decision_score",
+            "status": "failed",
+            "summary": "决策评分工具调用失败，主流程继续。",
+            "risk_level": None,
+            "metrics": {},
+            "error": f"TOOL_ERROR: {exc}",
+        }
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.log_call("decision_score", req.model_dump(), failed_data, duration_ms)
+        return ApiResponse(success=True, data=failed_data, message="")

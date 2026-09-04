@@ -108,6 +108,27 @@ def test_decision_score_invalid_case_type() -> None:
     assert result["error"] == "UNSUPPORTED_CASE_TYPE"
 
 
+def test_decision_score_impulse_string_false() -> None:
+    """字符串 "false" 应解析为 False，不扣分。"""
+    result = call_tool("decision_score", {"case_type": "shopping", "impulse_trigger": "false"})
+    assert result["status"] == "success"
+    assert result["metrics"]["score"] == 50
+
+
+def test_decision_score_impulse_string_true() -> None:
+    """字符串 "true" 应解析为 True，扣 10 分。"""
+    result = call_tool("decision_score", {"case_type": "shopping", "impulse_trigger": "true"})
+    assert result["status"] == "success"
+    assert result["metrics"]["score"] == 40
+
+
+def test_decision_score_impulse_invalid() -> None:
+    """非法字符串应返回 failed / INVALID_ARGS，而不是被强转成 True。"""
+    result = call_tool("decision_score", {"case_type": "shopping", "impulse_trigger": "abc"})
+    assert result["status"] == "failed"
+    assert result["error"] == "INVALID_ARGS"
+
+
 def test_unknown_tool_failed() -> None:
     """未知工具名返回 failed / UNKNOWN_TOOL。"""
     result = call_tool("not_exist", {})
@@ -116,17 +137,22 @@ def test_unknown_tool_failed() -> None:
 
 
 def test_call_logs_every_call() -> None:
-    """每次 call_tool 都会写入日志。"""
+    """成功路径：工具函数写一条日志，call_tool 不重复写（只保留一条）。"""
     call_tool(
         "cost_analyzer",
         {"case_type": "shopping", "price": 300, "monthly_budget_left": 2000},
     )
     logs = logger.get_all()
-    assert len(logs) >= 1
-    # cost_analyzer 底层函数也会写一条输入不含 case_type 的日志，
-    # 因此这里检查“存在一条来自 call_tool 分发、输入含 case_type=shopping 的记录”。
-    assert any(
-        record["tool_name"] == "cost_analyzer"
-        and record["input"].get("case_type") == "shopping"
-        for record in logs
-    )
+    cost_logs = [r for r in logs if r["tool_name"] == "cost_analyzer"]
+    assert len(cost_logs) == 1, f"期望只有一条日志，实际 {len(cost_logs)} 条"
+
+
+def test_call_logs_failure_only_once() -> None:
+    """失败路径：call_tool 补一条失败日志，且只有一条。"""
+    call_tool("decision_score", {"case_type": "shopping", "impulse_trigger": "abc"})
+    logs = logger.get_all()
+    failed_logs = [
+        r for r in logs
+        if r["tool_name"] == "decision_score" and r["output"].get("status") == "failed"
+    ]
+    assert len(failed_logs) == 1
