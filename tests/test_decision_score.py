@@ -81,3 +81,12 @@ def test_history_risk_out_of_range_raises():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+def test_impulse_trigger_must_be_bool():
+    """score_decision 直接调用时，impulse_trigger 必须是布尔值，字符串应报错。"""
+    try:
+        score_decision(case_type="shopping", impulse_trigger="true")
+        assert False, "expected ValueError"
+    except ValueError:
+        pass

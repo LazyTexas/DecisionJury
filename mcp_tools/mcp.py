@@ -79,9 +79,10 @@ def get_tool_definitions() -> list[dict[str, Any]]:
 
 
 def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
-    """按工具名分发到具体函数，并统一返回 ToolResult 兼容结构 + 记录调用日志。
+    """按工具名分发到具体函数，并统一返回 ToolResult 兼容结构。
 
-    失败时返回 status=failed，不抛出异常（保证主流程不中断）。
+    成功路径由各工具函数写一条调用日志；失败路径由本分发器补一条失败的调用日志，
+    因此使用统一入口调用时只保留一条调用记录。
     """
     args = dict(arguments or {})
     start = time.perf_counter()
@@ -101,8 +102,10 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
             name, "工具调用失败，主流程继续。", f"TOOL_ERROR: {exc}"
         )
 
-    duration_ms = (time.perf_counter() - start) * 1000
-    logger.log_call(name, args, result, duration_ms)
+    # 成功时工具函数已记日志；这里只在失败时补记，避免重复。
+    if result.get("status") == "failed":
+        duration_ms = (time.perf_counter() - start) * 1000
+        logger.log_call(name, args, result, duration_ms)
     return result
 
 
@@ -194,6 +197,28 @@ def _call_cooling_reminder(args: dict[str, Any]) -> dict[str, Any]:
     )
 
 
+def _parse_bool(value: Any, default: bool = False) -> bool:
+    """把参数解析成布尔值，无法解析时抛 ValueError。
+
+    避免 bool("false") == True 这类误判，也避免把任意字符串强制成 True。
+    """
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in ("true", "1", "yes", "y"):
+            return True
+        if text in ("false", "0", "no", "n"):
+            return False
+        raise ValueError(f"impulse_trigger 无法解析的布尔值: {value!r}")
+    if isinstance(value, int):
+        if value in (0, 1):
+            return bool(value)
+    raise ValueError(f"impulse_trigger 必须是布尔值或可解析字符串，收到: {value!r}")
+
+
 def _call_decision_score(args: dict[str, Any]) -> dict[str, Any]:
     case_type = args.get("case_type")
     if case_type not in ("shopping", "time"):
@@ -203,12 +228,21 @@ def _call_decision_score(args: dict[str, Any]) -> dict[str, Any]:
             "UNSUPPORTED_CASE_TYPE",
         )
 
+    try:
+        impulse_trigger = _parse_bool(args.get("impulse_trigger"), default=False)
+    except ValueError as exc:
+        return _failed_tool(
+            "decision_score",
+            str(exc),
+            "INVALID_ARGS",
+        )
+
     raw = score_decision(
         case_type=case_type,
         cost_risk_level=args.get("cost_risk_level", "medium"),
         history_risk=args.get("history_risk", 0.5),
         usage_value=args.get("usage_value", 0.5),
-        impulse_trigger=bool(args.get("impulse_trigger", False)),
+        impulse_trigger=impulse_trigger,
     )
 
     return _success_tool(
