@@ -380,6 +380,7 @@ completed
 | POST | `/api/rag/search` | RAG 检索 | D | C |
 | POST | `/api/tools/cost-analyzer` | 成本计算 | E | C |
 | POST | `/api/tools/cooling-reminder` | 冷静期提醒 | E | C |
+| POST | `/api/tools/decision-score` | 决策评分 | E | C |
 | GET | `/api/watchlist?user_id=u001` | 查询观察清单 | B/E | A |
 | POST | `/auth/register` | 用户注册 | B | A |
 | POST | `/auth/login` | 用户登录 | B | A |
@@ -962,6 +963,63 @@ POST /api/tools/cooling-reminder
 - 工具失败不应导致 Agent 主流程中断。
 - 法官 Agent 必须在判决书中标记工具结果缺失。
 - 工具只提供结构化依据，不直接决定最终裁决。
+
+### 11.3 决策评分工具
+
+```text
+POST /api/tools/decision-score
+```
+
+请求：
+
+```json
+{
+  "case_type": "shopping",
+  "cost_risk_level": "high",
+  "history_risk": 0.7,
+  "usage_value": 0.6,
+  "impulse_trigger": true
+}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| case_type | string | 是 | `shopping` 或 `time` |
+| cost_risk_level | string | 是 | 来自 cost_analyzer 的 `low` / `medium` / `high` |
+| history_risk | number | 是 | 0 表示历史支持，1 表示历史警示，取 0~1 |
+| usage_value | number | 是 | 0 表示价值低，1 表示价值高，取 0~1 |
+| impulse_trigger | boolean | 是 | 是否因促销/种草/情绪等冲动触发 |
+
+返回：
+
+```json
+{
+  "success": true,
+  "data": {
+    "tool_name": "decision_score",
+    "status": "success",
+    "summary": "综合评分中等，建议暂缓后再决定。",
+    "risk_level": "medium",
+    "metrics": {
+      "score": 54,
+      "risk_level": "medium",
+      "dimensions": {
+        "cost": -20,
+        "history": -6,
+        "usage_value": 4,
+        "impulse": -10
+      }
+    },
+    "error": null
+  },
+  "message": ""
+}
+```
+
+说明：
+
+- `decision_score` 是纯规则方法，不依赖 LLM，输出 0~100 综合分。
+- 分数仅供法官 Agent 参考，不直接决定最终裁决。
 
 ## 12. 判决书与轨迹接口
 

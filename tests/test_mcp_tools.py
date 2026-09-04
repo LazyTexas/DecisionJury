@@ -11,12 +11,13 @@ def setup_function() -> None:
     logger.clear()
 
 
-def test_tool_definitions_contain_two_tools() -> None:
-    """至少声明 cost_analyzer 与 cooling_reminder 两个工具。"""
+def test_tool_definitions_contain_tools() -> None:
+    """声明 cost_analyzer / cooling_reminder / decision_score 三个工具。"""
     defs = get_tool_definitions()
     names = {d["name"] for d in defs}
     assert "cost_analyzer" in names
     assert "cooling_reminder" in names
+    assert "decision_score" in names
 
 
 def test_cost_analyzer_shopping_success() -> None:
@@ -80,6 +81,31 @@ def test_cooling_reminder_missing_args() -> None:
     result = call_tool("cooling_reminder", {"case_id": "case_001", "title": "test"})
     assert result["status"] == "failed"
     assert result["error"] == "MISSING_ARGS"
+
+
+def test_decision_score_success() -> None:
+    """决策评分成功返回 score 与 risk_level。"""
+    result = call_tool(
+        "decision_score",
+        {
+            "case_type": "shopping",
+            "cost_risk_level": "low",
+            "history_risk": 0.2,
+            "usage_value": 0.9,
+            "impulse_trigger": False,
+        },
+    )
+    assert result["tool_name"] == "decision_score"
+    assert result["status"] == "success"
+    assert result["risk_level"] == "low"
+    assert result["metrics"]["score"] == 90
+
+
+def test_decision_score_invalid_case_type() -> None:
+    """非法 case_type 返回 failed / UNSUPPORTED_CASE_TYPE。"""
+    result = call_tool("decision_score", {"case_type": "medical"})
+    assert result["status"] == "failed"
+    assert result["error"] == "UNSUPPORTED_CASE_TYPE"
 
 
 def test_unknown_tool_failed() -> None:

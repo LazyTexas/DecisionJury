@@ -3,7 +3,7 @@
 运行方式：
     python -m mcp_tools.demo
 
-会依次调用 cost_analyzer（购物 + 时间）和 cooling_reminder，
+会依次调用 cost_analyzer（购物 + 时间）、cooling_reminder 和 decision_score，
 并打印工具调用日志（来自 mcp_tools.logger），方便在答辩时展示
 “至少两个 MCP 工具被调用”的课程要求证据。
 """
@@ -48,8 +48,19 @@ def main() -> None:
         },
     )
 
+    decision_score = call_tool(
+        "decision_score",
+        {
+            "case_type": "shopping",
+            "cost_risk_level": "high",
+            "history_risk": 0.7,
+            "usage_value": 0.6,
+            "impulse_trigger": True,
+        },
+    )
+
     output = {
-        "tool_results": [shopping_cost, time_cost, reminder],
+        "tool_results": [shopping_cost, time_cost, reminder, decision_score],
         "call_log": logger.get_all(),
     }
     print(json.dumps(output, ensure_ascii=False, indent=2))

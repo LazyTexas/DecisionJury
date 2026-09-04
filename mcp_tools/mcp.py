@@ -16,6 +16,7 @@ from typing import Any
 
 from mcp_tools.cost_analyzer import analyze_shopping, analyze_time
 from mcp_tools.cooling_reminder import create_reminder
+from mcp_tools.decision_score import score_decision
 from mcp_tools.logger import logger
 import time
 
@@ -54,6 +55,21 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
             "required": ["user_id", "case_id", "title"],
         },
     },
+    {
+        "name": "decision_score",
+        "description": "对购物或时间决策给出 0~100 的可解释综合分，辅助法官裁决。",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "case_type": {"type": "string", "enum": ["shopping", "time"]},
+                "cost_risk_level": {"type": "string", "enum": ["low", "medium", "high"]},
+                "history_risk": {"type": "number", "minimum": 0, "maximum": 1},
+                "usage_value": {"type": "number", "minimum": 0, "maximum": 1},
+                "impulse_trigger": {"type": "boolean"},
+            },
+            "required": ["case_type"],
+        },
+    },
 ]
 
 
@@ -74,6 +90,8 @@ def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, A
             result = _call_cost_analyzer(args)
         elif name == "cooling_reminder":
             result = _call_cooling_reminder(args)
+        elif name == "decision_score":
+            result = _call_decision_score(args)
         else:
             result = _failed_tool(
                 name, f"未知工具: {name}", "UNKNOWN_TOOL"
@@ -172,6 +190,35 @@ def _call_cooling_reminder(args: dict[str, Any]) -> dict[str, Any]:
             "due_at": raw.get("due_at"),
             "status": raw.get("status"),
             "watch_items": args.get("watch_items") or [],
+        },
+    )
+
+
+def _call_decision_score(args: dict[str, Any]) -> dict[str, Any]:
+    case_type = args.get("case_type")
+    if case_type not in ("shopping", "time"):
+        return _failed_tool(
+            "decision_score",
+            "case_type 只能是 shopping 或 time",
+            "UNSUPPORTED_CASE_TYPE",
+        )
+
+    raw = score_decision(
+        case_type=case_type,
+        cost_risk_level=args.get("cost_risk_level", "medium"),
+        history_risk=args.get("history_risk", 0.5),
+        usage_value=args.get("usage_value", 0.5),
+        impulse_trigger=bool(args.get("impulse_trigger", False)),
+    )
+
+    return _success_tool(
+        "decision_score",
+        summary=raw.get("suggestion", "决策评分完成。"),
+        risk_level=raw.get("risk_level"),
+        metrics={
+            "score": raw.get("score"),
+            "risk_level": raw.get("risk_level"),
+            "dimensions": raw.get("dimensions", {}),
         },
     )
 
