@@ -99,6 +99,9 @@ class DeepSeekLLMClient:
             "temperature": 0.2,
             "response_format": {"type": "json_object"},
         }
+        if task == "input_parser":
+            # 字段抽取不需要深度推理，降低思考强度以缩短常规收集请求延迟。
+            request_body["reasoning_effort"] = "low"
         request = Request(
             url=f"{self.base_url}/chat/completions",
             data=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
