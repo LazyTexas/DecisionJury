@@ -18,18 +18,34 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
 
     # 2. 检查状态
     if case.status == CaseStatus.REJECTED:
-        return ApiResponse(success=False, data=None, message="HIGH_RISK_DECISION")
+        # 从 collected_fields 获取拒绝原因
+        collected = case.collected_fields or {}
+        reject_reason = collected.get("reject_reason", "该决策超出系统支持范围。")
+        return ApiResponse(
+            success=False,
+            data={
+                "case_status": CaseStatus.REJECTED,
+                "is_high_risk": True,
+                "reject_reason": reject_reason,
+            },
+            message="HIGH_RISK_DECISION"
+        )
 
     if case.status != CaseStatus.READY_FOR_DEBATE:
+        # 从 collected_fields 获取缓存的 next_question
+        collected = case.collected_fields or {}
+        next_question = collected.get("next_question")
+        if not next_question:
+            next_question = "请继续补充以下信息" if case.missing_fields else None
         return ApiResponse(
-        success=False,
-        data={
-            "case_status": case.status,
-            "missing_fields": case.missing_fields or [],
-            "next_question": "请继续补充以下信息" if case.missing_fields else None,
-        },
-        message="MISSING_FIELDS"
-    )
+            success=False,
+            data={
+                "case_status": case.status,
+                "missing_fields": case.missing_fields or [],
+                "next_question": next_question,
+            },
+            message="MISSING_FIELDS"
+        )
     
     # 3. 更新状态为 debating
     case.status = CaseStatus.DEBATING

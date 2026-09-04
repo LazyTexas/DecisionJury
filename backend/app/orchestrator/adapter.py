@@ -15,7 +15,7 @@ def run_case_decision_flow(
     """
     B 后端调用的统一入口。
     将 run_decision_flow 的 dataclass 结果转为 dict，
-    并统一 case_status / message 等顶层字段命名。
+    并统一 case_status / message / debate_events 等顶层字段命名。
     """
     # MVP 阶段只支持 shopping
     if case_type != "shopping":
@@ -24,9 +24,10 @@ def run_case_decision_flow(
             "case_id": case_id,
             "case_status": "rejected",
             "message": "UNSUPPORTED_CASE_TYPE",
+            "debate_events": [],
         }
 
-    # 字段名映射：B 可能用不同名称 → C 模块标准字段名
+    # 字段名映射
     if collected_fields:
         field_mapping = {
             "usage_scenario": "purpose",
@@ -51,6 +52,17 @@ def run_case_decision_flow(
 
     # 转为 dict
     data = to_dict(result)
+
+    # 确保 debate_events 字段存在（即使为空列表）
+    if "debate_events" not in data:
+        data["debate_events"] = []
+
+    # 确保 message 字段统一
+    if "message" not in data:
+        if data.get("success"):
+            data["message"] = "debate completed"
+        else:
+            data["message"] = "DEBATE_FAILED"
 
     # 统一返回格式
     return data

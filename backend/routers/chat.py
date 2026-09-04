@@ -49,18 +49,39 @@ def send_message(
             message="PARSE_ERROR"
         )
 
-    # ===== 4. 直接使用 C 计算好的 merged_fields =====
-    # 不再遍历 extracted_fields，而是直接使用 merged_fields
+    # 4. 检查高风险
+    if result_dict.get("is_high_risk"):
+        reject_reason = result_dict.get("reject_reason", "该决策超出系统支持范围。")
+        # 更新案件状态为 REJECTED
+        case.status = CaseStatus.REJECTED
+        # 保存拒绝原因到 collected_fields
+        collected = case.collected_fields or {}
+        collected["is_high_risk"] = True
+        collected["reject_reason"] = reject_reason
+        case.collected_fields = collected
+        case.missing_fields = []
+        db.commit()
+
+        return ApiResponse(
+            success=True,
+            data={
+                "reply": reject_reason,
+                "case_status": CaseStatus.REJECTED,
+                "collected_fields": collected,
+                "missing_fields": [],
+                "is_high_risk": True,
+                "reject_reason": reject_reason,
+            },
+            message=""
+        )
+    
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
     case.missing_fields = result_dict.get("missing_fields", [])
     case.status = result_dict.get("case_status", CaseStatus.COLLECTING)
 
     # 5. 根据状态生成回复
-    if result_dict.get("is_high_risk"):
-        case.status = CaseStatus.REJECTED
-        reply = result_dict.get("reject_reason", "该决策超出系统支持范围。")
-    elif case.status == CaseStatus.READY_FOR_DEBATE:
+    if case.status == CaseStatus.READY_FOR_DEBATE:
         reply = "信息已补充完整，可以进入正反方分析。"
     else:
         # 优先使用 C 的 next_question
@@ -68,12 +89,8 @@ def send_message(
         if next_question:
             reply = next_question
         else:
-            # 兜底：如果 next_question 为空，列出缺失字段
-            missing = case.missing_fields or []
-            if missing:
-                reply = f"还需要补充以下信息：{', '.join(missing)}。请继续补充。"
-            else:
-                reply = "信息仍在收集中，请继续补充相关细节。"
+            # 如果 C 模块没有返回追问，使用通用提示（不暴露字段名）
+            reply = "信息仍在收集中，请继续补充相关细节。"
 
     # 6. 保存助手消息
     assistant_msg = Message(
@@ -103,6 +120,8 @@ def send_message(
             "case_status": case.status,
             "collected_fields": safe_fields,
             "missing_fields": case.missing_fields,
+            "is_high_risk": False,
+            "reject_reason": None,
         },
         message=""
     )
