@@ -55,6 +55,57 @@ def analyze_time_cost(hours_required: float, free_hours_this_week: float, urgent
         )
 
 
+def score_decision(
+    case_id: str,
+    case_type: str,
+    fields: dict[str, Any],
+    rag_evidence: list[Any],
+    cost_result: ToolResult,
+) -> ToolResult:
+    """调用 E 的 decision_score，并把 C 的案件上下文转换为工具契约。"""
+    _ = case_id
+    try:
+        if case_type != "shopping":
+            return _failed_tool_result(
+                tool_name="decision_score",
+                summary="当前 decision_score adapter 仅支持 shopping。",
+                error="UNSUPPORTED_CASE_TYPE",
+            )
+
+        risk_tags = {"idle", "regret", "budget", "cooling"}
+        history_risk = (
+            sum(1 for item in rag_evidence if risk_tags.intersection(item.tags)) / len(rag_evidence)
+            if rag_evidence
+            else 0.5
+        )
+        frequency = str(fields.get("expected_usage_frequency", ""))
+        purpose = str(fields.get("purpose", ""))
+        if frequency in {"每天", "每日", "经常", "高频"}:
+            usage_value = 0.9
+        elif purpose:
+            usage_value = 0.65
+        else:
+            usage_value = 0.3
+
+        raw_result = call_tool(
+            "decision_score",
+            {
+                "case_type": "shopping",
+                "cost_risk_level": cost_result.risk_level or "medium",
+                "history_risk": max(0.0, min(history_risk, 1.0)),
+                "usage_value": usage_value,
+                "impulse_trigger": fields.get("trigger_reason") in {"促销", "种草", "情绪"},
+            },
+        )
+        return _to_tool_result(raw_result, "decision_score")
+    except Exception as exc:
+        return _failed_tool_result(
+            tool_name="decision_score",
+            summary="决策评分工具调用失败，主流程继续。",
+            error=f"TOOL_ERROR: {exc}",
+        )
+
+
 def create_cooling_reminder(
     user_id: str,
     case_id: str,

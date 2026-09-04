@@ -267,6 +267,40 @@ def test_tool_results_include_cost_analyzer(monkeypatch: Any) -> None:
     assert any(item["tool_name"] == "cost_analyzer" for item in result["tool_results"])
 
 
+def test_tool_results_include_decision_score_before_agents(monkeypatch: Any) -> None:
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+
+    result = run_complete_shopping_case()
+    tool_names = [item["tool_name"] for item in result["tool_results"]]
+    trace_names = [item["name"] for item in result["trace"]]
+    judge_step = next(step for step in result["steps"] if step["agent"] == "judge_agent")
+
+    assert "decision_score" in tool_names
+    assert trace_names.index("cost_analyzer") < trace_names.index("decision_score")
+    assert trace_names.index("decision_score") < trace_names.index("pro_agent")
+    assert "decision_score" in judge_step["used_tool_names"]
+    assert "decision_score" in result["debate_events"][3]["evidence"]
+
+
+def test_decision_score_failure_does_not_interrupt_main_flow(monkeypatch: Any) -> None:
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr(
+        "backend.app.orchestrator.decision_flow.score_decision",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("score service unavailable")),
+    )
+
+    result = run_complete_shopping_case()
+    score_result = next(item for item in result["tool_results"] if item["tool_name"] == "decision_score")
+
+    assert result["success"] is True
+    assert result["case_status"] == "completed"
+    assert score_result["status"] == "failed"
+    assert "decision_score" in result["steps"][-1]["used_tool_names"]
+    assert len(result["debate_events"]) == 4
+
+
 def test_rag_exception_does_not_interrupt_main_flow(monkeypatch: Any) -> None:
     def raise_rag_error(*args: Any, **kwargs: Any) -> list[Any]:
         assert kwargs["raise_on_error"] is True

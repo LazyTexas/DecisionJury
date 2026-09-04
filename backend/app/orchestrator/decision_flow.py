@@ -8,7 +8,7 @@ from backend.app.agents.input_parser import parse_input
 from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
 from backend.app.schemas.decision import AgentStep, DebateEvent, DebateResult, DecisionReport, ToolResult, TraceItem
-from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder
+from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder, score_decision
 from backend.app.services.rag_adapter import search_rag_evidence
 
 
@@ -85,6 +85,17 @@ def run_decision_flow(
             fallback=_failed_tool_result("cost_analyzer", "成本计算工具调用失败，主流程继续。", "TOOL_ERROR"),
         )
     ]
+    tool_results.append(
+        _record_trace(
+            trace,
+            trace_type="tool_call",
+            name="decision_score",
+            input_summary="cost_risk_level and shopping decision dimensions",
+            func=lambda: score_decision(case_id, "shopping", fields, rag_evidence, tool_results[0]),
+            output_summary_builder=lambda result: result.summary,
+            fallback=_failed_tool_result("decision_score", "决策评分工具调用失败，主流程继续。", "TOOL_ERROR"),
+        )
+    )
     debate_events.append(_build_clerk_event(fields, rag_evidence, tool_results))
 
     pro_step = _record_agent_trace(
