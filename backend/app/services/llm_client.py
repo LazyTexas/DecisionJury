@@ -141,6 +141,7 @@ def _build_system_prompt(task: str) -> str:
         "input_parser": "你是 DecisionJury 的购物输入解析 Agent，负责理解用户自然语言并提取已明确表达的信息。",
         "pro_agent": "你是购物法庭的正方 Agent，只分析支持购买的理由，不做最终裁决。",
         "con_agent": "你是购物法庭的反方 Agent，只分析风险、成本和替代方案，不做最终裁决。",
+        "judge_agent": "你是购物法庭的法官说明 Agent，负责解释应用规则已经确定的判决结果。",
     }.get(task, "你是 DecisionJury 的辅助分析 Agent。")
 
     if task == "input_parser":
@@ -166,7 +167,13 @@ def _build_system_prompt(task: str) -> str:
         "arguments 必须是字符串数组。\n"
         "confidence 必须是 0 到 1 之间的数字。\n"
         "如果 RAG 证据为空，不得编造历史证据。\n"
-        "如果 MCP 工具结果包含失败项，必须在分析中说明不确定性。"
+        "如果 MCP 工具结果包含失败项，必须在分析中说明不确定性。\n"
+        + (
+            "final_decision 由应用规则决定，你只能解释该结果，不能改写或替换它。\n"
+            "必须同时参考正方、反方、RAG 和 MCP 结果，不得编造不存在的证据。"
+            if task == "judge_agent"
+            else ""
+        )
     )
 
 
@@ -199,6 +206,14 @@ def _build_user_prompt(task: str, payload: dict[str, Any]) -> str:
             }
         ),
     }
+    if task == "judge_agent":
+        prompt_payload.update(
+            {
+                "final_decision": payload.get("final_decision"),
+                "pro_agent_result": payload.get("pro_agent_result", {}),
+                "con_agent_result": payload.get("con_agent_result", {}),
+            }
+        )
     return json.dumps(prompt_payload, ensure_ascii=False, indent=2)
 
 

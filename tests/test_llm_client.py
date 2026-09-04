@@ -204,6 +204,35 @@ def test_prompt_contains_output_constraints() -> None:
     assert "如果 RAG 证据为空，不得编造历史证据" in prompt
 
 
+def test_judge_prompt_keeps_fixed_decision_and_debate_context() -> None:
+    system_prompt = llm_client._build_system_prompt("judge_agent")
+    user_prompt = llm_client._build_user_prompt(
+        "judge_agent",
+        {
+            **sample_payload(),
+            "final_decision": "delay",
+            "pro_agent_result": {"summary": "支持购买", "arguments": ["用途明确"]},
+            "con_agent_result": {"summary": "建议谨慎", "arguments": ["预算压力"]},
+        },
+    )
+    prompt_data = json.loads(user_prompt)
+
+    assert "只能解释该结果" in system_prompt
+    assert prompt_data["final_decision"] == "delay"
+    assert prompt_data["pro_agent_result"]["summary"] == "支持购买"
+    assert prompt_data["con_agent_result"]["summary"] == "建议谨慎"
+
+
+def test_judge_prompt_document_uses_rag_evidence_placeholder() -> None:
+    from pathlib import Path
+
+    prompt_path = Path(__file__).parents[1] / "backend" / "app" / "prompts" / "judge_agent.md"
+    prompt = prompt_path.read_text(encoding="utf-8")
+
+    assert "{{rag_evidence}}" in prompt
+    assert "{{rag_results}}" not in prompt
+
+
 def test_user_prompt_keeps_rag_and_failed_tool_details() -> None:
     payload = sample_payload()
     payload["rag_evidence"] = [

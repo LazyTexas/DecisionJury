@@ -4,6 +4,7 @@ from typing import Any
 
 from backend.app.orchestrator.decision_flow import run_decision_flow
 from backend.app.schemas.decision import ToolResult, to_dict
+from backend.app.services.llm_client import DeepSeekLLMClient
 
 
 SHOPPING_FINAL_DECISIONS = {"buy", "delay", "reject", "alternative"}
@@ -101,6 +102,72 @@ def test_debate_output_contains_required_sections(monkeypatch: Any) -> None:
     assert isinstance(result["trace"], list)
 
 
+def test_debate_events_have_stable_courtroom_order(monkeypatch: Any) -> None:
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+
+    result = run_complete_shopping_case()
+    events = result["debate_events"]
+
+    assert [event["order"] for event in events] == [1, 2, 3, 4]
+    assert [event["speaker"] for event in events] == ["clerk", "pro_agent", "con_agent", "judge_agent"]
+    assert [event["phase"] for event in events] == [
+        "case_summary",
+        "opening_statement",
+        "closing_argument",
+        "verdict",
+    ]
+    assert result["report"]["debate_events"] == events
+    assert all(event["status"] == "completed" for event in events)
+    assert "study headphones" in events[0]["content"]
+    assert "1299" in events[0]["content"]
+    assert "study focus" in events[0]["content"]
+    assert "2000" in events[0]["content"]
+    assert "basic earbuds" in events[0]["content"]
+    assert "cost_analyzer" in events[0]["evidence"]
+    assert "The product has a clear study use case." in events[1]["content"]
+    assert "The purchase still has budget and alternative risks." in events[2]["content"]
+    assert result["report"]["final_decision"] in events[3]["content"]
+
+
+def test_judge_deepseek_explanation_does_not_change_rule_decision(monkeypatch: Any) -> None:
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(
+        client,
+        "complete_json",
+        lambda task, payload: {
+            "summary": "法庭综合双方意见后，建议先冷静观察。",
+            "arguments": ["正方需求明确。", "反方预算风险更值得优先考虑。"],
+            "confidence": 0.83,
+        },
+    )
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.judge_agent.get_llm_client", lambda: client)
+
+    result = run_complete_shopping_case()
+
+    assert result["report"]["summary"] == "法庭综合双方意见后，建议先冷静观察。"
+    assert result["report"]["final_decision"] in SHOPPING_FINAL_DECISIONS
+    assert result["report"]["final_decision"] not in result["report"]["summary"]
+    assert "法庭综合双方意见后" in result["debate_events"][3]["content"]
+
+
+def test_judge_invalid_deepseek_response_uses_local_explanation(monkeypatch: Any) -> None:
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(client, "_request_completion", lambda task, payload: "not json")
+    monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
+    monkeypatch.setattr("backend.app.agents.judge_agent.get_llm_client", lambda: client)
+
+    result = run_complete_shopping_case()
+
+    assert result["success"] is True
+    assert result["report"]["summary"] != "mock LLM returned no task-specific content"
+    assert result["report"]["summary"].startswith("本案对")
+    assert len(result["debate_events"]) == 4
+
+
 def test_report_final_decision_is_valid_shopping_decision(monkeypatch: Any) -> None:
     monkeypatch.setattr("backend.app.agents.pro_agent.get_llm_client", fake_llm_client)
     monkeypatch.setattr("backend.app.agents.con_agent.get_llm_client", fake_llm_client)
@@ -131,6 +198,7 @@ def test_high_risk_input_is_rejected_before_debate(monkeypatch: Any) -> None:
     assert result["tool_results"] == []
     assert result["report"] is None
     assert result["reason"]
+    assert result["debate_events"] == []
 
 
 def test_missing_fields_return_next_question_or_reason(monkeypatch: Any) -> None:
@@ -153,6 +221,7 @@ def test_missing_fields_return_next_question_or_reason(monkeypatch: Any) -> None
     assert result["rag_evidence"] == []
     assert result["tool_results"] == []
     assert result["report"] is None
+    assert result["debate_events"] == []
 
 
 def test_empty_rag_returns_empty_evidence_without_fabrication(monkeypatch: Any) -> None:
