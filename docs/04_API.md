@@ -382,6 +382,7 @@ completed
 | POST | `/api/tools/cooling-reminder` | 冷静期提醒 | E | C |
 | POST | `/api/tools/decision-score` | 决策评分 | E | C |
 | GET | `/api/watchlist?user_id=u001` | 查询观察清单 | B/E | A |
+| DELETE | `/api/watchlist/{reminder_id}` | 删除观察清单项 | B/E | A |
 | POST | `/auth/register` | 用户注册 | B | A |
 | POST | `/auth/login` | 用户登录 | B | A |
 
@@ -1186,7 +1187,36 @@ GET /api/watchlist?user_id=u001
 }
 ```
 
-### 14.2 提交决策复盘
+### 14.2 删除观察清单项
+
+```text
+DELETE /api/watchlist/{reminder_id}
+```
+
+| 字段 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| reminder_id | string | 是 | 观察清单项 ID（来自 14.1 返回的 reminder_id） |
+
+返回：
+
+```json
+{
+  "success": true,
+  "data": {
+    "deleted": true,
+    "reminder_id": "reminder_001"
+  },
+  "message": ""
+}
+```
+
+说明：
+
+- 对应前端观察清单的“删除”操作。
+- 软删除：将提醒 `status` 置为 `cancelled`，该提醒不再出现在待复盘列表（`status == waiting` 条件）。
+- 删除不存在的提醒返回 `success:false`、`message: "REMINDER_NOT_FOUND"`。
+
+### 14.3 提交决策复盘
 
 ```text
 POST /api/cases/{case_id}/feedback

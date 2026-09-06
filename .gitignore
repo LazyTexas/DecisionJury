@@ -58,3 +58,12 @@ vector_store/
 *.pdf
 ~$*.docx
 
+
+# old frontend backup (do NOT commit / push)
+/frontend/_BACKUP_old_ui/
+/frontend/src/_BACKUP_old_ui/
+
+# frontend local-only artifacts (not for PR / production)
+/frontend/pnpm-lock.yaml
+/frontend/pnpm-workspace.yaml
+/frontend/public/prototype-v*.html

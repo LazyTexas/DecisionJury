@@ -1,62 +1,49 @@
 import { useState } from 'react';
-import { Modal, Form, Select, Rate, Input, Button, message } from 'antd';
 import { submitFeedback } from '../api';
 
-interface FeedbackModalProps {
+const ACTIONS = [
+  { v: 'bought', label: '买了 / 做了' },
+  { v: 'not_bought', label: '没买 / 没做' },
+  { v: 'delayed', label: '延后了' },
+  { v: 'other', label: '其他' },
+];
+
+export default function FeedbackModal({
+  caseId,
+  open,
+  onClose,
+}: {
   caseId: string;
   open: boolean;
   onClose: () => void;
-}
-
-export default function FeedbackModal({ caseId, open, onClose }: FeedbackModalProps) {
-  const [form] = Form.useForm();
+}) {
+  const [action, setAction] = useState('bought');
+  const [sat, setSat] = useState(3);
+  const [review, setReview] = useState('');
+  const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = async (values: { actual_action: string; satisfaction: number; review?: string }) => {
-    setSubmitting(true);
+  if (!open) return null;
+
+  const submit = async () => {
+    setSubmitting(true); setError('');
     try {
-      const res = await submitFeedback(caseId, values);
-      message.success('复盘已保存');
+      await submitFeedback(caseId, { actual_action: action, satisfaction: sat, review });
       onClose();
-    } catch (err: any) {
-      message.error(err.message || '提交失败');
-    } finally {
-      setSubmitting(false);
-    }
+    } catch (e) { setError((e as Error).message || '提交失败'); }
+    finally { setSubmitting(false); }
   };
 
   return (
-    <Modal
-      title="决策复盘"
-      open={open}
-      onCancel={onClose}
-      footer={null}
-      destroyOnHidden
-    >
-      <Form form={form} layout="vertical" onFinish={handleSubmit} requiredMark={false}>
-        <Form.Item name="actual_action" label="你最终做了什么？" rules={[{ required: true, message: '请选择' }]}>
-          <Select placeholder="请选择">
-            <Select.Option value="bought">买了/做了</Select.Option>
-            <Select.Option value="not_bought">没买/没做</Select.Option>
-            <Select.Option value="delayed">延后了</Select.Option>
-            <Select.Option value="other">其他</Select.Option>
-          </Select>
-        </Form.Item>
-
-        <Form.Item name="satisfaction" label="满意度评分" rules={[{ required: true, message: '请评分' }]}>
-          <Rate />
-        </Form.Item>
-
-        <Form.Item name="review" label="复盘感想（选填）">
-          <Input.TextArea rows={3} placeholder="分享一下你的感受…" />
-        </Form.Item>
-
-        <Form.Item>
-          <Button type="primary" htmlType="submit" loading={submitting} block>
-            提交复盘
-          </Button>
-        </Form.Item>
-      </Form>
-    </Modal>
+    <div className="overlay" onClick={onClose}>
+      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-head"><h3>决策复盘</h3><button className="modal-x" aria-label="关闭" onClick={onClose}>×</button></div>
+        <div className="field"><label>你最终做了什么？</label><select value={action} onChange={(e) => setAction(e.target.value)}>{ACTIONS.map((a) => <option key={a.v} value={a.v}>{a.label}</option>)}</select></div>
+        <div className="field"><label>满意度评分</label><select value={sat} onChange={(e) => setSat(Number(e.target.value))}>{[5,4,3,2,1].map((n) => <option key={n} value={n}>{n} 分{n === 5 ? ' · 很满意' : n === 1 ? ' · 不满意' : ''}</option>)}</select></div>
+        <div className="field"><label>复盘感想（选填）</label><textarea value={review} onChange={(e) => setReview(e.target.value)} placeholder="分享一下你的感受…" rows={3} /></div>
+        {error && <div className="auth-error">{error}</div>}
+        <button className="btn" style={{ width: '100%' }} onClick={submit} disabled={submitting}>{submitting ? '提交中…' : '提交复盘'}</button>
+      </div>
+    </div>
   );
 }
