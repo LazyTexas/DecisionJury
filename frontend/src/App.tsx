@@ -8,6 +8,7 @@ import CreateCasePage from './pages/CreateCasePage';
 import ChatPage from './pages/ChatPage';
 import VerdictPage from './pages/VerdictPage';
 import HistoryPage from './pages/HistoryPage';
+import WatchlistPage from './pages/WatchlistPage';
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/chat/:caseId" element={<ChatPage />} />
         <Route path="/verdict/:caseId" element={<VerdictPage />} />
         <Route path="/history" element={<HistoryPage />} />
+        <Route path="/watchlist" element={<WatchlistPage />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -363,3 +363,15 @@ export async function deleteCase(caseId: string): Promise<{ deleted: boolean }> 
     method: 'DELETE',
   });
 }
+
+// ---- 历史记录删除（软删）----
+export async function deleteHistory(historyId: string): Promise<{ deleted: boolean }> {
+  if (USE_MOCK) return { deleted: true };
+  return request(`/history/${historyId}?user_id=${getCurrentUserId()}`, { method: 'DELETE' });
+}
+
+// ---- 观察清单删除（将提醒标记为已取消）----
+export async function deleteWatchlistItem(reminderId: string): Promise<{ deleted: boolean }> {
+  if (USE_MOCK) return { deleted: true };
+  return request(`/watchlist/${reminderId}?user_id=${getCurrentUserId()}`, { method: 'DELETE' });
+}

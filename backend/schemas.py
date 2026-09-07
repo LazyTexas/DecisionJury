@@ -83,6 +83,17 @@ class SendMessageResponse(BaseModel):
     is_high_risk: bool = False
     reject_reason: Optional[str] = None
 
+class DebateEvent(BaseModel):
+    """庭审事件"""
+    event_id: str
+    order: int
+    speaker: str  # clerk / pro_agent / con_agent / judge_agent
+    phase: str    # case_summary / opening_statement / closing_argument / verdict
+    content: str
+    evidence: List[str] = []
+    status: str   # completed / failed
+
+
 class DebateResponse(BaseModel):
     case_id: str
     case_status: str
@@ -166,12 +177,3 @@ class ErrorResponse(BaseModel):
             }
         }
 
-class DebateEvent(BaseModel):
-    """庭审事件"""
-    event_id: str
-    order: int
-    speaker: str  # clerk / pro_agent / con_agent / judge_agent
-    phase: str    # case_summary / opening_statement / closing_argument / verdict
-    content: str
-    evidence: List[str] = []
-    status: str   # completed / failed
