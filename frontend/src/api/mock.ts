@@ -178,23 +178,6 @@ const mockToolResults: ToolResult[] = [
   },
 ];
 
-const mockReport: DecisionReport = {
-  report_id: 'report_001',
-  case_id: 'case_001',
-  case_type: CaseType.SHOPPING,
-  final_decision: ShoppingDecision.DELAY,
-  confidence: 0.75,
-  summary: '本案建议暂缓购买 3 天。',
-  case_summary: '用户想购买 1299 元降噪耳机用于学习。',
-  pro_points: ['存在学习降噪场景，可能提高专注度。'],
-  con_points: ['价格占剩余预算较高，且已有普通耳机。'],
-  rag_evidence: mockRagEvidence,
-  tool_results: mockToolResults,
-  next_actions: ['加入观察清单，3 天后复盘。'],
-  created_at: now,
-  debate_events: mockDebateEvents,
-};
-
 const mockDebateEvents: DebateEvent[] = [
   {
     event_id: 'event_001', order: 1, speaker: 'clerk', phase: 'case_summary',
@@ -217,6 +200,23 @@ const mockDebateEvents: DebateEvent[] = [
     evidence: [], status: 'completed',
   },
 ];
+
+const mockReport: DecisionReport = {
+  report_id: 'report_001',
+  case_id: 'case_001',
+  case_type: CaseType.SHOPPING,
+  final_decision: ShoppingDecision.DELAY,
+  confidence: 0.75,
+  summary: '本案建议暂缓购买 3 天。',
+  case_summary: '用户想购买 1299 元降噪耳机用于学习。',
+  pro_points: ['存在学习降噪场景，可能提高专注度。'],
+  con_points: ['价格占剩余预算较高，且已有普通耳机。'],
+  rag_evidence: mockRagEvidence,
+  tool_results: mockToolResults,
+  next_actions: ['加入观察清单，3 天后复盘。'],
+  created_at: now,
+  debate_events: mockDebateEvents,
+};
 
 const mockTrace: TraceItem[] = [
   {
