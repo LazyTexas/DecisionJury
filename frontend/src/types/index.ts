@@ -136,6 +136,17 @@ export interface ToolResult {
   error: string | null;
 }
 
+/** 庭审辩论事件（书记员/正方/反方/法官发言，含角色、阶段与发言内容） */
+export interface DebateEvent {
+  event_id: string;
+  order: number;
+  speaker: string;
+  phase: string;
+  content: string;
+  evidence: string[];
+  status?: string;
+}
+
 /** 判决书 */
 export interface DecisionReport {
   report_id: string;
@@ -151,6 +162,7 @@ export interface DecisionReport {
   tool_results: ToolResult[];
   next_actions: string[];
   created_at: string;
+  debate_events?: DebateEvent[];
 }
 
 /** Agent 执行轨迹项 */
