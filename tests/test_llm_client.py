@@ -452,3 +452,25 @@ def test_parser_validation_does_not_mutate_input() -> None:
 
     assert value["extracted_fields"]["price"] == "999"
     assert result["extracted_fields"]["price"] == 999.0
+
+
+def test_parser_validation_accepts_optional_c_metadata() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {"price": 2500},
+        "correction_fields": {},
+        "next_question": "请补充预算。",
+        "confidence": 0.9,
+        "field_meta": {"price": {"status": "confirmed"}},
+        "conflicts": [],
+        "next_question_key": "monthly_budget_left",
+        "is_complete": False,
+        "termination_reason": "missing_required_fields",
+        "parser_used": "deepseek",
+    }
+    result = llm_client._validate_parser_result(value)
+    assert result["field_meta"]["price"]["status"] == "confirmed"
+    assert result["next_question_key"] == "monthly_budget_left"

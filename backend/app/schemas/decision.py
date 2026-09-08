@@ -110,6 +110,14 @@ class ParserResult:
     next_question: str | None
     case_status: str
     agent_step: AgentStep
+    correction_fields: dict[str, Any] = field(default_factory=dict)
+    # C 模块扩展信息均为可选，保持旧调用方按原字段构造/读取时兼容。
+    field_meta: dict[str, Any] = field(default_factory=dict)
+    conflicts: list[dict[str, Any]] = field(default_factory=list)
+    next_question_key: str | None = None
+    is_complete: bool = False
+    termination_reason: str | None = None
+    parser_used: str | None = None
 
 
 @dataclass
