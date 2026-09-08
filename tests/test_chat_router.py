@@ -3,25 +3,12 @@
 测试 chat 路由（POST /api/cases/{case_id}/messages）
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from backend.main import app
-from backend.database import SessionLocal
 from backend.models import Case, Message
 from backend.schemas import CaseStatus
 
-client = TestClient(app)
-
-
-@pytest.fixture(scope="function")
-def db_session():
-    """提供数据库会话，测试结束后回滚"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
+# client / db_session 统一由 tests/conftest.py 提供（内存 SQLite + get_db 依赖覆盖）。
+# 原先本文件自建的 db_session 用真实 SessionLocal，指向 data/decisionjury.db，
+# 与 conftest 的 TestClient 用的内存库不是同一个数据库，用例必然失败。
 
 
 def _create_test_case(
