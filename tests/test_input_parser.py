@@ -1,6 +1,8 @@
 # tests/test_input_parser.py
 """Input Parser 单元测试 —— 纯逻辑，无外部依赖"""
 
+import pytest
+
 from backend.app.agents import input_parser
 from backend.app.agents.input_parser import parse_input
 from backend.app.services.llm_client import DeepSeekLLMClient
@@ -448,3 +450,20 @@ def test_minimum_fields_complete_even_when_suggested_fields_missing():
     assert result.is_complete is True
     assert result.case_status == "ready_for_debate"
     assert result.missing_fields == ["purpose", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
+
+
+# ========== 已知缺陷（xfail，待 Agent 编排修复）==========
+
+@pytest.mark.xfail(
+    reason=(
+        "已知缺陷：价格数字后 8 个字符内出现“预算”时，_is_budget_context() 会把该价格"
+        "误判为预算并丢弃。价格在前、预算紧随其后时 price 提取为 None；"
+        "把预算写在价格之前（或两者之间多几个字）则正常。待 input_parser 修复后移除本标记。"
+    ),
+    strict=False,
+)
+def test_price_kept_when_budget_follows_closely():
+    """价格在前、预算紧随其后时，price 与 monthly_budget_left 都应被提取。"""
+    result = parse_input("想买降噪耳机，价格 1299 元，本月预算还剩 2000 元")
+    assert result.extracted_fields.get("price") == 1299.0
+    assert result.extracted_fields.get("monthly_budget_left") == 2000.0
