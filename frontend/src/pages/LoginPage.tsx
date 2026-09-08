@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import AuthShell from '../auth/AuthShell';
@@ -11,24 +11,36 @@ export default function LoginPage() {
   const [pwd, setPwd] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const idRef = useRef<HTMLInputElement>(null);
+
+  // 来自“切换用户”：登录页提示并自动聚焦账号框
+  const fromState = (location.state as { from?: string } | null)?.from;
+  const isSwitch = fromState === 'switch';
+
+  useEffect(() => {
+    if (isSwitch) idRef.current?.focus();
+  }, [isSwitch]);
 
   if (user) return <Navigate to="/" replace />;
-  const from = (location.state as { from?: string } | null)?.from;
+
+  // 合法回跳来源：仅指向站内且不是登录页本身；'switch'/'logout' 等标记不当作路由
+  const from = typeof fromState === 'string' && fromState.startsWith('/') && fromState !== '/login' ? fromState : null;
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmitting(true); setError('');
     try {
       await login(id.trim(), pwd);
-      navigate(from && from !== '/login' ? from : '/', { replace: true });
+      navigate(from || '/', { replace: true });
     } catch (err) { setError((err as Error).message || '登录失败，请重试'); }
     finally { setSubmitting(false); }
   };
 
   return (
     <AuthShell title="登录" subtitle="冷静决策助手，登录后继续你的决策旅程">
+      {isSwitch && <div className="auth-notice">已退出当前账号，请选择其他账号登录。</div>}
       <form onSubmit={submit}>
-        <div className="field"><label>用户 ID</label><input value={id} onChange={(e) => setId(e.target.value)} placeholder="你的用户 ID（自定义，将用于关联案件）" maxLength={40} /></div>
+        <div className="field"><label>用户 ID</label><input ref={idRef} value={id} onChange={(e) => setId(e.target.value)} placeholder="你的用户 ID（自定义，将用于关联案件）" maxLength={40} /></div>
         <div className="field"><label>密码</label><input type="password" value={pwd} onChange={(e) => setPwd(e.target.value)} placeholder="请输入密码" /></div>
         {error && <div className="auth-error">{error}</div>}
         <button className="btn" style={{ width: '100%' }} disabled={submitting}>{submitting ? '登录中…' : '登录'}</button>

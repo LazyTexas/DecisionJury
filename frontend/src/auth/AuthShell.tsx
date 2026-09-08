@@ -13,6 +13,7 @@ export default function AuthShell({
   return (
     <div className="auth-shell">
       <div className="auth-card">
+        <div className="auth-logo">D</div>
         <div className="auth-brand">DecisionJury</div>
         {title && <div className="auth-title">{title}</div>}
         {subtitle && <div className="auth-sub">{subtitle}</div>}

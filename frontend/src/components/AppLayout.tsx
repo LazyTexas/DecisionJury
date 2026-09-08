@@ -3,7 +3,7 @@
 // 案件页（对话/判决书）按 caseId 从首页进入，不作顶层导航。
 // ============================================================
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { useTheme, ThemeIcon } from '../theme/ThemeContext';
@@ -39,13 +39,28 @@ function pendingCount(items: WatchlistItem[]): number {
 
 export default function AppLayout() {
   const { theme, toggle } = useTheme();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [pending, setPending] = useState(0);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
+  // 点击菜单外区域关闭下拉
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); };
+  }, [menuOpen]);
+
+  // 观察清单到期数（不影响本模块主功能）
   useEffect(() => {
     let cancelled = false;
     getWatchlist()
@@ -53,6 +68,19 @@ export default function AppLayout() {
       .catch(() => { });
     return () => { cancelled = true; };
   }, []);
+
+  const handleLogout = () => {
+    setMenuOpen(false);
+    logout();
+    navigate('/login', { replace: true, state: { from: 'logout' } });
+  };
+
+  const handleSwitch = () => {
+    setMenuOpen(false);
+    logout();
+    // 通过路由 state 标记“切换用户”，登录页据此提示并自动聚焦账号框
+    navigate('/login', { replace: true, state: { from: 'switch' } });
+  };
 
   const title = useMemo(() => {
     if (location.pathname.startsWith('/chat')) return '信息收集';
@@ -95,9 +123,36 @@ export default function AppLayout() {
           <div className="tb-title">{title}<span className="muted">DecisionJury · 多 Agent 冷静决策助手</span></div>
           <div className="tb-right">
             <button className="theme-btn" onClick={toggle} title="切换深色/浅色" aria-label="切换主题"><ThemeIcon theme={theme} /></button>
-            <div className="user" title="当前用户">
-              <span className="u-av">{displayName.slice(0, 1).toUpperCase()}</span>
-              <span className="u-name">{displayName}</span>
+            <div className="user" ref={menuRef}>
+              <button
+                className="user-btn"
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                title="账户菜单"
+                onClick={() => setMenuOpen((o) => !o)}
+              >
+                <span className="u-av">{displayName.slice(0, 1).toUpperCase()}</span>
+                <span className="u-name">{displayName}</span>
+                <svg className="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M6 9l6 6 6-6" /></svg>
+              </button>
+
+              {menuOpen && (
+                <div className="user-menu" role="menu">
+                  <div className="um-head">
+                    <span className="um-av">{displayName.slice(0, 1).toUpperCase()}</span>
+                    <div className="um-meta"><b>{user?.name || user?.user_id || '访客'}</b><span>{user?.user_id ?? ''}</span></div>
+                  </div>
+                  <div className="um-divider" />
+                  <button className="um-item" role="menuitem" onClick={handleSwitch}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M17 2l4 4-4 4M3 11v-1a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v1a4 4 0 0 1-4 4H3" /></svg>
+                    切换用户
+                  </button>
+                  <button className="um-item" role="menuitem" onClick={handleLogout}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" /></svg>
+                    登出
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
