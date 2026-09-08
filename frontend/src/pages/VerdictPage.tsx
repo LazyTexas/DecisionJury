@@ -5,6 +5,7 @@ import { DECISION_META, CASE_TYPE_META, TRACE_NAME_LABEL, TRACE_TYPE_LABEL } fro
 import { formatDateTime } from '../utils/format';
 import type { DecisionReport, RagEvidence, ToolResult, TraceItem } from '../types';
 import FeedbackModal from '../components/FeedbackModal';
+import TraceLogView from '../components/TraceLogView';
 
 const nodeColor: Record<string, [string, string]> = {
   input_parser: ['#3B5BDB', '解'], rag_search: ['#7C5CBF', '检'], cost_analyzer: ['#0E9AA7', '算'],
@@ -20,6 +21,7 @@ export default function VerdictPage() {
   const [trace, setTrace] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [traceOpen, setTraceOpen] = useState(false);
 
   useEffect(() => {
     if (!caseId) return;
@@ -53,9 +55,13 @@ export default function VerdictPage() {
             <div className="verdict-badge"><div className="vlabel">{meta?.label ?? report.final_decision}</div><div className="gauge"><svg viewBox="0 0 160 160"><circle className="track" cx="80" cy="80" r="66" /><circle className="p" cx="80" cy="80" r="66" transform="rotate(-90 80 80)" style={{ strokeDasharray: C, strokeDashoffset: gaugeOffset }} /></svg><div className="val"><b>{report.confidence}</b><span>法官置信度</span></div></div><p className="muted" style={{ maxWidth: 520 }}>{report.summary}</p></div>
             <h2>后续动作</h2><ul className="actions">{(report.next_actions || []).map((a, i) => <li key={i}><span className="i">{i + 1}</span>{a}</li>)}</ul>
             <div className="sig"><p>DecisionJury · 冷静裁判庭</p><p className="tiny">生成于 {formatDateTime(report.created_at)} · 报告 {report.report_id}</p><div className="stamp"><b>冷静裁判庭</b><span>判决专用章</span></div></div>
-            <div style={{ textAlign: 'center', marginTop: 20 }}><button className="btn ghost" onClick={() => setFeedbackOpen(true)}>提交决策复盘</button></div>
+            <div style={{ textAlign: 'center', marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+              <button className="btn ghost" onClick={() => setFeedbackOpen(true)}>提交决策复盘</button>
+              <button className="btn ghost" onClick={() => setTraceOpen(true)}>查看完整 Agent 执行轨迹</button>
+            </div>
           </div>
           <FeedbackModal caseId={caseId!} open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+          <TraceLogView open={traceOpen} caseId={caseId!} report={report} onClose={() => setTraceOpen(false)} />
         </>
       )}
     </div>

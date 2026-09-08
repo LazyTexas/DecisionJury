@@ -17,6 +17,7 @@ import {
   RiskLevel,
   DecisionReport,
   TraceItem,
+  DebateEvent,
   CaseSummary,
   HistoryItem,
   HistoryResult,
@@ -177,6 +178,29 @@ const mockToolResults: ToolResult[] = [
   },
 ];
 
+const mockDebateEvents: DebateEvent[] = [
+  {
+    event_id: 'event_001', order: 1, speaker: 'clerk', phase: 'case_summary',
+    content: '书记员：本案争议为是否购买降噪耳机。商品价格为1299元，主要用途是学习，本月剩余预算为2000元，已有替代品：普通耳机。',
+    evidence: [], status: 'completed',
+  },
+  {
+    event_id: 'event_002', order: 2, speaker: 'pro_agent', phase: 'opening_statement',
+    content: '正方：降噪耳机与“学习”相关，若使用频率为每天，具备一定购买价值。 主要观点：购买目的较明确：学习；预期使用频率为每天，可能支撑长期价值；如果已有替代品不能解决当前问题，新增商品有一定合理性。',
+    evidence: ['cost_analyzer'], status: 'completed',
+  },
+  {
+    event_id: 'event_003', order: 3, speaker: 'con_agent', phase: 'closing_argument',
+    content: '反方：降噪耳机仍有预算压力、闲置和冲动消费风险，需要谨慎。 主要观点：已有替代情况：普通耳机；购买触发因素：刚需；应先确认现有物品是否已经足够覆盖核心需求。',
+    evidence: ['history_001', 'cost_analyzer'], status: 'completed',
+  },
+  {
+    event_id: 'event_004', order: 4, speaker: 'judge_agent', phase: 'verdict',
+    content: '法官：判决结果为 delay。本案对降噪耳机的辅助建议是：建议暂缓购买 3 天后复盘。 未找到相关历史证据，本次判断主要基于当前输入和工具结果。 后续行动：加入观察清单，3 天后复盘真实需求。；比较已有替代品或低价替代方案能否满足核心用途。',
+    evidence: [], status: 'completed',
+  },
+];
+
 const mockReport: DecisionReport = {
   report_id: 'report_001',
   case_id: 'case_001',
@@ -191,6 +215,7 @@ const mockReport: DecisionReport = {
   tool_results: mockToolResults,
   next_actions: ['加入观察清单，3 天后复盘。'],
   created_at: now,
+  debate_events: mockDebateEvents,
 };
 
 const mockTrace: TraceItem[] = [
