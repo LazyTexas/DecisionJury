@@ -156,7 +156,9 @@ def _build_system_prompt(task: str) -> str:
             "允许字段：product_name、price、purpose、monthly_budget_left、owned_alternatives、"
             "expected_usage_frequency、trigger_reason。\n"
             "预算金额和商品价格必须区分；只有明确的纠正表达才允许覆盖已有字段。\n"
-            "如果字段缺失，请生成一句简短自然的 next_question，最多询问 2 到 3 个关键字段。\n"
+            "价格线索包括价格、售价、花、买下来；预算线索包括本月、每月、预算、可支配、余额、还剩。\n"
+            "支持元、块、大洋、人民币及中文口语数字；无法判断多个金额归属时保留 conflicts 候选，不要猜测。\n"
+            "如果字段缺失，请生成一句简短自然且只询问一个字段的 next_question。\n"
             "返回字段应包含 case_type、is_supported、is_high_risk、reject_reason、extracted_fields、"
             "correction_fields、next_question、confidence；若遗漏 is_supported，应用会根据其他字段推导。"
         )
@@ -274,7 +276,15 @@ def _validate_parser_result(value: Any) -> dict[str, Any]:
         "next_question",
         "confidence",
     }
-    optional_keys = {"is_supported"}
+    optional_keys = {
+        "is_supported",
+        "field_meta",
+        "conflicts",
+        "next_question_key",
+        "is_complete",
+        "termination_reason",
+        "parser_used",
+    }
     if set(value) - (required_keys | optional_keys) or required_keys - set(value):
         raise ValueError("parser result keys are incomplete or unknown")
 
@@ -287,6 +297,12 @@ def _validate_parser_result(value: Any) -> dict[str, Any]:
         "correction_fields",
         "next_question",
         "confidence",
+        "field_meta",
+        "conflicts",
+        "next_question_key",
+        "is_complete",
+        "termination_reason",
+        "parser_used",
     }
     if set(value) - allowed_keys:
         raise ValueError("parser result contains unknown keys")
@@ -325,6 +341,21 @@ def _validate_parser_result(value: Any) -> dict[str, Any]:
         raise ValueError("reject_reason must be a string or null")
     if value["next_question"] is not None and not isinstance(value["next_question"], str):
         raise ValueError("next_question must be a string")
+    if "field_meta" in value and not isinstance(value["field_meta"], dict):
+        raise ValueError("field_meta must be an object")
+    if "conflicts" in value and not isinstance(value["conflicts"], list):
+        raise ValueError("conflicts must be a list")
+    if "next_question_key" in value and value["next_question_key"] is not None:
+        if not isinstance(value["next_question_key"], str):
+            raise ValueError("next_question_key must be a string or null")
+        if value["next_question_key"] != "price_or_budget" and value["next_question_key"] not in PARSER_FIELDS:
+            raise ValueError("unknown next_question_key")
+    if "is_complete" in value and not isinstance(value["is_complete"], bool):
+        raise ValueError("is_complete must be boolean")
+    if "termination_reason" in value and value["termination_reason"] is not None and not isinstance(value["termination_reason"], str):
+        raise ValueError("termination_reason must be a string or null")
+    if "parser_used" in value and value["parser_used"] is not None and not isinstance(value["parser_used"], str):
+        raise ValueError("parser_used must be a string or null")
 
     try:
         confidence = float(value["confidence"])
@@ -343,4 +374,10 @@ def _validate_parser_result(value: Any) -> dict[str, Any]:
         "correction_fields": corrections,
         "next_question": value["next_question"],
         "confidence": confidence,
+        "field_meta": dict(value.get("field_meta") or {}),
+        "conflicts": list(value.get("conflicts") or []),
+        "next_question_key": value.get("next_question_key"),
+        "is_complete": value.get("is_complete"),
+        "termination_reason": value.get("termination_reason"),
+        "parser_used": value.get("parser_used"),
     }
