@@ -17,6 +17,44 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
     case_id = f"case_{uuid.uuid4().hex[:8]}"
 
     # ===== 新增：从 description 中提取字段 =====
+    # 防呆：若用户只填了标题而“详细描述”为空，不要交给 LLM 解析空串——
+    # DeepSeek 对空输入判定不可靠，可能随机返回 case_type=null / is_supported=false，
+    # 导致新建决策被误判为“不支持”而直接 rejected。空描述应视为“还需收集信息”。
+    if not (req.description or "").strip():
+        if req.title.strip():
+            # 把标题作为商品名线索，其余字段留给后续对话收集
+            initial_collected = {"product_name": req.title.strip()[:20], "description": req.description}
+            initial_missing = ["price", "purpose", "monthly_budget_left", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
+            is_high_risk = False
+            reject_reason = ""
+            initial_status = CaseStatus.COLLECTING
+            case = Case(
+                id=case_id,
+                user_id=req.user_id,
+                case_type=req.case_type,
+                title=req.title,
+                description=req.description,
+                status=initial_status,
+                collected_fields=initial_collected,
+                missing_fields=initial_missing,
+            )
+            db.add(case)
+            db.commit()
+            db.refresh(case)
+            return ApiResponse(
+                success=True,
+                data={
+                    "case_id": case_id,
+                    "case_status": case.status,
+                    "collected_fields": initial_collected,
+                    "missing_fields": initial_missing,
+                    "next_question": "为了进入购物法庭分析，还需要补充：这个商品大约多少钱？ 你买它主要是为了解决什么问题，或用于什么场景？",
+                    "is_high_risk": False,
+                    "reject_reason": None,
+                },
+                message="case created"
+            )
+
     try:
         parser_result = parse_input(
             raw_input=req.description,
@@ -28,6 +66,20 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_collected = parser_dict.get("merged_fields", {})
         initial_missing = parser_dict.get("missing_fields", [])
         initial_status = parser_dict.get("case_status", CaseStatus.COLLECTING)
+
+        # 防呆：LLM 对购物输入可能误判为“不支持/拒绝”。只要不是高风险主题，
+        # 就不应直接把正常决策设为 rejected（reject 只应由高风险触发）。
+        # 因此这里把“非高风险却 rejected”的异常状态降级为 collecting，转成继续收集信息。
+        if not is_high_risk and initial_status == CaseStatus.REJECTED:
+            initial_status = CaseStatus.COLLECTING
+            if not initial_missing:
+                initial_missing = [
+                    "product_name", "price", "purpose", "monthly_budget_left",
+                    "owned_alternatives", "expected_usage_frequency", "trigger_reason",
+                ]
+            initial_collected.pop("is_high_risk", None)
+            initial_collected.pop("reject_reason", None)
+            reject_reason = ""
 
         if is_high_risk:
             initial_status = CaseStatus.REJECTED
@@ -42,6 +94,8 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_status = CaseStatus.COLLECTING
         is_high_risk = False
         reject_reason = ""
+        # 解析失败时兜底：不产生追问，交由后续对话收集（避免 parser_dict 未定义导致 UnboundLocalError）
+        parser_dict = {}
 
     # 确保 description 保留
     if "description" not in initial_collected:
@@ -318,21 +372,39 @@ def create_feedback(
     else:
         result = "neutral"
 
-    # 4. 创建历史记录
-    history = History(
-        id=f"history_{uuid.uuid4().hex[:8]}",
-        user_id=req.user_id,
-        case_type=case.case_type,
-        summary=f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★",
-        result=result,
-        tags=[],
-        title=case.title,
-        case_id=case.id,
-        report_id=case.report_id,
-        context=req.review or "",
-        final_decision=case.final_decision,
-    )
-    db.add(history)
+    # 4. 创建/更新历史记录（同一案件只保留一条复盘记录，重复提交则更新）
+    # 保证幂等：避免用户反复点击"提交决策复盘"时反复插入相同案件的历史记录。
+    history = db.query(History).filter(
+        History.case_id == case.id,
+        History.is_deleted == 0,
+    ).first()
+
+    if history:
+        # 已存在复盘记录 → 更新内容
+        history.user_id = req.user_id
+        history.case_type = case.case_type
+        history.summary = f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★"
+        history.result = result
+        history.title = case.title
+        history.report_id = case.report_id
+        history.context = req.review or ""
+        history.final_decision = case.final_decision
+    else:
+        # 尚无复盘记录 → 新建
+        history = History(
+            id=f"history_{uuid.uuid4().hex[:8]}",
+            user_id=req.user_id,
+            case_type=case.case_type,
+            summary=f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★",
+            result=result,
+            tags=[],
+            title=case.title,
+            case_id=case.id,
+            report_id=case.report_id,
+            context=req.review or "",
+            final_decision=case.final_decision,
+        )
+        db.add(history)
 
     # 5. 更新观察清单状态（如果有）
     reminder = db.query(Reminder).filter(

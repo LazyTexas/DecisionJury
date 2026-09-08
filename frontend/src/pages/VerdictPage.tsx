@@ -44,8 +44,7 @@ export default function VerdictPage() {
           </div></div>
           <div className="letter">
             <p className="lead">你正在犹豫：{report.case_summary}。我们检索了你过去的决策记录，并核算了成本。以下是完整的分析过程与最终建议——结论供你参考，最终仍由你决定。</p>
-            <h2>正方观点</h2>
-            <div className="arg"><div className="col"><h4><span className="dot" style={{ background: 'var(--pro)' }}></span>收益</h4><ul>{(report.pro_points || []).map((p, i) => <li key={i}>{p}</li>)}</ul></div><div className="col con"><h4><span className="dot" style={{ background: 'var(--con)' }}></span>风险</h4><ul>{(report.con_points || []).map((p, i) => <li key={i}>{p}</li>)}</ul></div></div>
+            <div className="arg"><div className="col"><h2 className="arg-title">正方观点</h2><h4><span className="dot" style={{ background: 'var(--pro)' }}></span>收益</h4><ul>{(report.pro_points || []).map((p, i) => <li key={i}>{p}</li>)}</ul></div><div className="col con"><h2 className="arg-title">反方观点</h2><h4><span className="dot" style={{ background: 'var(--con)' }}></span>风险</h4><ul>{(report.con_points || []).map((p, i) => <li key={i}>{p}</li>)}</ul></div></div>
             <h2>历史证据（RAG）</h2>
             {(report.rag_evidence || []).length === 0 ? <p className="muted">无引用证据。</p> : (report.rag_evidence || []).map((ev: RagEvidence, i) => (<div key={ev.id} className="cite"><div className="no">{i + 1}</div><div className="ct"><b>{ev.title}</b><span className="score">相关性 {ev.score}</span><p>{ev.content}</p></div></div>))}
             <h2>工具计算结果</h2>

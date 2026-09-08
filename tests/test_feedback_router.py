@@ -245,6 +245,53 @@ def test_feedback_updates_reminder_status(client, db_session):
     assert updated_reminder.status == "reviewed"
 
 
+def test_feedback_idempotent_same_case_single_history(client, db_session):
+    """同一案件重复提交复盘只保留一条历史记录（幂等，重复提交则更新）"""
+    case = Case(
+        id="case_idempotent",
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机",
+        status=CaseStatus.COMPLETED,
+        final_decision="delay",
+        report_id="report_001",
+        collected_fields={},
+        missing_fields=[]
+    )
+    db_session.add(case)
+    db_session.commit()
+
+    # 第一次提交
+    r1 = client.post(
+        "/api/cases/case_idempotent/feedback",
+        json={"user_id": "u001", "actual_action": "bought", "satisfaction": 4, "review": "买了，体验不错"}
+    )
+    assert r1.status_code == 200
+    assert r1.json()["success"] is True
+    history_id = r1.json()["data"]["history_id"]
+
+    # 第二次提交（模拟用户反复点击）
+    r2 = client.post(
+        "/api/cases/case_idempotent/feedback",
+        json={"user_id": "u001", "actual_action": "regret", "satisfaction": 2, "review": "后悔了，其实不该买"}
+    )
+    assert r2.status_code == 200
+    assert r2.json()["success"] is True
+    # 返回的是同一条历史记录 id（更新而非新建）
+    assert r2.json()["data"]["history_id"] == history_id
+
+    # 该案件在数据库中只应有一条未删除的复盘历史记录
+    histories = db_session.query(History).filter(
+        History.case_id == "case_idempotent",
+        History.is_deleted == 0,
+    ).all()
+    assert len(histories) == 1
+    # 内容已被第二次提交更新
+    assert histories[0].result == "regret"
+    assert histories[0].context == "后悔了，其实不该买"
+
+
 def test_feedback_review_optional(client, db_session):
     """review 字段选填，不填也能提交"""
     case = Case(

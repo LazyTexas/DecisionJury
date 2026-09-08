@@ -202,6 +202,7 @@ html[data-theme='dark'] .chain .c-ico, html[data-theme='dark'] .node .n-ico { bo
 .letter h2 { font-size:20px; margin:32px 0 14px; padding-bottom:10px; border-bottom:1px solid var(--line); }
 .arg { display:grid; grid-template-columns:1fr 1fr; gap:22px; margin-top:6px; }
 .arg .col { border-left:3px solid var(--pro); padding-left:16px; }
+.arg .arg-title { font-size:20px; margin:0 0 14px; padding-bottom:10px; border-bottom:1px solid var(--line); font-family:'Noto Serif SC','Songti SC','SimSun',serif; font-weight:600; letter-spacing:.2px; }
 .arg .col.con { border-color:var(--con); }
 .arg .col h4 { font-size:15px; margin-bottom:10px; display:flex; align-items:center; gap:8px; }
 .arg ul { list-style:none; }
@@ -234,10 +235,10 @@ html[data-theme='dark'] .vlabel { color:#3a2c00; }
 .actions .i { width:22px; height:22px; border-radius:50%; background:var(--brand-soft); color:var(--brand); font-size:12px; flex-shrink:0; display:flex; align-items:center; justify-content:center; font-weight:700; }
 .sig { margin-top:38px; text-align:right; border-top:1px solid var(--line); padding-top:20px; }
 .sig p { font-size:14px; }
-.sig .stamp { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; margin-top:12px; width:78px; height:78px; border:2px solid var(--con); color:var(--con); border-radius:50%; font-family:serif; transform:rotate(-8deg); opacity:.85; position:relative; background:radial-gradient(circle,color-mix(in srgb,var(--con) 5%,transparent),transparent 72%); }
-.sig .stamp::before { content:''; position:absolute; inset:5px; border:1px solid var(--con); border-radius:50%; }
-.sig .stamp b { font-size:14px; letter-spacing:2px; }
-.sig .stamp span { font-size:9px; opacity:.82; margin-top:2px; }
+.sig .stamp { display:inline-flex; flex-direction:column; align-items:center; justify-content:center; margin-top:12px; width:96px; height:96px; border:2px solid var(--con); color:var(--con); border-radius:50%; font-family:'Noto Serif SC','Songti SC','SimSun',serif; transform:rotate(-8deg); opacity:.85; position:relative; background:radial-gradient(circle,color-mix(in srgb,var(--con) 5%,transparent),transparent 72%); }
+.sig .stamp::before { content:''; position:absolute; inset:6px; border:1px solid var(--con); border-radius:50%; }
+.sig .stamp b { font-size:14px; line-height:1; white-space:nowrap; letter-spacing:1px; }
+.sig .stamp span { font-size:9px; line-height:1; white-space:nowrap; letter-spacing:1px; opacity:.82; margin-top:3px; }
 
 .form-card { max-width:620px; }
 .type-opt { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
