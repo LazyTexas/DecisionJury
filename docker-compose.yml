@@ -1,0 +1,98 @@
+# DecisionJury 一键启动（Docker Compose）
+#
+# 快速开始：
+#   cp deploy/.env.docker.example .env    # 填 DEEPSEEK_API_KEY
+#   docker compose up -d --build
+#   docker compose logs -f
+#   docker compose down                   # 停止（保留数据库）
+#   docker compose down -v                # 停止并删除数据库 volume
+#
+# 服务拓扑（backend / rag 只在 compose 内网，不对宿主机发布端口）：
+#   浏览器 → frontend(nginx:80 → 宿主机 8088) → backend(8000) → rag(8001)
+
+services:
+  rag:
+    build:
+      context: .
+      dockerfile: rag/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: decisionjury-rag:latest
+    environment:
+      # RAG 需要拉后端实时历史记录做联动，容器内用服务名访问
+      BACKEND_HISTORY_URL: http://backend:8000/api/history
+      RAG_LIVE_RECORDS: "1"
+      HISTORY_TIMEOUT: "3"
+    healthcheck:
+      # retriever 没有 /health 路由，用 POST /api/rag/search 探活
+      test: ["CMD", "python", "-c", "import json,urllib.request,sys; r=urllib.request.Request('http://127.0.0.1:8001/api/rag/search', data=json.dumps({'user_id':'healthcheck','case_id':'healthcheck','case_type':'shopping','query':'ping','top_k':1}).encode(), headers={'Content-Type':'application/json'}); sys.exit(0 if urllib.request.urlopen(r, timeout=5).getcode()==200 else 1)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks: [decisionjury]
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+    image: decisionjury-backend:latest
+    environment:
+      # 必须是 production：development 下检测到表结构不一致会删库重建
+      ENV: production
+      # 容器内绝对路径（4 个斜杠 = sqlite:/// + /data/...）
+      DATABASE_URL: sqlite:////data/decisionjury.db
+      RAG_SEARCH_URL: http://rag:8001/api/rag/search
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_TIMEOUT_SECONDS: ${DEEPSEEK_TIMEOUT_SECONDS:-30}
+    volumes:
+      - decisionjury-data:/data
+    depends_on:
+      rag:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5).getcode()==200 else 1)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks: [decisionjury]
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NPM_REGISTRY: ${NPM_REGISTRY:-https://registry.npmmirror.com}
+    image: decisionjury-frontend:latest
+    ports:
+      # 宿主机端口 → 容器 80。
+      # 默认 8088 而非 5173：Windows 上 5173 常落在 Hyper-V 保留端口段
+      # （netsh interface ipv4 show excludedportrange protocol=tcp 可查），
+      # 会报 bind: access permissions。Linux 服务器可用 FRONTEND_PORT=5173
+      # 与 deploy/start.sh 的访问地址保持一致。
+      - "${FRONTEND_PORT:-8088}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks: [decisionjury]
+
+volumes:
+  # 显式命名，避免 docker compose -p 前缀变化导致找不到旧数据
+  decisionjury-data:
+    name: decisionjury-data
+
+networks:
+  decisionjury:
+    driver: bridge

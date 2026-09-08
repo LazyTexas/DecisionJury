@@ -1,0 +1,39 @@
+# ===== 版本控制 / IDE =====
+.git
+.idea
+.vscode
+.claude
+
+# ===== Python 虚拟环境与缓存 =====
+.venv
+venv
+backend/venv
+rag/venv
+__pycache__
+*.py[cod]
+.pytest_cache
+.ruff_cache
+.mypy_cache
+
+# ===== 前端（用 frontend/ 作为独立构建上下文，不进后端/RAG 镜像）=====
+frontend
+
+# ===== 非运行时目录 =====
+docs
+tests
+deploy
+logs
+*.log
+tmp
+temp
+*.md
+*.pdf
+
+# ===== 本地数据库（容器内用 volume，镜像保持可复现）=====
+data/*.db
+data/*.sqlite
+data/*.sqlite3
+
+# ===== 密钥（绝不进镜像）=====
+.env
+.env.*
