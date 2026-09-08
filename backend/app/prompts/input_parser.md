@@ -59,9 +59,9 @@ Existing missing fields:
 
 {{existing_missing_fields}}
 
-## Required Shopping Fields
+## Shopping Fields
 
-Before a shopping case can enter debate, collect these fields as much as possible:
+Minimum decision fields are `product_name`, `price`, and `monthly_budget_left`. The other fields improve analysis but do not block completion:
 
 - `product_name`: Product or service the user wants to buy
 - `price`: Product price as a number, in RMB yuan
@@ -79,7 +79,7 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 4. The application computes missing fields after validating and merging the model response.
 5. The application derives the final case status locally; do not include `case_status` in the model response.
 6. Do not ask again for fields that were already clearly answered.
-7. Ask for at most 2 to 3 key fields in one follow-up question.
+7. Ask for exactly one key field in each `next_question`.
 8. Do not invent price, budget, alternatives, usage frequency, or purchase motivation.
 9. Treat vague answers such as "maybe", "not sure", "probably", or "I don't know" as missing for the relevant field.
 10. Use `snake_case` for all field names.
@@ -88,6 +88,11 @@ Before a shopping case can enter debate, collect these fields as much as possibl
 13. Understand natural and colloquial Chinese, but extract only facts clearly stated by the user.
 14. Put explicitly corrected values in `correction_fields`; ordinary additions belong in `extracted_fields`.
 15. Do not use `correction_fields` for guesses or ambiguous statements.
+16. Map “价格是/售价/花/买下来” to `price`; map “本月/每月/预算/可支配/余额/还剩” to `monthly_budget_left`.
+17. Parse `元、块、大洋、人民币`; normalize “两千五” to 2500, “三千左右” to 3000 with approximate metadata, and “两千来块” to an approximate 2000 candidate.
+18. Expressions such as “别人有、同事买了、看到别人用” belong to `trigger_reason`.
+19. If multiple amounts have no clear semantic owner, leave price and budget unset, return candidates in optional `conflicts`, and ask one confirmation question. Never guess.
+20. A latest explicit product expression such as “我要买冰箱” supersedes an older product name. Explicit corrections such as “不是 A，是 B” go into `correction_fields` and replace the old value.
 
 ## Output JSON Schema
 
@@ -107,7 +112,13 @@ Before a shopping case can enter debate, collect these fields as much as possibl
   },
   "correction_fields": {},
   "next_question": null,
-  "confidence": 0.0
+  "confidence": 0.0,
+  "field_meta": {},
+  "conflicts": [],
+  "next_question_key": null,
+  "is_complete": false,
+  "termination_reason": "missing_required_fields",
+  "parser_used": "deepseek"
 }
 
 ## Output Constraints
