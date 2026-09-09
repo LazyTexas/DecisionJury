@@ -122,10 +122,10 @@ def test_get_watchlist_sorted_by_due_at(client, db_session):
 
 
 def test_get_watchlist_missing_user_id(client):
-    """缺少 user_id 返回验证错误"""
+    """缺少 user_id 且无 Token 时返回 MISSING_USER_ID（HTTP 200 + 业务错误码）"""
     response = client.get("/api/watchlist")
 
-    assert response.status_code == 422
+    assert response.status_code == 200
     data = response.json()
     assert data["success"] is False
-    assert data["message"] == "VALIDATION_ERROR"
+    assert data["message"] == "MISSING_USER_ID"
