@@ -39,6 +39,8 @@ def test_create_reminder_success_maps_to_tool_result() -> None:
     assert result.metrics["status"] == "scheduled"
     assert result.metrics["cooling_days"] == 3
     assert result.metrics["watch_items"] == ["still needed"]
+    assert result.metrics["title"] == "cooling review"
+    assert result.metrics["reason"] == "budget risk"
     assert result.error is None
 
 
@@ -88,6 +90,24 @@ def test_adapter_uses_unified_mcp_entrypoint(monkeypatch: Any) -> None:
     assert result.error == "TOOL_ERROR: tool down"
     assert captured["name"] == "cooling_reminder"
     assert captured["arguments"]["watch_items"] == []
+
+
+def test_reminder_metadata_uses_call_arguments_without_mutating_tool_output(monkeypatch: Any) -> None:
+    raw_metrics = {"reminder_id": "r_test", "due_at": "2026-09-12T12:00:00+08:00"}
+
+    def fake_call_tool(name: str, arguments: dict[str, Any]) -> dict[str, Any]:
+        return {
+            "tool_name": name,
+            "status": "success",
+            "summary": "reminder scheduled",
+            "metrics": raw_metrics,
+        }
+
+    monkeypatch.setattr(mcp_adapter, "call_tool", fake_call_tool)
+    result = mcp_adapter.create_cooling_reminder("u001", "case_001", "cooling review")
+
+    assert result.metrics == {**raw_metrics, "title": "cooling review", "reason": ""}
+    assert raw_metrics == {"reminder_id": "r_test", "due_at": "2026-09-12T12:00:00+08:00"}
 
 
 def test_analyze_time_cost_maps_to_tool_result() -> None:

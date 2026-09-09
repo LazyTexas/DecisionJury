@@ -2,24 +2,35 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
+from typing import Optional
 from backend.database import get_db
-from backend.models import Case, Message, Reminder, History, Trace
-from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest
+from backend.models import Case, Message, Reminder, History, Trace, User
+from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest, SHOPPING_REQUIRED_FIELDS
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
+from backend.security import get_current_user_optional
 
 router = APIRouter(prefix="/api", tags=["cases"])
 
 # ========== 创建案件 ==========
 @router.post("/cases", response_model=ApiResponse)
-def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
+def create_case(
+    req: CreateCaseRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else req.user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 生成 case_id
     case_id = f"case_{uuid.uuid4().hex[:8]}"
 
     # ===== 新增：从 description 中提取字段 =====
-    # 防呆：若用户只填了标题而“详细描述”为空，不要交给 LLM 解析空串——
+    # 防呆：若用户只填了标题而"详细描述"为空，不要交给 LLM 解析空串——
     # DeepSeek 对空输入判定不可靠，可能随机返回 case_type=null / is_supported=false，
-    # 导致新建决策被误判为“不支持”而直接 rejected。空描述应视为“还需收集信息”。
+    # 导致新建决策被误判为"不支持"而直接 rejected。空描述应视为"还需收集信息"。
     if not (req.description or "").strip():
         if req.title.strip():
             # 把标题作为商品名线索，其余字段留给后续对话收集
@@ -30,7 +41,7 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
             initial_status = CaseStatus.COLLECTING
             case = Case(
                 id=case_id,
-                user_id=req.user_id,
+                user_id=effective_user_id,  # <-- 改用 effective_user_id
                 case_type=req.case_type,
                 title=req.title,
                 description=req.description,
@@ -67,26 +78,43 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_missing = parser_dict.get("missing_fields", [])
         initial_status = parser_dict.get("case_status", CaseStatus.COLLECTING)
 
-        # 防呆：LLM 对购物输入可能误判为“不支持/拒绝”。只要不是高风险主题，
-        # 就不应直接把正常决策设为 rejected（reject 只应由高风险触发）。
-        # 因此这里把“非高风险却 rejected”的异常状态降级为 collecting，转成继续收集信息。
+        # 获取 C 模块新字段
+        is_complete = parser_dict.get("is_complete", False)
+        conflicts = parser_dict.get("conflicts", [])
+        next_question_key = parser_dict.get("next_question_key")
+        termination_reason = parser_dict.get("termination_reason", "")
+        parser_used = parser_dict.get("parser_used", "")
+
+        # 防呆：非高风险被误判为 rejected 时降级
         if not is_high_risk and initial_status == CaseStatus.REJECTED:
             initial_status = CaseStatus.COLLECTING
-            if not initial_missing:
-                initial_missing = [
-                    "product_name", "price", "purpose", "monthly_budget_left",
-                    "owned_alternatives", "expected_usage_frequency", "trigger_reason",
-                ]
+            # 保留已提取的字段，只补充真正缺失的字段
+            required_fields = SHOPPING_REQUIRED_FIELDS.copy()
+            collected_keys = set(initial_collected.keys())
+            initial_missing = [f for f in required_fields if f not in collected_keys]
             initial_collected.pop("is_high_risk", None)
             initial_collected.pop("reject_reason", None)
             reject_reason = ""
 
+        # ===== 高风险 / 完整判断 =====
         if is_high_risk:
             initial_status = CaseStatus.REJECTED
             initial_missing = []
-            # 保存拒绝原因到 collected_fields
             initial_collected["is_high_risk"] = True
             initial_collected["reject_reason"] = reject_reason
+        elif is_complete:
+            initial_status = CaseStatus.READY_FOR_DEBATE
+
+        # ===== 接入新字段到 collected_fields =====
+        if conflicts:
+            initial_collected["_conflicts"] = conflicts
+        if next_question_key:
+            initial_collected["_current_question_key"] = next_question_key
+        if termination_reason:
+            initial_collected["_termination_reason"] = termination_reason
+        if parser_used:
+            initial_collected["_parser_used"] = parser_used
+
     except Exception as e:
         print(f"[WARN] create_case parse_input 调用失败: {e}")
         initial_collected = {}
@@ -94,7 +122,6 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_status = CaseStatus.COLLECTING
         is_high_risk = False
         reject_reason = ""
-        # 解析失败时兜底：不产生追问，交由后续对话收集（避免 parser_dict 未定义导致 UnboundLocalError）
         parser_dict = {}
 
     # 确保 description 保留
@@ -104,7 +131,7 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
     # 创建案件
     case = Case(
         id=case_id,
-        user_id=req.user_id,
+        user_id=effective_user_id,  # <-- 改用 effective_user_id
         case_type=req.case_type,
         title=req.title,
         description=req.description,
@@ -116,7 +143,7 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(case)
 
-# 生成追问
+    # 生成追问
     next_question = None
     if not is_high_risk and initial_missing:
         # 直接使用 C 模块返回的 next_question
@@ -138,10 +165,22 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
 
 # ========== 查询案件详情 ==========
 @router.get("/cases/{case_id}", response_model=ApiResponse)
-def get_case(case_id: str, db: Session = Depends(get_db)):
+def get_case(
+    case_id: str,
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
+
+    if case.user_id != effective_user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
 
     return ApiResponse(
         success=True,
@@ -165,16 +204,21 @@ def get_case(case_id: str, db: Session = Depends(get_db)):
 # ========== 案件列表 ==========
 @router.get("/cases", response_model=ApiResponse)
 def list_cases(
-    user_id: str = Query(..., description="用户 ID"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(10, ge=1, le=100, description="每页条数"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     获取用户的所有案件，按更新时间倒序排列，支持分页。
     """
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 构建基础查询
-    query = db.query(Case).filter(Case.user_id == user_id)
+    query = db.query(Case).filter(Case.user_id == effective_user_id)
 
     # 获取总数
     total = query.count()
@@ -217,23 +261,48 @@ def list_cases(
 
 # ========== 查询判决书 ==========
 @router.get("/cases/{case_id}/report", response_model=ApiResponse)
-def get_report(case_id: str, db: Session = Depends(get_db)):
+def get_report(
+    case_id: str,
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     """
     获取案件的判决书。
     从 debate_result 中读取 C 模块生成的真实报告。
     """
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
+    if case.user_id != effective_user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
+
     # 2. 检查是否有辩论结果
     if not case.debate_result:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
+    # 类型安全：确保 debate_result 是 dict
+    if not isinstance(case.debate_result, dict):
+        print(f"[WARN] debate_result 格式异常: {type(case.debate_result)}")
+        return ApiResponse(success=False, data=None, message="REPORT_DATA_CORRUPTED")
+    
     # 3. 从 debate_result 中提取 report 和 debate_events
-    report_data = case.debate_result.get("report", {})
-    debate_events = case.debate_result.get("debate_events", [])
+    # 安全提取 report，确保是 dict
+    report_data = case.debate_result.get("report")
+    if not isinstance(report_data, dict):
+        report_data = {}
+
+    # 安全提取 debate_events，确保是 list
+    debate_events = case.debate_result.get("debate_events")
+    if not isinstance(debate_events, list):
+        debate_events = []
+
     if not report_data:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
@@ -246,18 +315,22 @@ def get_report(case_id: str, db: Session = Depends(get_db)):
         message=""
     )
 
-# ... 其他路由 ...
-
+# ========== 更新案件 ==========
 @router.patch("/cases/{case_id}", response_model=ApiResponse)
 def update_case(
     case_id: str,
     req: UpdateCaseRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     部分更新案件信息。
     只有传入的字段才会更新，未传入的字段保持不变。
     """
+    effective_user_id = current_user.id if current_user else req.user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
@@ -265,6 +338,13 @@ def update_case(
             success=False,
             data=None,
             message="CASE_NOT_FOUND"
+        )
+
+    if case.user_id != effective_user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="FORBIDDEN"
         )
 
     # 2. 更新基础字段
@@ -275,7 +355,7 @@ def update_case(
         case.description = req.description
 
     if req.user_id is not None:
-        case.user_id = req.user_id
+        case.user_id = effective_user_id  # 强制使用有效用户 ID
 
     # 3. 更新 collected_fields（合并更新，不覆盖）
     if req.collected_fields is not None:
@@ -340,20 +420,29 @@ def update_case(
         message="case updated"
     )
 
+# ========== 决策复盘 ==========
 @router.post("/cases/{case_id}/feedback", response_model=ApiResponse)
 def create_feedback(
     case_id: str,
     req: CreateFeedbackRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     决策复盘接口
     用户对已完成决策进行复盘，反馈实际行为和满意度
     """
+    effective_user_id = current_user.id if current_user else req.user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
+
+    if case.user_id != effective_user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
 
     # 2. 检查案件是否已完成
     if case.status != CaseStatus.COMPLETED:
@@ -373,7 +462,6 @@ def create_feedback(
         result = "neutral"
 
     # 4. 创建/更新历史记录（同一案件只保留一条复盘记录，重复提交则更新）
-    # 保证幂等：避免用户反复点击"提交决策复盘"时反复插入相同案件的历史记录。
     history = db.query(History).filter(
         History.case_id == case.id,
         History.is_deleted == 0,
@@ -381,7 +469,7 @@ def create_feedback(
 
     if history:
         # 已存在复盘记录 → 更新内容
-        history.user_id = req.user_id
+        history.user_id = effective_user_id
         history.case_type = case.case_type
         history.summary = f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★"
         history.result = result
@@ -393,7 +481,7 @@ def create_feedback(
         # 尚无复盘记录 → 新建
         history = History(
             id=f"history_{uuid.uuid4().hex[:8]}",
-            user_id=req.user_id,
+            user_id=effective_user_id,
             case_type=case.case_type,
             summary=f"用户复盘：{case.title}，实际行为：{req.actual_action}，满意度：{req.satisfaction}★",
             result=result,
@@ -429,7 +517,8 @@ def create_feedback(
 @router.delete("/cases/{case_id}", response_model=ApiResponse)
 def delete_case(
     case_id: str,
-    user_id: str = Query(..., description="用户 ID"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
@@ -437,6 +526,14 @@ def delete_case(
     - messages/traces/reminders 因外键 CASCADE 自动级联删除
     - histories 记录软删除（is_deleted=1，RAG 仍可检索，case_id/report_id 保留）
     """
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="MISSING_USER_ID"
+        )
+
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
@@ -447,7 +544,7 @@ def delete_case(
         )
 
     # 2. 权限校验
-    if case.user_id != user_id:
+    if case.user_id != effective_user_id:
         return ApiResponse(
             success=False,
             data=None,

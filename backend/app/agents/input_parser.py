@@ -449,7 +449,11 @@ def _parse_amount(value: str) -> float:
 def _is_budget_context(text: str, span: tuple[int, int]) -> bool:
     context_start = max(0, span[0] - 8)
     context_end = min(len(text), span[1] + 8)
-    context = text[context_start:context_end]
+    # Limit each side to the amount's clause so nearby budget statements stay separate.
+    clause_boundary = r"[，,。.;；!?！？]"
+    before = re.split(clause_boundary, text[context_start:span[0]])[-1]
+    after = re.split(clause_boundary, text[span[1]:context_end])[0]
+    context = before + text[span[0]:span[1]] + after
     return any(keyword in context for keyword in BUDGET_CONTEXT_KEYWORDS)
 
 

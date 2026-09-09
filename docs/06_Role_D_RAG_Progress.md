@@ -1,176 +1,130 @@
-# 角色 D（RAG 与数据检索）任务完成度与下一步计划
+# D 模块：RAG 实现、验收与历史记录
 
-> 本文档由角色 D 维护，用于向全员同步 RAG 模块的当前完成度、剩余工作、验收方式与依赖。
+> 当前实现基线：`dev@53d70bc`。本次购物交付；time主流程延期，不再等待C为本轮实现时间编排。以下将静态事实、待验收与历史测量分开，取消无证据的综合完成百分比。
 
-## 1. 角色与范围
+## 1. 职责与实现现状
 
-| 项 | 说明 |
+D负责 `rag/`、历史种子、检索/评测，配合B历史接口、C RAG adapter和A证据展示。
+
+| 内容 | 代码现状 |
 |---|---|
-| 成员 | D |
-| 模块 | RAG 与数据检索 |
-| 主要负责目录 | `rag/`、`data/` |
-| 配合目录 | `backend/`、`tests/` |
+| 种子 | data/history_records.json，共500条，购物250、时间250；本轮按JSON分组核对 |
+| 检索 | FastAPI + jieba搜索分词 + BM25，按类型过滤、按标题去重 |
+| 实时数据 | 尝试拉取当前用户的B历史，按ID合并，实时记录优先 |
+| 契约 | 仅返回RagEvidence字段，失败/无命中不编造 |
+| C接入 | C通过HTTP调用D，不再使用mock_rag主链路 |
+| 工程 | RAG已纳入BAT、screen与Docker Compose配置 |
+| 评测 | 检索指标、关键词接地、规则生成侧指标及测试文件已存在 |
 
-交付清单（来自 `docs/03_Milestones.md` §6.2）：
+“已存在实现”不等于该基线所有评测/部署均已重新通过。时间种子与组件测试保留，不将它们算作已交付的时间产品。
 
-- 历史记录数据结构。
-- 模拟数据。
-- 检索模块。
-- 检索结果格式。
-- RAG 评测样例。
+## 2. 数据流与限制
 
-## 2. 完成度一览
+```text
+用户反馈 → B histories
+                    ↘
+静态JSON（首次缓存） → D按用户拉取实时历史 → 按ID合并
+  → 按case_type过滤 → jieba/BM25 → 标题去重 → RagEvidence
+  → C正反方/法官上下文、report与trace
+```
 
-| # | 任务 | 状态 | 说明 | 完成度 |
+每次检索都会尝试拉取实时历史，当前只请求page=1、page_size=1000，不是无限分页同步；拉取失败时保留静态数据。新反馈只有在保存、读取、过滤成功后才可能成为命中，不保证立即命中。
+
+B当前历史GET过滤is_deleted=0；软删除记录虽然仍在数据库，但不保证经当前HTTP链路继续用于RAG。种子属于演示数据，不可冒充当前用户的真实消费经历。
+
+| 配置 | 默认 | 含义 |
+|---|---|---|
+| RAG_LIVE_RECORDS | 1 | 非1时不拉取实时历史 |
+| BACKEND_HISTORY_URL | http://127.0.0.1:8000/api/history | 后端历史接口 |
+| HISTORY_TIMEOUT | 1.0秒 | 以data_loader.py实际赋值为准 |
+| C的RAG_SEARCH_URL | http://127.0.0.1:8001/api/rag/search | C到D的地址 |
+
+容器中使用服务名backend/rag，不使用指向自身的localhost。当前没有向量或混合检索。
+
+## 3. 返回与失败语义
+
+`POST /api/rag/search` 接受user_id/case_id/case_type/query/top_k，成功data.results为数组，元素包含id/title/content/score/source/case_type/tags/created_at。
+
+- score是BM25排序分数，不是概率。
+- 正常无结果返回[]；C记录rag_search completed。
+- 服务断开或非法响应时C adapter抛给编排层记录failed，再fallback=[]。
+- RAG不负责最终建议。判决规则、LLM说明、前端展示分别属于C/A，不能用检索成功证明这些层都成功。
+
+## 4. 测试与脚本
+
+| 文件 | 用途 |
+|---|---|
+| tests/test_rag.py | 检索、契约、类型/用户过滤、种子和标准查询 |
+| tests/test_rag_data_loader.py | 实时字段映射、合并、失败回退、开关 |
+| tests/test_rag_adapter.py | C-D HTTP/body/返回契约 |
+| tests/test_dialogue_quality_metrics.py | 证据上下文、引用和关键词接地计算 |
+| tests/test_rag_standard_metrics.py | 检索指标与规则生成侧指标 |
+| rag/evaluate_rag.py | 四组历史标准查询与命中 |
+| rag/evaluate_rag_standard.py | 检索侧指标；--live额外调用后端评估购物输出 |
+| rag/evaluate_dialogue_quality.py | 对话/证据代理指标 |
+| rag/e2e_verify.py | 辅助购物HTTP链路；不是完整UI/提醒验收 |
+
+`faithfulness` 实际计算报告词项落在证据中的比例，`answer_relevancy` 是预设要点命中比例；不能宣传为语义正确率或人工评审结果。相关集合依靠标题关键词建立，结果与种子、k值、规则有关。
+
+命令从仓库根目录执行，先按 [测试计划](05_TestPlan.md) 配置隔离环境：
+
+```powershell
+uv run --frozen pytest -p no:cacheprovider tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py tests/test_dialogue_quality_metrics.py tests/test_rag_standard_metrics.py
+uv run --frozen uvicorn retriever:app --app-dir rag --host 127.0.0.1 --port 8001
+```
+
+测试与服务在独立终端运行。离线评测：
+
+```powershell
+$env:RAG_LIVE_RECORDS = "0"
+uv run --frozen python rag/evaluate_rag.py --out "$env:TEMP/decisionjury-rag-eval.json"
+uv run --frozen python rag/evaluate_rag_standard.py --out "$env:TEMP/decisionjury-rag-standard.json"
+```
+
+实时脚本需要后端和RAG，先注册脚本使用的测试user_id。`rag/e2e_verify.py` 支持E2E_USER_ID/BACKEND_URL/RAG_URL；其默认e2e_user不会自动注册。脚本会写演示数据，使用隔离实例。B提醒导入已修复，但本轮没有复跑该实时脚本，不把它列为必然成功的命令。
+
+## 5. 本轮待验收与分工
+
+| 事项 | 配合 | 通过条件 |
+|---|---|---|
+| 购物检索/引用截图 | C/A | 实际命中进入上下文/报告，来源准确 |
+| B实时历史更新 | B | 新复盘候选可加载，过滤/删除行为如实展示 |
+| 提醒分支联调 | B | Reminder导入已修复，继续核验页面与复盘链路 |
+| BM25空/失败 | C | 空为completed，故障为failed，均不伪造证据 |
+| 当前评测复现 | D/测试 | 记录commit、种子、k、模式、实际数值 |
+| 部署互通 | E | 服务名/端口和数据源可达，健康检查之外有业务验收 |
+
+time端到端、向量/混合检索属于后续选题，不是本轮必须等待的依赖。A已有证据/庭审组件，仍需以真实页面确认显示效果。
+
+## 6. 历史测量（非本次复跑）
+
+以下保留原D交付日志，缺少与当前基线一一对应的运行环境和完整原始产物，不可直接作为新答辩的最新性能数据：
+
+- 早期定向测试记录：29 passed。
+- 早期购物联调记录：命中3条，rag_search completed，report.final_decision=delay。
+- 历史查询优化记录：四组标准查询由3组expected_hit变为4组；其中两组time只属组件检索。
+- 对话代理指标记录：retrieval_hits=3、evidence_in_judge_context=true、report_cites_evidence=true、grounded_keyword_hit=true、token_overlap=16。
+
+原top_k=5检索测量：
+
+| 查询 | Precision | Recall | MRR | NDCG |
 |---|---|---|---|---|
-| 1 | 历史记录数据结构 | ✅ 完成 | 500 条记录，字段稳定：`id/title/content/context/pros/cons/tags/...` | 100% |
-| 2 | 模拟数据 | ✅ 完成 | 购物 250 + 时间 250，共 **500 条** | 100% |
-| 3 | 检索模块 | ✅ 完成 | `rag/retriever.py`：FastAPI + jieba + BM25，`POST /api/rag/search`（端口 8001） | 100% |
-| 4 | 检索结果格式 | ✅ 完成 | 返回 `success/data.results/message`，每条结果仅含 `RagEvidence` 字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪内部字段 | 100% |
-| 5 | 前后端数据联动 | ✅ 完成 | `rag/data_loader.py` 合并静态种子 + B `/api/history` 实时历史，新决策复盘自动进入检索 | 100% |
-| 6 | RAG 测试 | ⚠️ 主体完成 | 检索/防幻觉/类型隔离/500 条/时间场景/字段映射/合并/回退/adapter 契约 | 90% |
-| 7 | 与 C 真实联调 | ✅ 完成 | 已端到端联调验证：创建购物案件 → debate → `rag_evidence` 命中 3 条、trace `rag_search completed`、无命中返回空 | 100% |
-| 8 | RAG 评测样例 / 指标 | ✅ 完成 | 新增 `rag/evaluate_rag.py`，输出 top_k/类型/预期命中/分数；4 个标准查询中 3 个 expected_hit，`参加社团活动` 未命中预期关键词 | 80% |
-| 9 | 答辩证据 | ⚠️ 部分 | 已能产出检索结果、评测 JSON、判决书引用证据；待补正式截图 | 50% |
+| 降噪耳机 | 0.4 | 0.33 | 1.0 | 0.55 |
+| 学习用品 | 0.8 | 0.14 | 1.0 | 0.85 |
+| 社团活动（历史组件） | 0.6 | 0.25 | 0.5 | 0.53 |
+| 技术分享（历史组件） | 0.4 | 0.25 | 1.0 | 0.55 |
 
-**综合完成度估算：约 92%。**
+原生成侧记录：耳机faithfulness=0.18、answer_relevancy=1.0、延迟约1.06秒；学习用品为0.11/0.5/约0.13秒。真实模型/fallback状态未在这些记录中充分证明，不能称为DeepSeek真实端到端性能。词项重合低也不直接证明判决错误。
 
-## 3. 已完成内容（实现现状）
+## 7. 历史提交与材料
 
-### 3.1 数据集：500 条
-- `data/history_records.json`：**500 条**（购物 250 + 时间 250），与原有结构一致。
-- 新增 `rag/build_history_data.py`：确定性生成脚本（固定随机种子、幂等），可复现数据集。
+原开发分支为 `feature/rag-500-linkage`，相关能力已存在于本次dev基线；不再写“等待合入”作为当前状态。原记录保留以下提交标识，具体归属和合并历史以Git为准：
 
-### 3.2 检索模块
-- `rag/retriever.py` 使用 `jieba` 分词 + `rank_bm25.BM25Okapi` 实现 BM25 检索。
-- 按 `case_type` 做购物/时间类型隔离。
-- 返回结构：`{ "success": true, "data": { "results": [RagEvidence...] }, "message": "" }`。
-- 每条结果仅返回 `RagEvidence` 契约字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，`score` 保留 4 位小数。
-- 检索质量优化：query 与语料统一用 `jieba.lcut_for_search`（解决“社团活动/学习用品”被切成整词导致无法命中）；语料加入 `tags`；返回前按 `title` 去重，避免重复记录挤占 top-k。
-- 无命中返回空数组 `[]`，不编造历史。
-
-### 3.3 后端联动（新输入的数据入库）
-- `rag/data_loader.py`：
-  - 读取静态 JSON（500 条）。
-  - 拉取 B 后端 `GET /api/history?user_id=...&page=1&page_size=1000` 的实时历史。
-  - 字段映射：`history_id → id`、`summary → content`、`source → decision_history`。
-  - 按 `id` 合并去重，实时记录优先。
-  - 后端不可用时**自动回退到静态数据**，不中断 RAG 服务。
-- `rag/retriever.py` 每次检索按请求里的 `user_id` 实时取数，保证前端新数据**立即可检索**。
-- 使用 Python 标准库 `urllib`，**未新增第三方依赖**。
-
-### 3.4 环境变量（可选）
-| 变量 | 默认值 | 说明 |
-|---|---|---|
-| `RAG_LIVE_RECORDS` | `1` | 设为 `0` 关闭后端联动（离线/单测） |
-| `BACKEND_HISTORY_URL` | `http://127.0.0.1:8000/api/history` | 后端历史接口地址 |
-| `HISTORY_TIMEOUT` | `1.0` | 请求后端历史接口超时（秒） |
-
-### 3.5 测试覆盖
 ```text
-tests/test_rag.py                 检索命中/防幻觉/类型隔离/500 条数据/时间场景/RagEvidence 字段/仅契约字段/4 组标准查询命中
-tests/test_rag_data_loader.py     字段映射/静态+实时合并/回退/联动开关/响应解包
-tests/test_rag_adapter.py         C-D adapter 契约（成功/空结果/失败/缺字段/URL/body）
-tests/test_dialogue_quality_metrics.py  对话质量指标计算（检索命中/进上下文/判决书引用/关键词接地）
-tests/test_rag_standard_metrics.py      标准版指标纯函数（Precision/Recall/MRR/NDCG/忠实度/答案相关性）
+6b95b43  8ab0b21  344a29a  3277999  4c35073
+1c9b032  beb33cc  157f199  cbde8e8
 ```
 
-验证命令：
-```bash
-uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py tests/test_dialogue_quality_metrics.py tests/test_rag_standard_metrics.py
-uv run python -m compileall -q rag tests
-```
+旧文档日期“2020-07”不可靠，本次不替它推定真实验收日期。旧本地产物名为rag_eval_result.json、rag_dialogue_quality_result.json、rag_std_retrieval.json、rag_std_full.json；文件名不证明产物当前存在或结果有效。
 
-当前结果：`29 passed`。
-
-### 3.6 联调与评测脚本
-```text
-rag/evaluate_rag.py                RAG 检索评测：跑 docs/05_TestPlan.md §5.1 标准查询，输出 top_k/类型/预期命中/分数
-rag/e2e_verify.py                  端到端联调验证：创建购物案件 → debate → rag_evidence/trace/report/无命中检查
-rag/evaluate_dialogue_quality.py   对话质量量化：检索命中数/进入法官上下文/判决书引用证据/关键词接地(token_overlap)
-rag/evaluate_rag_standard.py       标准版 RAG 评估：检索侧 Precision/Recall/MRR/NDCG + 生成侧忠实度/答案相关性/延迟
-```
-
-## 4. 下一步该做什么（按优先级）
-
-### P0（已完成）
-- ✅ **端到端联调**：`uv run python rag/e2e_verify.py`（需 8000/8001）。结果：购物案件 `rag_evidence` 命中 3 条、trace `rag_search completed`、无命中返回空、report.final_decision=delay。
-- ✅ **RAG 评测脚本/指标**：`uv run python rag/evaluate_rag.py --out data/rag_eval_result.json`。优化前 `参加社团活动` 为 False；优化后 4 个标准查询 **全部 expected_hit=True**。
-- ✅ **对话质量量化指标**：`uv run python rag/evaluate_dialogue_quality.py --out data/rag_dialogue_quality_result.json`（需 8000/8001）。实测：`retrieval_hits=3`、`evidence_in_judge_context=True`、`report_cites_evidence=True`、`grounded_keyword_hit=True`、`token_overlap=16`。`tests/test_dialogue_quality_metrics.py` 覆盖该指标计算。
-- ✅ **标准版 RAG 评估指标**：`uv run python rag/evaluate_rag_standard.py --out data/rag_std_full.json`（离线算检索侧；`--live` 追加生成侧）。
-  - 检索侧（top_k=5）：降噪耳机 P=0.4/R=0.33/MRR=1.0/NDCG=0.55；学习用品 P=0.8/R=0.14/MRR=1.0/NDCG=0.85；社团活动 P=0.6/R=0.25/MRR=0.5/NDCG=0.53；技术分享 P=0.4/R=0.25/MRR=1.0/NDCG=0.55。
-  - 生成侧（购物）：降噪耳机 faithfulness=0.18/answer_relevancy=1.0/延迟≈1.06s；学习用品 faithfulness=0.11/answer_relevancy=0.5/延迟≈0.13s；time 场景生成侧暂不可算（C 未实现 time 流程）。
-  - 结论：检索 recall 偏低（top_k=5 相对相关池偏小，可调 top_k/混合检索）；生成 faithfulness 偏低（判决书措辞对证据接地不足，需优化 Prompt）。
-
-### P1（建议完成）
-- ✅ 已完成：契约裁剪。`rag/retriever.py` 返回结果只保留 `RagEvidence` 所需字段（`id/title/content/score/source/case_type/tags/created_at`），已裁剪 `case_id/price/pros/cons` 等内部字段，并补充“仅契约字段”单测。
-- ✅ **已完成：检索质量优化 + 4 组标准查询命中**。`rag/retriever.py` 统一 query/语料分词、语料加入 tags、按 title 去重；`tests/test_rag.py` 新增 `test_rag_standard_query_expected_hits`，4 组查询（降噪耳机/学习用品/社团活动/技术分享）在 top_k=5 内均命中预期关键词。
-- 剩余：**time 场景检索验证**：C 完成 time 流程后会以 `case_type=time` 调用，D 先确认时间记录检索正常；补答辩检索/引用截图。
-
-### P2（可选 / 依赖其他角色）
-6. **BM25 → 混合检索**（BM25 + 向量，可选加分）。
-7. **RAG 纳入一键启动/Docker**（依赖 E/部署）。
-8. **前端证据展示**（依赖 A/B 前端联调后，确认后端能返回 `rag_evidence`）。
-
-## 5. 依赖与阻塞
-
-| 依赖 | 状态 | 影响 |
-|---|---|---|
-| C 模块 time 决策流程 | ❌ 尚未实现 | time 端到端联调需等 C |
-| B 前后端真实接口链路 | 🔶 联调中 | 判决书/前端证据展示需等 A/B |
-| B 历史接口 `/api/history` | ✅ 已提供 | RAG 实时联动依赖它，后端关闭时回退静态数据 |
-
-## 6. RAG 完成定义（验收标准）
-
-- 购物 / 时间两条链路都能引用至少 1 条 RAG 历史证据。
-- 无相关历史时返回空数组，不编造。
-- RAG 失败不中断 Agent 主流程（trace 记录 `rag_search failed`）。
-- 评测指标可复现，能在答辩中展示检索结果截图与判决书引用证据。
-
-## 7. 运行与测试命令
-
-```bash
-# 一键启动前后端 + RAG（推荐）
-start_all.bat
-
-# 单独启动 RAG
-cd rag && venv\Scripts\activate && uvicorn retriever:app --host 127.0.0.1 --port 8001
-
-# 运行 RAG 相关测试
-uv run pytest tests/test_rag.py tests/test_rag_data_loader.py tests/test_rag_adapter.py
-
-# RAG 评测（离线，可复现）
-uv run python rag/evaluate_rag.py --out data/rag_eval_result.json
-
-# 端到端联调（需先启动 8000/8001）
-uv run python rag/e2e_verify.py
-
-# 重新生成 500 条数据集（幂等）
-python rag/build_history_data.py
-```
-
-## 8. 当前提交分支
-
-- 分支：`feature/rag-500-linkage`
-- 提交记录（append 到 origin/dev 之上）：
-  - `6b95b43 feat: 扩充 RAG 历史数据至 500 条并联动后端历史入库`
-  - `8ab0b21 refactor: RAG 检索结果裁剪为 RagEvidence 契约字段并补充测试`
-  - `344a29a test: 补充 RAG 评测脚本与端到端联调验证脚本，更新 D 进度文档`
-  - `3277999 docs: 更新 D RAG 进度小结与提交记录`
-  - `4c35073 feat: 优化 RAG 检索质量（查询分词/标签索引/标题去重）并补标准查询断言`
-  - `1c9b032 docs: 更新 RAG 检索质量优化与完成度`
-  - `beb33cc feat: 新增对话质量量化评估指标（检索命中/进上下文/判决书引用/关键词接地）`
-  - `157f199 docs: 补充对话质量量化指标与提交记录`
-  - `cbde8e8 feat: 新增标准版 RAG 评估指标（Precision/Recall/MRR/NDCG + 忠实度/答案相关性）`
-- 状态：**已推送远程**，待通过 PR 合并到 `dev`。
-
-## 9. 一次性进度小结（2020-07 更新）
-
-- RAG 主链路（500 条数据、BM25 检索、契约字段、后端历史联动）已完成。
-- P0 已完成：端到端联调验证通过（购物案例命中 3 条证据、trace completed、无命中返回空）；RAG 评测脚本产出 `data/rag_eval_result.json`。
-- P1 检索质量优化已完成：query/语料统一用 `lcut_for_search`、语料加 tags、按 title 去重；4 组标准查询在 top_k=5 内均命中预期关键词。
-- 对话质量量化指标已完成：`rag/evaluate_dialogue_quality.py` 输出检索命中/进上下文/判决书引用/关键词接地（token_overlap），实测 `grounded_keyword_hit=True`。
-- 标准版 RAG 评估指标已完成：`rag/evaluate_rag_standard.py`（检索侧 Precision/Recall/MRR/NDCG + 生成侧忠实度/答案相关性/延迟）。真实发现：检索 recall 偏低（top_k=5 相对相关池偏小）、生成 faithfulness 偏低（判决书对证据接地不足）、time 生成侧暂不可算。
-- 当前估算完成度 **约 95%**。
-- 剩余重点：调优 top_k/混合检索以提升 recall；优化法官 Prompt 提升 faithfulness；等 C 完成 time 流程后补 time 生成侧；补答辩检索/判决书引用截图；可选接 LLM 做更细的“回答相关性/一致性”打分。
-- 未提交：`data/rag_eval_result.json`、`data/rag_dialogue_quality_result.json`、`data/rag_std_retrieval.json`、`data/rag_std_full.json`（评测结果，本地留作答辩证据）。
+新的截图和指标必须注明版本/模式，避免提交数据库、密钥和本地评测输出。正式交付范围以 [MVP](01_MVP.md) 为准。

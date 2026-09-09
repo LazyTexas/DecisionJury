@@ -1,6 +1,6 @@
 # backend/schemas.py
 from pydantic import BaseModel
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, Literal
 from datetime import datetime
 
 
@@ -49,10 +49,8 @@ class CreateHistoryRequest(BaseModel):
     user_id: str
     case_type: str  # shopping / time
     summary: str
-    result: str  # worth / regret / neutral
+    # result: str  # worth / regret / neutral
     tags: Optional[List[str]] = []
-
-    # ===== 新增字段 =====
     title: Optional[str] = None  # 商品/活动名称
     price: Optional[float] = None  # 商品价格
     usage_frequency: Optional[str] = None  # daily / weekly / monthly / once
@@ -62,6 +60,7 @@ class CreateHistoryRequest(BaseModel):
     final_decision: Optional[str] = None  # buy / delay / reject / alternative
     case_id: Optional[str] = None  # 关联原案件 ID
     report_id: Optional[str] = None  # 关联报告 ID
+    result: Literal["worth", "regret", "neutral"] # 限制枚举值
     
 class CreateFeedbackRequest(BaseModel):
     """决策复盘请求"""
@@ -177,3 +176,6 @@ class ErrorResponse(BaseModel):
             }
         }
 
+
+class DebateRequest(BaseModel):
+    user_id: str

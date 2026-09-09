@@ -40,7 +40,7 @@ if not exist "%PYTHON_EXE%" (
 rem ========== 1. Start Backend (B + C modules) ==========
 rem Use cmd /c (not /k) so the window closes automatically once the process is stopped.
 echo [1/3] Starting backend...
-start "DecisionJury Backend" cmd /c "cd /d %~dp0 && .venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
+start "DecisionJury Backend" cmd /c "cd /d %~dp0 && set ENFORCE_JWT=true && .venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
 
 timeout /t 3 /nobreak >nul
 
