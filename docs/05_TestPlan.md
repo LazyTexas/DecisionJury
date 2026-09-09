@@ -1,473 +1,199 @@
-# DecisionJury 测试验收文档
+# DecisionJury 测试计划与验收记录
 
-## 1. 测试目标
+> 适用代码基线：`dev@53d70bc`，本轮范围为购物决策。`time` 主流程延期，不作为验收缺陷；已有时间工具/检索单测可作为组件兼容测试保留。本文中的“预期”不是已通过结果。
 
-验证 DecisionJury 是否满足 MVP 要求和课程最低技术要求。
+## 1. 验收分层
 
-测试重点不是追求大规模自动化测试，而是保证答辩演示链路稳定、技术要求能被清楚证明。
+| 层次 | 要证明什么 | 不能替代什么 |
+|---|---|---|
+| 静态核对 | 字段、路由、规则、文档与代码相符 | 真实运行和部署 |
+| 单元/契约测试 | 规则、schema、mock响应、adapter和隔离路由行为 | 真实DeepSeek质量、浏览器体验 |
+| 真实API验收 | parser、正反方、法官说明实际调用模型且无静默降级 | 整个Web持久化闭环 |
+| 端到端/页面 | 注册 → 创建 → 补充 → 庭审/报告 → 提醒 → 复盘 | 生产安全和可靠性 |
+| 部署演练 | 当前构建、数据保留、服务互通和演示复现 | 长期可用性或未测的公网性能 |
 
-## 2. 测试范围
+## 2. 安全测试环境
 
-- 购物决策流程。
-- 时间决策流程。
-- 多 Agent 编排。
-- RAG 检索。
-- MCP 工具调用。
-- 多轮状态管理。
-- 最终判决书生成。
-- 前端完整演示。
-- 高风险输入拒绝。
+使用专门终端，不读取/打印 Key 文件内容，不对日常数据库做测试。TestClient 生命周期会执行数据库检查，仅替换请求依赖不足以保护真实数据库，因此测试前同时设置 `DATABASE_URL`。
 
-## 3. 测试数据集
+Windows PowerShell，仓库根目录：
 
-### 3.1 用户偏好
-
-```json
-{
-  "user_id": "u001",
-  "monthly_budget": 2500,
-  "monthly_budget_left": 2000,
-  "shopping_preferences": ["数码产品", "学习用品"],
-  "time_preferences": ["优先课程作业", "避免周末全天占用"]
-}
+```powershell
+$env:DATABASE_URL = "sqlite:///:memory:"
+$env:ENV = "development"
+$env:DEEPSEEK_API_KEY = ""
+$env:PYTHON_DOTENV_DISABLED = "1"
+$env:RAG_LIVE_RECORDS = "0"
+$env:PYTHONIOENCODING = "utf-8"
+uv run --frozen pytest -p no:cacheprovider tests
 ```
 
-### 3.2 历史记录样例
+这些变量只用于该测试终端；不要随后在同一终端启动日常服务。`PYTHON_DOTENV_DISABLED=1` 禁用已锁定版本 python-dotenv 的文件加载，避免清空环境变量后又从本机 `.env` 读入 Key。测试库 fixture 使用外键和占位用户/案件；新用例应使用独立 ID，不将固定占位 ID 当作空数据。
 
-```json
-[
-  {
-    "case_type": "shopping",
-    "summary": "购买机械键盘 399 元后使用频率较低。",
-    "result": "regret",
-    "tags": ["electronics", "idle"]
-  },
-  {
-    "case_type": "shopping",
-    "summary": "购买学习台灯 129 元后每天使用，评价为值得。",
-    "result": "worth",
-    "tags": ["study", "useful"]
-  },
-  {
-    "case_type": "time",
-    "summary": "参加社团活动占用 8 小时，导致课程作业延期。",
-    "result": "regret",
-    "tags": ["club", "delay"]
-  },
-  {
-    "case_type": "time",
-    "summary": "参加 2 小时技术分享，收获较高，没有影响任务。",
-    "result": "worth",
-    "tags": ["tech", "low_cost"]
-  }
-]
-```
-
-## 4. 功能测试用例
-
-### 4.1 测试文件清单
-
-| 测试文件 | 测试数量 | 覆盖功能 |
-| --- | --- | --- |
-| `test_cases_router.py` | 12 | 案件创建、查询、列表、报告 |
-| `test_chat_router.py` | 10 | 多轮对话、字段提取、状态流转 |
-| `test_debate_router.py` | 6 | 辩论启动、错误处理、trace |
-| `test_history_router.py` | 10 | 历史记录 CRUD、分页、筛选 |
-| `test_watchlist_router.py` | 5 | 观察清单查询、排序 |
-| `test_feedback_router.py` | 9 | 反馈提交、满意度映射、联动 |
-| `test_trace_router.py` | 5 | 执行轨迹查询、排序、字段完整性 |
-| `test_health_router.py` | 2 | 健康检查 |
-| `test_migrate.py` | 6 | 数据库迁移函数 |
-| 合计 | 65 |  |
-
-### 4.2 运行测试
+Linux/macOS 可在单条命令范围设置同样的变量：
 
 ```bash
-# 运行所有测试
-pytest
-
-# 运行指定测试文件
-pytest tests/test_debate_router.py -v
-
-# 运行特定测试
-pytest tests/test_debate_router.py::test_debate_success -v
+DATABASE_URL=sqlite:///:memory: ENV=development DEEPSEEK_API_KEY= PYTHON_DOTENV_DISABLED=1 RAG_LIVE_RECORDS=0 PYTHONIOENCODING=utf-8 uv run --frozen pytest -p no:cacheprovider tests
 ```
 
-### 4.3 测试通过标准
+首次安装依赖见 [README](../README.md)。`httpx2` 已列在开发依赖中，不再以手动安装未记录包的方式维持测试环境。
 
-- 所有测试用例通过率 100%
-- 无跳过的测试（`@pytest.mark.skip` 除外）
-- 测试执行时间 < 30 秒
+当前先显式指定 `tests/`：根目录自动收集会导入 `backend/test/test_feedback_quick.py`，该辅助脚本在导入时直接查询/写入默认数据库，并非隔离 fixture 用例。在内存空库会报错，在日常数据库上则可能写入测试案件；不要通过切回真实数据库规避此问题。迁移测试另有引擎隔离缺陷，见§9，指定目录并不代表全部通过。
 
-### TC-001 创建购物决策案件
+### 2.1 定向命令
 
-输入：
+以下命令沿用上面的隔离环境：
 
-```text
-我想买一副 1299 元的降噪耳机，最近学习需要安静。
+```powershell
+uv run --frozen pytest -p no:cacheprovider tests/test_input_parser.py tests/test_llm_client.py tests/test_judge_agent.py tests/test_agent_flow.py tests/test_mcp_adapter.py tests/test_rag_adapter.py
+uv run --frozen pytest -p no:cacheprovider tests/test_rag.py tests/test_rag_data_loader.py tests/test_dialogue_quality_metrics.py tests/test_rag_standard_metrics.py
+uv run --frozen pytest -p no:cacheprovider tests/test_cost_analyzer.py tests/test_cooling_reminder.py tests/test_decision_score.py tests/test_mcp_tools.py tests/test_tools_router.py
+uv run --frozen pytest -p no:cacheprovider tests/test_cases_router.py tests/test_chat_router.py tests/test_debate_router.py tests/test_history_router.py tests/test_watchlist_router.py tests/test_feedback_router.py tests/test_trace_route.py tests/test_health_route.py tests/test_migrate.py
+uv run --frozen python -m compileall -q backend tests rag mcp_tools
+git diff --check
 ```
 
-预期：
+`test_chat_router.py` 文件名保留，但新契约是 `/api/cases/{case_id}/messages`，不要求恢复旧 `/api/chat`。
 
-- 系统识别为 `shopping`。
-- 系统追问预算和已有替代品。
-- 成功创建 `case_id`。
-- 案件状态为 `collecting`。
+## 3. 信息收集回归
 
-自动化测试：`test_cases_router.py::test_create_case_success`
-
-### TC-002 创建时间决策案件
-
-输入：
-
-```text
-我要不要参加这个社团活动？会占用周末两天。
-```
-
-预期：
-
-- 系统识别为 time。
-- 系统追问当前任务、活动收益和占用时间。
-- 成功创建 case_id。
-- 案件状态为 collecting。
-
-### TC-003 多轮补全购物信息
-
-步骤：
-
-1. 用户只输入商品和动机。
-2. 系统追问预算。
-3. 用户补充预算。
-4. 系统追问已有替代品。
-5. 用户补充替代品。
-
-预期：
-
-- 系统逐步更新案件字段。
-- 不重复追问已经回答的问题。
-- 最终状态变为 `ready_for_debate`。
-
-自动化测试：`test_chat_router.py::test_messages_transitions_to_ready`
-
-### TC-004 多轮补全时间信息
-
-步骤：
-
-1. 用户只输入活动。
-2. 系统追问占用时间。
-3. 用户补充占用时间。
-4. 系统追问当前任务。
-5. 用户补充任务。
-
-预期：
-
-- 系统能判断时间压力。
-- 系统能进入辩论流程。
-
-### TC-005 多 Agent 辩论流程
-
-步骤：
-
-1. 创建一个完整案件。
-2. 补全必要信息。
-3. 启动分析流程。
-
-预期：
-
-- 正方 Agent 输出支持理由。
-- 反方 Agent 输出风险和替代方案。
-- 法官 Agent 输出最终裁决。
-- 输出内容结构清晰。
-
-自动化测试：`test_debate_router.py::test_debate_success`
-
-### TC-006 判决书生成
-
-预期判决书包含：
-
-- 案件摘要。
-- 正方观点。
-- 反方观点。
-- 历史证据。
-- 成本分析。
-- 最终裁决。
-- 后续动作。
-
-自动化测试：`test_cases_router.py::test_get_report_success`
-
-### TC-007 决策复盘
-
-步骤：
-
-1. 完成辩论的案件。
-2. 用户提交反馈（`actual_action`、`satisfaction`、`review`）。
-
-预期：
-
-- 创建历史记录。
-- `satisfaction` 自动映射 `result`（5/4 → `worth`，3 → `neutral`，2/1 → `regret`）。
-- 观察清单状态更新为 `reviewed`。
-
-自动化测试：`test_feedback_router.py`
-
-## 5. RAG 测试
-
-### 5.1 检索命中测试
-
-| 查询 | 预期命中 |
-|---|---|
-| 想买降噪耳机 | 电子产品、预算、闲置记录 |
-| 想买学习用品 | 学习台灯、值得购买记录 |
-| 参加社团活动 | 社团活动、作业延期记录 |
-| 参加技术分享 | 技术分享、低时间成本记录 |
-
-### 5.2 RAG 验收指标
-
-MVP 至少记录：
-
-- top_k 命中数量。
-- 是否命中预期类型。
-- 检索结果是否进入法官 Agent 上下文。
-- 最终判决书是否引用历史证据。
-
-### 5.3 RAG 失败场景
-
-输入：
-
-```text
-我要不要买一个完全没有历史记录相关的物品？
-```
-
-预期：
-
-- 系统说明未找到相关历史记录。
-- 系统不能编造历史记录。
-- 系统仍可基于正反方分析和工具结果给出低置信度建议。
-
-自动化测试：`test_debate_router.py::test_debate_success`（验证 RAG fallback 场景）
-
-## 6. MCP 工具测试
-
-### 6.1 cost_analyzer 边界测试
-
-| 场景 | 输入 | 预期 |
+| 场景 | 输入/操作 | 核心预期 |
 |---|---|---|
-| 商品价格低于预算 20% | price=300, budget=2000 | low |
-| 商品价格约占预算 60% | price=1200, budget=2000 | medium |
-| 商品价格超过预算 | price=2600, budget=2000 | high |
-| 活动占空闲时间 20% | hours=4, free=20 | low |
-| 活动占空闲时间 80% | hours=16, free=20 | high |
+| 最低字段 | 商品名、价格、剩余预算齐全 | 无冲突时 ready_for_debate；增强字段可仍缺失 |
+| 邻接预算 | 想买降噪耳机，价格 1299 元，本月预算还剩 2000 元 | price=1299，budget=2000 |
+| 语序/标点 | 预算在前、价格在后；不同分句标点 | 同一语义不互相覆盖 |
+| 中文金额 | 预算大概还有三千左右；预算还剩两千五 | 预算3000/2500，不误识别为商品价格 |
+| 价格补充 | 价格大概是2500元。 | price=2500 |
+| 明确纠正 | 刚才价格说错了，不是2500，是2200。 | price=2200，既有预算不受影响 |
+| 预算纠正 | 预算不是3000，是2500 | 更新预算，不生成错误price |
+| 频率否定 | 我不是每天用，大概一周两次 | 不提取被否定的“每天” |
+| 金额歧义 | 无上下文的多个金额 | 记录歧义/针对性追问，不强行当作确定价格和预算 |
+| 模型非法数据 | 非对象/非法金额/不支持字段等 | 按当前校验契约拒绝并fallback |
+| 累计状态 | 多轮分别给商品、价格、预算 | 检查 merged_fields，不只检查本轮 extracted_fields |
+| 最低完成但有选填缺失 | 未填写用途/频率 | 不以 missing_fields 非空强行重开收集 |
 
-### 6.2 cooling_reminder 测试
+parser 的元数据与用户对话上下文不等同于完整的跨轮记忆；本轮不验收“最多三轮保证退出”这一尚未实现的功能。
 
-| 场景 | 输入 | 预期 |
-|---|---|---|
-| 购物暂缓 3 天 | item=耳机, days=3 | 生成观察清单 |
-| 时间决策次日复盘 | title=社团活动, days=1 | 生成提醒 |
-| days 为空 | days=null | 返回参数错误或使用默认值 |
+## 4. Agent、庭审与工具
 
-## 7. 高风险输入测试
+- 完整 C 结果有4个 Agent steps 和4条庭审事件；speaker/order/phase 固定对应书记员、正方、反方、法官。
+- `result.debate_events` 与 `report.debate_events` 一致；正反方内容包含各自摘要与论点，evidence 与真实上下文相符。
+- 正反方没有交叉反驳/二次回应；模型请求次数和页面逐步播放不能据此误记。
+- 法官规则产生 final_decision/confidence；LLM说明不得覆盖结论；远端失败或非法JSON时保留本地说明。
+- C 不按高风险标记直接中断，但 B 风险拒绝分支不得进入正常庭审；分别验证 C 和 B，避免用旧C断言代替当前契约。
+- 价格1299、预算2000：成本风险high；预算3000：占比约0.43、medium。检查成本结果不是展示文案随意编造。
+- decision_score 输入 high/0.7/0.6/true 时计算为18、high，不是旧示例中的54。
+- 评分工具失败应记录失败，不强制终止流程，也不伪造有效分数；法官不直接以评分替换规则结论。
+- 提醒为条件步骤；trace 含评分后通常为7或8条，不固定七条。
+- 提醒失败应保留“手动设置复盘提醒”等可行动提示；成功 metrics 含title/reason，但不等于数据库已写入。
 
-以下输入必须拒绝裁决：
+## 5. RAG 验收
 
-```text
-我要不要借钱投资？
-我要不要吃这个药？
-我要不要起诉别人？
-我要不要辞职？
-我要不要分手？
+### 5.1 检索查询与指标
+
+购物标准查询：“想买降噪耳机”“想买学习用品”；无命中查询选择种子中无相关内容的词，期望空数组。脚本中保留的“参加社团活动”“参加技术分享”是组件兼容样例，不属于本轮时间主流程验收。
+
+```powershell
+$env:RAG_LIVE_RECORDS = "0"
+uv run --frozen python rag/evaluate_rag.py --out "$env:TEMP/decisionjury-rag-eval.json"
+uv run --frozen python rag/evaluate_rag_standard.py --out "$env:TEMP/decisionjury-rag-standard.json"
 ```
 
-预期：
+记录数据集版本、query、top_k、相关集合定义、命中和分数。规则脚本的 faithfulness 是词项重合比例，answer_relevancy 是预设要点命中比例；不是人工语义忠实度，也不是模型准确率。
 
-- 系统说明当前项目仅支持购物和时间类低风险日常决策。
-- 不进入正反方辩论。
-- 不生成裁决。
-- 不调用冷静期工具。
+### 5.2 服务与数据流
 
-自动化测试：`test_debate_router.py::test_debate_high_risk_returns_rejected`
+1. 检索命中时，RAG证据进入正反方与法官上下文、报告与引用信息。
+2. 正常无命中：空数组，rag_search trace为completed。
+3. RAG断连/非法响应：空数组，trace为failed，后续Agent可继续。
+4. 反馈成功写入历史后，下一次按用户拉取有机会检索到它；不保证每条复盘都命中。
+5. 静态种子不能被表述为当前用户真实经历；实时用户过滤单独验证。
 
-## 8. 前端验收
+## 6. B 与页面验收
 
-前端至少包含：
+测试用户必须先经 `POST /auth/register` 创建，不能随便使用数据库不存在的 `user_id`。统一使用一个独立测试用户及新案件。
 
-- 创建案件页。
-- 多轮对话页。
-- Agent 辩论结果展示区。
-- RAG 证据展示区。
-- 工具调用结果展示区。
-- 判决书展示页。
-- 观察清单页。
-
-验收标准：
-
-- 用户不看控制台也能完成完整流程。
-- 页面能清楚展示正方、反方、法官观点。
-- 页面能展示最终裁决和后续动作。
-- 页面不能出现明显布局错乱。
-
-## 9. API 契约验收
-
-所有模块联调前，必须确认实现符合 `docs/04_API.md` v0.2。
-
-### 9.1 接口路径验收
-
-必须使用以下接口路径：
-
-| 功能 | 接口 |
-| --- | --- |
-| 创建案件 | `POST /api/cases` |
-| 多轮补充信息 | `POST /api/cases/{case_id}/messages` |
-| 启动 Agent 分析 | `POST /api/cases/{case_id}/debate` |
-| 查询判决书 | `GET /api/cases/{case_id}/report` |
-| 查询执行轨迹 | `GET /api/cases/{case_id}/trace` |
-| RAG 检索 | `POST /api/rag/search` |
-| 成本计算工具 | `POST /api/tools/cost-analyzer` |
-| 冷静期提醒工具 | `POST /api/tools/cooling-reminder` |
-| 历史记录 | `GET /api/history`、`POST /api/history` |
-| 观察清单 | `GET /api/watchlist` |
-| 决策复盘 | `POST /api/cases/{case_id}/feedback` |
-
-### 9.2 公共结构验收
-
-联调返回结果必须符合以下公共结构：
-
-- `Case`
-- `AgentStep`
-- `RagEvidence`
-- `ToolResult`
-- `DecisionReport`
-- `TraceItem`
-
-重点检查：
-
-- 字段统一使用 `snake_case`。
-- `RagEvidence` 必须包含 `id`、`title`、`content`、`score`、`source`。
-- `ToolResult` 必须包含 `tool_name`、`status`、`summary`、`risk_level`、`metrics`、`error`。
-- `AgentStep` 必须包含 `agent`、`status`、`summary`、`confidence`、`arguments`、`used_rag_ids`、`used_tool_names`、`error`。
-- `DecisionReport` 必须包含最终裁决、正方观点、反方观点、RAG 证据、工具结果和后续动作。
-- `TraceItem` 必须能展示 Agent、RAG、工具调用的执行顺序。
-- 响应格式统一为 `{success, data, message}`
-- 所有枚举值使用小写 `snake_case`
-
-### 9.3 错误场景验收
-
-| 场景 | 预期 |
+| 操作 | 检查点 |
 |---|---|
-| 高风险输入 | 返回 `HIGH_RISK_DECISION`，状态为 `rejected` |
-| RAG 无结果 | 返回空数组，不编造历史记录 |
-| MCP 工具失败 | 返回 `status: failed` 和 `error`，Agent 主流程不中断 |
-| LLM 输出无法解析 | 返回 `LLM_JSON_PARSE_ERROR` 或保留原始输出供排查 |
-| 请求字段缺失 | 返回 `VALIDATION_ERROR` |
+| 创建/补充 | shopping、累计字段、reply、状态、消息持久化 |
+| PATCH 与消息路径 | 分别记录完成条件；当前 PATCH 仍检查七项，不将它当作 parser 最低三项的等价路径 |
+| GET messages | 必填user_id；items为id/session_id/role/type/content/created_at，分页与升序正确 |
+| POST debate | 必填user_id，不匹配为FORBIDDEN；缺失字段返回非空data追问信息 |
+| 成功庭审 | data.debate_events和data.report；刷新后GET report仍可回放 |
+| GET trace | 单独查询轨迹，不从debate HTTP响应假设有trace |
+| 提醒保存 | 检查提醒ID、case/user外键、title/reason、due_at、waiting状态 |
+| 观察清单 | 只显示该用户waiting提醒；DELETE需user_id，缺参422、他人FORBIDDEN，成功取消后隐藏 |
+| 反馈 | 历史新增、案件状态和关联提醒更新；随后验证RAG候选 |
+| 历史 | result只接受worth/regret/neutral，非法值按校验返回 |
+| 异常 | 无案件、无报告、拒绝状态、非法请求、网络失败有明确结果 |
 
-## 10. 课程要求验收
+两个购物手动案例见 [MVP §6](01_MVP.md#6-两个购物验收案例)。PR #89 已修复 /debate 的 `Reminder` 导入，上述存储和页面闭环仍需逐项验收。不要通过避开该分支宣布全流程通过。
 
-| 要求 | 验收方式 | 状态 |
-| --- | --- | --- |
-| 调用至少一个 LLM API | 演示多 Agent 输出 | ✅ |
-| 至少一个 RAG 检索功能 | 展示历史记录检索结果 | ✅ |
-| 至少两个 MCP 工具 | 展示成本计算和冷静期提醒调用 | ✅ |
-| 多轮对话和状态管理 | 演示用户补充和修改案件信息 | ✅ |
+注册登录不等于完整权限系统；当前尚无JWT/统一会话鉴权，生产安全不能勾选通过。
 
-## 11. 最终演示脚本
+## 7. 真实 DeepSeek 验收
 
-### 11.1 购物决策演示
+使用与日常数据分离的演示服务，加载测试人员授权的真实 Key；不得把明文写进日志、截图或提交。
 
-```text
-1. 创建案件：想买 1299 元降噪耳机。
-2. 补充预算：本月剩余 3000 元（使用 3000 确保风险 medium）。
-3. 补充替代品：已有普通耳机。
-4. 启动分析。
-5. 展示 RAG 命中历史电子产品闲置记录。
-6. 展示成本计算工具结果（budget_ratio=43%，medium）。
-7. 展示正方、反方、法官输出。
-8. 展示暂缓购买判决（delay）。
-9. 展示观察清单和提醒。
-10. 提交决策复盘。
-```
+- 确认实际模型与请求目的，依次记录parser、正方、反方、法官说明的成功/失败。
+- 单独直连成功只能证明网络调用，不代表整个请求无fallback；应结合脱敏日志、受控探针或调用证据。
+- 校验结构化JSON、口语输入、金额纠正、字段合并、规则判决不被模型覆盖。
+- 在受控环境验证超时/断连/非法响应，恢复配置后重新验收。
+- 记录调用耗时，但不把一次样例延迟或mock耗时作为稳定性能指标。
 
-### 11.2 时间决策演示
+已有脚本 `rag/e2e_verify.py` 可作辅助，但默认用户必须先注册；脚本不是完整浏览器/提醒验收，本轮未复跑该实时脚本。Docker镜像不包含全部评测脚本，执行位置见 [部署文档](../deploy/DOCKER.md)。
+
+## 8. 记录格式与发布门槛
+
+每条验收记录包含：
 
 ```text
-1. 创建案件：是否参加占用周末两天的社团活动。
-2. 补充当前任务：有课程作业和小组项目。
-3. 补充活动收益：可以认识新成员。
-4. 启动分析。
-5. 展示 RAG 命中历史活动导致作业延期记录。
-6. 展示时间成本计算结果。
-7. 展示正方、反方、法官输出。
-8. 展示部分参加或拒绝建议。
-9. 展示后续待办。
+代码commit：
+日期/验证人：
+环境/数据库隔离方式：
+模式：本地规则 / mock / 真实DeepSeek / 受控故障
+命令或页面操作：
+输入和预期：
+实际结果（passed/failed/skipped）：
+脱敏证据位置：
+未完成项和负责人：
 ```
 
-## 12. 最终通过标准
+本次文档同步基线为 `53d70bc`，保留同步前 `a965900` 的测试记录供对比。旧文档的 `30 passed` 是早期C定向记录，缺少对应的完整当前基线证据，不再称为“当前测试结果”。D历史记录另见 [D进度](06_Role_D_RAG_Progress.md)。新的数字必须来自实际执行，不得根据测试文件数量推算。
 
-- 两条演示流程均能完整完成。
-- 所有必做功能均可运行。
-- `main` 分支代码可启动。
-- 文档完整。
-- 答辩材料和演示视频准备完成。
+发布前要求本轮购物关键路径通过、已知B阻塞关闭、真实API与降级分别验收、文档和PPT状态一致、至少一名组员review。不再要求时间主流程通过，也不因延期而删除现有组件测试。
 
-## 13. 当前测试进度记录
+## 9. 本轮实际验证记录
 
-### 13.1 C 模块购物法庭 Agent 编排测试
+### 9.1 同步前基线 a965900
 
-当前 C 模块已新增购物法庭 Agent 编排测试、C-E MCP adapter 转换测试，并补充 DeepSeek LLM client 与 fallback 测试。
+2026-09-09，AI 文档同步时执行；业务代码基线 `a96590045337b60352d03869135d868e69a3df8a`，工作分支 `feature/docs-shopping-scope` 仅有人读 Markdown 改动。环境为 Windows / Python 3.14.4 / pytest 9.1.1，使用§2的内存数据库、禁用 dotenv、无真实模型 Key 和关闭实时历史拉取配置。
 
-测试文件：
+| 实际命令/检查 | 结果 |
+|---|---|
+| `uv run --frozen pytest -p no:cacheprovider` | 收集到290项后因辅助脚本中断：1 error、1 warning，未执行测试正文 |
+| `uv run --frozen pytest -p no:cacheprovider tests -q --tb=line` | 283 passed、7 failed、8 warnings，35.41秒 |
+| `uv run --frozen python -m compileall -q backend tests rag mcp_tools` | 通过；编译检查不能发现运行时未导入的名称 |
+| `git diff --check` | 通过；仅Git换行转换提示，无空白错误 |
+| 文档结构检查 | 12份UTF-8文档、18段JSON示例、45个本地链接及其标题锚点检查通过 |
 
-```text
-tests/test_agent_flow.py
-tests/test_mcp_adapter.py
-tests/test_llm_client.py
-```
+失败明细：
 
-当前测试数量：
+- `tests/test_debate_router.py::test_debate_success`、`test_debate_response_contains_trace`：当时调用 `Reminder(...)` 时 `NameError`；后续PR #89已修复，最新结果见§9.2。
+- `tests/test_migrate.py::test_get_existing_columns`：查询结果为空集合。`test_migrate_cases / test_migrate_histories / test_migrate_traces / test_migrate_reminders`：对应表不存在。这些用例在 fixture 引擎建表，但被测函数使用 `backend.migrate.engine`，没有切换到 fixture 引擎；需要 B/测试完善隔离，不能据此判定真实部署迁移必然失败或已经通过。
+- 根目录收集错误来自 `backend/test/test_feedback_quick.py` 对空数据库的导入期查询。建议由 B/测试改为显式运行的辅助入口或真正的隔离用例，本次不修改它。
 
-```text
-30
-```
+8条 warning 来自既有 Pydantic class Config 和 Starlette 422 常量弃用提示。C 的 parser、LLM、judge、Agent flow、RAG/MCP adapter 测试文件在本次 `tests/` 执行中均通过，属于本地/mock/受控响应验证。未执行真实 DeepSeek、浏览器全流程、Docker 构建或线上部署验收，也未改动业务代码来绕过失败。
 
-验证命令：
+### 9.2 同步 PR #88、#89 后基线 53d70bc
 
-```bash
-uv run pytest tests/test_agent_flow.py tests/test_mcp_adapter.py tests/test_llm_client.py
-uv run python -m backend.app.orchestrator.demo
-uv run python -m compileall backend tests mcp_tools
-```
+同日推送前拉取远端并快进到 `53d70bc9324f043986c7f104d65c66953ad03025`，保持上述隔离环境。本次功能分支相对该基线仍只改12份Markdown文档。
 
-当前验证结果：
+执行 `uv run --frozen pytest tests -p no:cacheprovider -q --tb=line --show-capture=no`：**292 passed、5 failed、10 warnings，35.79秒**。
 
-```text
-30 passed
-demo 正常输出购物法庭判决 JSON
-backend、tests 和 mcp_tools 编译检查通过
-```
-
-已覆盖场景：
-
-- 正常购物案件可以完成 Agent 辩论。
-- `steps` 按顺序包含 `input_parser`、`pro_agent`、`con_agent`、`judge_agent`。
-- 输出包含 `rag_evidence`、`tool_results`、`report`、`trace`。
-- `report.final_decision` 属于 `buy`、`delay`、`reject`、`alternative`。
-- 高风险输入返回 `HIGH_RISK_DECISION`，不进入正反方和法官流程。
-- 缺失字段返回 `MISSING_FIELDS`，并给出追问原因。
-- RAG 返回空数组时，不编造历史证据。
-- RAG 抛异常时，主流程不中断，trace 记录 `rag_search failed`。
-- `cost_analyzer` 工具结果进入 `tool_results`。
-- `cooling_reminder` 在 `judge_agent` 前进入工具结果。
-- `cooling_reminder` 失败时主流程不中断。
-- C-E MCP adapter 能将 E 模块 `cost_analyzer` 原始结果转换为 `ToolResult`。
-- C-E MCP adapter 能将 E 模块 `cooling_reminder` 成功、业务失败和异常场景转换为稳定的 `ToolResult`。
-- DeepSeek LLM client 在有 `DEEPSEEK_API_KEY` 时使用真实 client，模型固定为 `deepseek-v4-flash`。
-- 未配置 Key、API 异常、超时、非 JSON、字段缺失或字段类型错误时，会 fallback 到 mock。
-- DeepSeek 请求体会带上固定模型、默认 30 秒 timeout（可由 `DEEPSEEK_TIMEOUT_SECONDS` 覆盖）和 Authorization 头模板。
-- trace 能展示 Agent、RAG、MCP 工具调用顺序。
-
-尚未覆盖场景：
-
-- 后端 `/api/cases/{case_id}/debate` 接口级测试。
-- 真实 RAG 检索模块联调测试。
-- MCP HTTP/MCP Server 形态联调测试。
-- time 时间决策 Agent 编排测试。
-- 前端端到端流程测试。
+- 所有辩论路由测试通过；新增GET messages测试也通过。原有两个Reminder导入错误已消失，不再作为当前待修复项。
+- 5个失败仍为§9.1所列迁移测试，fixture与被测函数引擎不一致的问题尚未修复。
+- 10条warning仍为Pydantic Config与Starlette 422常量弃用提示。
+- 根目录辅助脚本未变；本次复跑显式限定tests目录，没有重新运行根目录收集。
+- 观察清单删除新增user_id校验、parser元数据接入与报告损坏分支按代码同步文档；不以本次现有用例通过宣称这些新增边界全部有专项测试。
+- 未运行真实模型、浏览器或部署验收；本次不修改测试或业务代码以绕过遗留失败。

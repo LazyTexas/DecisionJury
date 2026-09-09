@@ -1,401 +1,114 @@
-# DecisionJury 里程碑计划
+# DecisionJury 里程碑与当前状态
 
-## 1. 项目周期
+> 范围决定：三周、5 人、购物决策 Web Demo。`time` 不再是本次必做、联调依赖或验收门槛，后续另行规划。实现核对基线：`dev@53d70bc`。本次文档同步未执行真实 DeepSeek、浏览器或部署验收；最新测试记录见 [测试计划](05_TestPlan.md)。
 
-项目周期为三周。目标是在三周内完成一个可运行、可演示、可答辩的 MVP。
+## 1. 状态口径
 
-## 2. 团队分工
+- **已实现**：在当前代码中可定位，不代表所有运行环境都已通过。
+- **待验收**：需指定 commit、环境、输入、命令和实际结果；不能用 mock 验证替代真实 API。
+- **待修复**：有已知问题，修复由对应模块承担。
+- **延期**：不属于本次范围，不计入当前交付缺陷。
+- 历史日志保留其原有证据属性，不以“当前 dev”或无依据完成百分比包装。
 
-本项目 5 人分工只按具体实现模块划分。文档、答辩、PPT、演示讲解不作为单独岗位，后期由全员基于自己负责模块共同补充。
+原三周计划曾包含时间主流程；本次按团队决定改为两个购物案例及异常场景，不删除现有时间组件代码或种子。
 
-| 成员  | 实现方向             | 主要职责                                                       |
-| --- | ---------------- | ---------------------------------------------------------- |
-| A   | 前端交互开发           | 页面结构、案件创建页、多轮对话页、判决书展示、RAG/MCP 结果展示                        |
-| B   | 后端 API 与状态管理     | FastAPI 接口、案件 CRUD、SQLite 数据存储、多轮会话状态、接口联调                 |
-| C   | Agent 编排与 LLM 调用 | LLM API 接入、输入解析 Agent、正方 Agent、反方 Agent、法官 Agent、Prompt 模板 |
-| D   | RAG 与数据检索        | 历史记录样例、规则知识库、BM25/向量/混合检索、证据引用、RAG 评测                      |
-| E   | MCP 工具与工程化       | cost_analyzer、cooling_reminder、工具调用日志、自动化测试、Docker 或一键启动   |
+## 2. 五人分工
 
-## 3. 三周总计划
-
-### 第 1 周：基础链路跑通
-
-目标：
-
-- 完成必要文档初稿。
-- 搭建项目仓库和基础目录。
-- 跑通 LLM 调用。
-- 跑通多 Agent 基础流程。
-- 完成案件创建和简单对话。
-
-验收标准：
-
-- 能创建购物案件。
-- 能创建时间案件。
-- 正方 Agent、反方 Agent、法官 Agent 能按顺序输出。
-- 有一份可运行的命令行或后端 Demo。
-
-### 第 2 周：RAG 与 MCP 工具接入
-
-目标：
-
-- 完成历史记录数据结构。
-- 完成 RAG 检索模块。
-- 完成成本计算 MCP 工具。
-- 完成冷静期提醒 MCP 工具。
-- 将 RAG 和 MCP 接入 Agent 主流程。
-
-验收标准：
-
-- 法官 Agent 能引用历史记录。
-- 成本计算工具能返回预算或时间成本结果。
-- 冷静期工具能创建观察清单或提醒任务。
-- 一条购物决策链路能完整跑通。
-- 一条时间决策链路能完整跑通。
-
-### 第 3 周：前端、测试、部署和演示环境
-
-目标：
-
-- 完成 Web 前端。
-- 完成测试用例。
-- 完成部署或本地一键启动脚本。
-- 完成前后端、RAG、MCP、Agent 全链路联调。
-- 冻结一套稳定可演示版本。
-
-验收标准：
-
-- 前端能完整演示购物决策。
-- 前端能完整演示时间决策。
-- 能展示 RAG 检索结果。
-- 能展示 MCP 工具调用结果。
-- 能生成最终判决书。
-- `main` 分支保留稳定可演示版本。
-
-## 4. 每日详细计划
-
-### 第 1 周
-
-| 天数    | 目标                  | 主要负责人 | 输出物                          |
-| ----- | ------------------- | ----- | ---------------------------- |
-| Day 1 | 明确实现范围和技术选型         | 全员    | 技术栈、目录、接口草案                  |
-| Day 2 | 搭建基础工程和本地运行方式       | B / E | 后端启动、工具模块骨架、README 运行说明      |
-| Day 3 | 跑通 LLM API 和基础后端    | B / C | `/api/chat` Demo、LLM 调用 Demo |
-| Day 4 | 完成多 Agent Prompt 初版 | C     | 正方、反方、法官输出                   |
-| Day 5 | 准备历史记录样例和 RAG 初版    | D     | 样例数据、检索 Demo                 |
-| Day 6 | 前端基础页面              | A     | 创建案件页面                       |
-| Day 7 | 第一次阶段演示             | 全员    | 命令行或页面 Demo                  |
-
-### 第 2 周
-
-| 天数     | 目标                | 主要负责人             | 输出物              |
-| ------ | ----------------- | ----------------- | ---------------- |
-| Day 8  | 完成 RAG 接入 Agent   | C / D             | 法官可引用历史记录        |
-| Day 9  | 实现成本计算工具          | E                 | cost_analyzer    |
-| Day 10 | 实现冷静期提醒工具         | E                 | cooling_reminder |
-| Day 11 | Agent 接入两个 MCP 工具 | C / E             | 工具调用链路           |
-| Day 12 | 完成购物决策完整流程        | A / B / C / D / E | 购物 Demo          |
-| Day 13 | 完成时间决策完整流程        | A / B / C / D / E | 时间 Demo          |
-| Day 14 | 第二次阶段演示和问题修复      | 全员                | 可运行集成版本          |
-
-### 第 3 周
-
-| 天数     | 目标               | 主要负责人 | 输出物               |
-| ------ | ---------------- | ----- | ----------------- |
-| Day 15 | 前端完善和结果页展示       | A     | 判决书页面             |
-| Day 16 | 测试用例和评测指标        | D / E | RAG 评测、工具测试、端到端测试 |
-| Day 17 | Docker 或一键启动脚本   | E     | 可复现运行环境           |
-| Day 18 | 联调修复和体验优化        | 全员    | 稳定集成版本            |
-| Day 19 | 全流程压测和边界 case 修复 | 全员    | 缺陷修复清单            |
-| Day 20 | 演示环境冻结和全流程彩排     | 全员    | 可演示版本             |
-| Day 21 | 最终修复、合并 main、提交  | 全员    | v1.0-demo         |
-
-## 5. 具体里程碑
-
-| 里程碑 | 内容                 | 负责人       | 截止时间       |
-| --- | ------------------ | --------- | ---------- |
-| M1  | 完成基础工程和本地启动        | B / E     | 第 1 周第 2 天 |
-| M2  | 完成前端案件创建页          | A         | 第 1 周第 6 天 |
-| M3  | 跑通 LLM API         | C         | 第 1 周第 3 天 |
-| M4  | 完成多 Agent 基础流程     | C         | 第 1 周第 5 天 |
-| M5  | 完成历史记录样例数据         | D         | 第 1 周第 5 天 |
-| M6  | 完成 RAG 检索          | D         | 第 2 周第 2 天 |
-| M7  | 完成成本计算 MCP 工具      | E         | 第 2 周第 3 天 |
-| M8  | 完成冷静期提醒 MCP 工具     | E         | 第 2 周第 4 天 |
-| M9  | Agent 接入 RAG 和 MCP | C / D / E | 第 2 周第 6 天 |
-| M10 | 完成前端主流程            | A / B     | 第 3 周第 2 天 |
-| M11 | 完成测试和缺陷修复          | 全员        | 第 3 周第 4 天 |
-| M12 | 完成部署和演示环境冻结        | E / 全员    | 第 3 周第 6 天 |
-
-## 6. 各角色交付清单
-
-### 6.1 目录责任分工
-
-| 成员                 | 主要负责目录                | 配合目录                | 说明                                    |
-| ------------------ | --------------------- | ------------------- | ------------------------------------- |
-| A 前端交互开发           | `frontend/`           | `backend/`          | 负责页面、交互、结果展示、接口联调                     |
-| B 后端 API 与状态管理     | `backend/`            | `tests/`、`data/`    | 负责 API、数据库、案件状态、多轮会话状态                |
-| C Agent 编排与 LLM 调用 | `backend/`            | `mcp_tools/`、`rag/` | 负责 LLM 接入、多 Agent 工作流、Prompt 模板、判决书生成 |
-| D RAG 与数据检索        | `rag/`、`data/`        | `backend/`、`tests/` | 负责样例数据、知识库、检索逻辑、证据引用                  |
-| E MCP 工具与工程化       | `mcp_tools/`、`tests/` | `backend/`、部署文件     | 负责 MCP 工具、工具测试、调用日志、Docker 或一键启动      |
-
-开发要求：
-
-- 每个成员优先在自己的负责目录内开发。
-- 跨目录修改必须在 PR 说明中写清楚原因。
-- 修改接口时，必须同步更新 `docs/04_API.md`。
-- 修改功能范围时，必须同步更新 `docs/01_MVP.md` 或 `docs/02_SPEC.md`。
-- 修改验收方式时，必须同步更新 `docs/05_TestPlan.md`。
-
-### 6.2 角色交付清单
-
-### A 前端交互开发
-
-- 案件创建页。
-- 多轮对话页。
-- 判决书结果页。
-- RAG 证据展示区。
-- MCP 工具调用结果展示区。
-- 前端与后端 API 联调。
-
-### B 后端 API 与状态管理
-
-- FastAPI 项目结构。
-- 案件创建、查询、更新接口。
-- 多轮消息接口。
-- SQLite 数据表和基础 CRUD。
-- 案件状态流转。
-- 后端接口错误处理。
-
-### C Agent 编排与 LLM 调用
-
-- LLM API 接入。
-- Prompt 模板。
-- 输入解析 Agent。
-- 正方 Agent。
-- 反方 Agent。
-- 法官 Agent。
-- 多 Agent 编排。
-- 判决书生成逻辑。
-
-### D RAG 与数据检索
-
-- 历史记录数据结构。
-- 模拟数据。
-- 检索模块。
-- 检索结果格式。
-- RAG 评测样例。
-
-### E MCP 工具与工程化
-
-- cost_analyzer。
-- cooling_reminder。
-- 可选 decision_score。
-- 工具调用日志。
-- 工具单元测试。
-- 部署脚本。
-- 一键启动脚本。
-
-## 7. 风险与预案
-
-| 风险          | 影响         | 预案                      |
-| ----------- | ---------- | ----------------------- |
-| LLM API 不稳定 | Agent 无法输出 | 准备备用模型或 mock 输出         |
-| RAG 效果差     | 法官依据不足     | 使用高质量模拟历史记录             |
-| MCP 工具接入慢   | 课程要求受影响    | 先做 HTTP 接口形式，再封装 MCP    |
-| 前端来不及       | 演示困难       | 先用 Streamlit 或简洁 Web 页面 |
-| 范围失控        | 三周做不完      | 只保留购物和时间两类案件            |
-| 结果太主观       | 答辩说服力下降    | 强制输出证据和工具结果             |
-
-## 8. 每日同步格式
-
-```text
-昨天完成：
-今天计划：
-当前卡点：
-需要谁配合：
-```
-
-## 9. 当前进度同步
-
-### 9.1 C 模块购物法庭进度
-
-截至当前 `dev` 分支，C 模块已完成购物法庭 Agent 编排主流程，并已完成与 B 后端 adapter、E MCP 工具 adapter、DeepSeek 真实 LLM 的阶段性集成。
-
-已完成内容：
-
-- 完成 `input_parser`、`pro_agent`、`con_agent`、`judge_agent` 四个 Agent 的基础实现。
-- 完成购物法庭多 Agent 编排流程。
-- 完成 DeepSeek 真实 LLM API 接入，模型固定为 `deepseek-v4-flash`，未配置 Key 或 API 失败时自动 fallback 到 mock。
-- 完成 mock RAG 接入位置。
-- 完成 C-E MCP adapter，当前主流程已通过 `backend/app/services/mcp_adapter.py` 调用 E 模块 `cost_analyzer` 和 `cooling_reminder`。
-- 完成 C-B 后端 adapter，当前通过 `backend/app/orchestrator/adapter.py` 向 B 后端提供 `run_case_decision_flow` 调用入口。
-- 完成结构化 `DecisionReport` 输出。
-- 完成 `AgentStep`、`ToolResult`、`RagEvidence`、`TraceItem` 输出。
-- 完成高风险输入拦截，高风险输入不会进入正反方辩论。
-- 完成 RAG 为空时不编造历史证据的处理。
-- 完成 RAG / MCP 异常兜底，异常不会直接中断 Agent 主流程。
-- 完成命令行 demo。
-- 完成 C 模块 Agent 编排测试、MCP adapter 测试和 DeepSeek LLM client 测试。
-
-当前验证命令：
-
-```bash
-uv run python -m backend.app.orchestrator.demo
-uv run pytest tests/test_agent_flow.py tests/test_mcp_adapter.py tests/test_llm_client.py
-uv run python -m compileall backend tests mcp_tools
-```
-
-下一步计划：
-
-- 与 D 模块对齐真实 RAG 检索返回结构和调用方式，后续用 C-D RAG adapter 替换当前 `mock_rag`。
-- 等 A/B 完成前端真实接口链路后，配合验收 `steps`、`rag_evidence`、`tool_results`、`report`、`trace` 展示。
-
-### 9.2 C 模块当前完成度判断
-
-购物法庭 C 模块本体已基本跑通，并完成 B/E 两侧关键 adapter 集成和 DeepSeek 真实 LLM 接入，当前购物流程完成度约为 90%。
-
-整体 C 模块仍需完成：
-
-- 真实 RAG 模块替换 mock RAG。
-- time 时间决策流程。
-- 前后端完整链路联调。
-
-### 9.3 D 模块 RAG 当前进度
-
-截至当前 `dev` 分支，D 模块已合并 RAG 初版代码，目录为 `rag/`。
-
-已完成内容：
-
-- 新增 `rag/retriever.py`，提供基于 FastAPI 的 `/api/rag/search` 检索接口雏形。
-- 使用 `jieba` 分词和 `rank_bm25` 实现 BM25 检索。
-- 请求结构与 `docs/04_API.md` 中的 RAG 检索接口基本对齐，包括 `user_id`、`case_id`、`case_type`、`query`、`top_k`。
-- 返回结构采用 `success / data.results / message` 形式，目标是返回 `RagEvidence[]`。
-- `data/history_records.json` 已扩充到 **500 条**（购物 250 + 时间 250），每条含 `id/title/content/context/pros/cons/tags` 等字段；`rag/build_history_data.py` 可确定性复现该数据集。
-
-当前进度 / 已确认：
-
-- C 模块已通过 `backend/app/services/rag_adapter.py` 以 HTTP 调用 D 的 `/api/rag/search`（端口 8001），RAG 失败时 fallback 为空数组、不中断主流程；调用入口已确认走 HTTP，不再需要 mock。
-- `rag/data_loader.py` 现已**联动 B 后端**：默认拉取 `GET /api/history` 的实时历史记录并与静态种子合并。前端新提交的决策复盘（feedback → history）会进入 RAG 检索候选；后端不可用时自动回退到静态 JSON，可用环境变量 `RAG_LIVE_RECORDS=0` 关闭。
-- `rag/retriever.py` 每次检索会按请求里的 `user_id` 拉取该用户的实时历史，保证前端新数据立即可检索。
-- RAG 依赖记录在 `rag/requirements.txt`（fastapi/uvicorn/jieba/rank_bm25）；联动使用 Python 标准库 `urllib`，未新增第三方依赖；`pyproject.toml` 已包含 jieba/rank_bm25。
-- RAG 单元测试：`tests/test_rag.py`（检索/防幻觉/隔离/500 条数据/时间场景）、`tests/test_rag_data_loader.py`（字段映射/合并/回退/开关）、`tests/test_rag_adapter.py`（C-D adapter 契约）。
-
-下一步计划：
-
-- 与 C 联调完整链路：启动 8001 RAG 后跑购物/时间案件，确认法官 `rag_evidence` 出现真实命中、trace 里 `rag_search completed`。
-- 补 RAG 评测指标（top_k 命中、命中类型、是否进入法官上下文），作为答辩证据。
-- 保留 RAG 失败时 fallback 为 `[]` 的行为，确保 Agent 主流程不中断且不编造历史证据。
-
-### 9.4 E 模块 MCP 工具与工程化进度
-
-截至当前 `dev` 分支，E 模块已完成 MCP 工具主体、工具调用日志、HTTP 接口和基础单测，并补充了 MCP 工具契约层与联调测试。
-
-已完成内容：
-
-- `mcp_tools/cost_analyzer.py`：实现购物预算占比与时间成本分析，支持 low / medium / high 风险等级，并新增数值校验（负数/空值会明确报错，由上层转成 `failed` ToolResult）。
-- `mcp_tools/cooling_reminder.py`：实现冷静期提醒，自动生成 reminder_id 与 due_at，缺 user_id/case_id 返回业务错误。
-- `mcp_tools/logger.py`：记录每次工具调用的输入、输出、耗时与时间戳（答辩取证用）。
-- `backend/routers/tools.py`：提供 `POST /api/tools/cost-analyzer` 与 `POST /api/tools/cooling-reminder`，返回统一 `ToolResult` 结构，冷却提醒会写入 `reminders` 表。
-- 新增 `mcp_tools/mcp.py`：MCP 工具契约层，定义两个工具的 inputSchema，并支持 `call_tool(name, arguments)` 统一分发，为后续封装 MCP Server 做准备。
-- 新增 `mcp_tools/demo.py`：`python -m mcp_tools.demo` 可一键展示 cost_analyzer（购物+时间）与 cooling_reminder 的调用及日志。
-- 测试：已补齐工具边界测试、MCP 契约层测试、HTTP 接口联调测试，并在 `tests/conftest.py` 补充共享 `db_session` 夹具，供各路由测试复用同一内存数据库。
-- `mcp_tools/decision_score.py`：决策评分工具（纯规则，不依赖 LLM），输出 0~100 综合分与 low/medium/high 风险等级；已接入 `call_tool` 与 `POST /api/tools/decision-score`，并补充单元测试与 HTTP 联调测试。
-
-尚未完成：
-
-- time 决策主流程接入（`analyze_time_cost` 已实现，但 `decision_flow.py` 仍只走 shopping，需等 C 模块的 time 流程）。
-- Docker 部署（可选加分项，M12；当前已有 `start_all.bat` 一键启动三端）。
-- 真实 RAG 与后端全链路联调（依赖 D/C 侧联调整体推进）。
-
-### 9.5 B模块 P0 任务完成情况
-
-| 编号 | 任务 | 状态 | 完成时间 |
-|:---:|---|---|:---:|
-| 1 | chat 路由改为 `/cases/{case_id}/messages`，接入 `input_parser` | ✅ 已完成 | 2026-07-08 |
-| 2 | `GET /api/cases/{case_id}/trace` — 执行轨迹存储与查询 | ✅ 已完成 | 2026-07-08 |
-| 3 | `GET /api/cases/{case_id}/report` — 返回 C 模块真实数据 | ✅ 已完成 | 2026-07-08 |
-| 4 | Trace 表创建 + 辩论后自动保存 trace | ✅ 已完成 | 2026-07-08 |
-
-### 9.6 B模块 P1 任务完成情况
-
-| 编号 | 任务 | 状态 | 完成时间 |
-|:---:|---|---|:---:|
-| 5 | `PATCH /api/cases/{case_id}` — 更新案件字段 | ✅ 已完成 | 2026-07-08 |
-| 6 | `GET /api/watchlist` — 观察清单查询 | ✅ 已完成 | 2026-07-09 |
-| 7 | `GET /api/history` + `POST /api/history` — 历史记录 CRUD | ✅ 已完成 | 2026-07-09 |
-| 8 | `POST /api/cases/{case_id}/feedback` — 决策复盘 | ✅ 已完成 | 2026-07-09 |
-| 9 | chat 路由事务修复（两次 commit → 一次） | ✅ 已完成 | 2026-07-08 |
-
-### 9.7 B模块 P2 任务完成情况
-
-| 编号 | 任务 | 状态 | 说明 |
-|:---:|---|---|---|
-| 10 | 全局异常处理器 | ✅ 已完成 | 7 种异常统一处理 |
-| 11 | 前后端 API 契约对齐修复 | ✅ 已完成 | 枚举值统一为 snake_case |
-| 12 | 数据库索引优化 | ✅ 已完成 | 8 个复合索引 |
-| 13 | 外键约束 | ✅ 已完成 | 3 个外键 + `ondelete=CASCADE` |
-| 14 | 用户登录认证 | ⏳ 待实现 | 所有功能稳定后统一添加 |
-
-### 9.8 B模块 接口实现总览
-
-| 接口 | 路径 | 状态 |
-|------|------|:---:|
-| 健康检查 | `GET /api/health` | ✅ |
-| 创建案件 | `POST /api/cases` | ✅ |
-| 案件详情 | `GET /api/cases/{case_id}` | ✅ |
-| 案件列表 | `GET /api/cases` | ✅ |
-| 补充信息 | `POST /api/cases/{case_id}/messages` | ✅ |
-| 启动辩论 | `POST /api/cases/{case_id}/debate` | ✅ |
-| 判决书查询 | `GET /api/cases/{case_id}/report` | ✅ |
-| 执行轨迹 | `GET /api/cases/{case_id}/trace` | ✅ |
-| 更新案件 | `PATCH /api/cases/{case_id}` | ✅ |
-| 观察清单 | `GET /api/watchlist` | ✅ |
-| 创建历史记录 | `POST /api/history` | ✅ |
-| 查询历史记录 | `GET /api/history` | ✅ |
-| 决策复盘 | `POST /api/cases/{case_id}/feedback` | ✅ |
-
-**接口完成率：13/13 = 100%**
-
-### 9.9 B模块 测试覆盖
-
-| 测试文件 | 测试数量 | 状态 |
+| 成员 | 实现方向 | 当前责任 |
 |---|---|---|
-| `test_cases_router.py` | 12 | ✅ |
-| `test_chat_router.py` | 10 | ✅ |
-| `test_debate_router.py` | 6 | ✅ |
-| `test_history_router.py` | 10 | ✅ |
-| `test_watchlist_router.py` | 5 | ✅ |
-| `test_feedback_router.py` | 9 | ✅ |
-| `test_trace_router.py` | 5 | ✅ |
-| `test_health_router.py` | 2 | ✅ |
-| `test_migrate.py` | 6 | ✅ |
-| **合计** | **65** | ✅ |
+| A | 前端交互 | 案件、消息、报告、庭审回放、证据/工具、历史和观察清单 |
+| B | API 与状态 | 注册登录、CRUD、消息、状态、SQLite、结果/trace/提醒/历史持久化 |
+| C | Agent 与 LLM | parser、正反方、规则法官和LLM说明、Prompt、RAG/MCP adapter、结构化结果 |
+| D | RAG | 种子与实时历史合并、BM25、证据契约、检索及生成代理指标 |
+| E | 工具与工程化 | 成本、评分、提醒、call_tool、日志、测试及运行/部署脚本 |
 
-### 9.10 B模块 剩余工作
+模块职责不等于每个文件都由该成员独自编写；个人贡献需结合实际提交和协作记录。文档、答辩、PPT 由全员校对，不另设仅负责汇报的岗位。
 
-| 优先级 | 任务 | 负责人 | 预计完成 |
-|:---:|---|---|:---:|
-| P0 | 前端联调与 API 接入 | A + B | 答辩前 |
-| P0 | 演示数据与演示脚本准备 | 全员 | 答辩前 |
-| P0 | 演示视频录制（加分项） | 全员 | 答辩前 |
-| P1 | 用户登录认证（JWT） | B | 答辩后 |
-| P2 | Docker 部署 | E | 可选 |
-| P2 | time 决策支持 | C | 可选 |
+## 3. 三周交付计划（调整后）
 
-## 10. 里程碑完成状态
-
-| 里程碑 | 内容 | 状态 |
+| 周次 | 目标 | 验收产物 |
 |---|---|---|
-| M1 | 完成基础工程和本地启动 | ✅ 已完成 |
-| M2 | 完成前端案件创建页 | ✅ 已完成 |
-| M3 | 跑通 LLM API | ✅ 已完成 |
-| M4 | 完成多 Agent 基础流程 | ✅ 已完成 |
-| M5 | 完成历史记录样例数据 | ✅ 已完成 |
-| M6 | 完成 RAG 检索 | ✅ 已完成 |
-| M7 | 完成成本计算 MCP 工具 | ✅ 已完成 |
-| M8 | 完成冷静期提醒 MCP 工具 | ✅ 已完成 |
-| M9 | Agent 接入 RAG 和 MCP | ✅ 已完成 |
-| M10 | 完成前端主流程 | ⏳ 联调中 |
-| M11 | 完成测试和缺陷修复 | ✅ 已完成 |
-| M12 | 完成部署和演示环境冻结 | ⏳ 待完成 |
+| 第 1 周 | 基础工程、案件、模型接入、Agent 原型 | 可运行购物解析/编排，API 和字段草案 |
+| 第 2 周 | 真实 RAG、规则工具、状态合并 | 购物主链路、证据、工具、异常降级测试 |
+| 第 3 周 | 前端庭审/报告、持久化闭环、部署与答辩 | 两个购物案例、回归记录、演示版本与截图 |
+
+此表是交付组织方案，不伪造逐日完成日期。完成事实以代码和带版本的验收记录为准。
+
+## 4. 实现现状
+
+| 模块 | 当前已实现 | 仍需确认 |
+|---|---|---|
+| A | React 页面、API 调用、报告和 TraceLogView 庭审事件展示 | 最新 B 消息列表的字段适配、刷新恢复、实际浏览器全流程 |
+| B | 用户表/注册登录、案件/消息/报告/trace/历史/反馈/观察清单接口；分页消息、部分parser元数据、提醒保存和删除时的用户比较 | 事务/幂等、元数据清理、全链路页面回归；无 JWT/统一会话鉴权 |
+| C | LLM parser、本地规则/纠正、最低字段、四庭审事件、规则判决+模型说明、三个工具和 HTTP RAG 接入 | 口语歧义与真实模型质量；不宣称跨轮轮数熔断已实现 |
+| D | jieba+BM25、静态/实时历史、证据裁剪、去重、评测脚本 | 最新基线检索/引用截图、评测重新取证 |
+| E | 三个规则工具、统一调用入口、日志、BAT/screen/Docker 配置 | 当前环境启动/构建验证，不等于已部署公网 |
+
+### 4.1 C 模块交付清单
+
+- `backend/app/agents/`：输入解析、正方、反方、法官。
+- `backend/app/services/`：DeepSeek client、RAG HTTP adapter、MCP adapter。
+- `backend/app/orchestrator/`：顺序编排、C-B adapter、独立 demo。
+- `backend/app/schemas/decision.py`：parser/Agent/证据/工具/报告/事件/trace 结构。
+- `backend/app/prompts/`：角色提示词说明，本次不改；当前客户端不读取这些文件，实际提示词由 `llm_client.py` 内函数构造。
+- C 对应测试：parser、LLM、judge、agent_flow、RAG/MCP adapter。
+
+主流程已不使用 mock RAG；使用 `call_tool` 而非直接 HTTP 调用工具路由。正反方独立陈述，不互相读取结果；法官规则唯一确定结论，DeepSeek 生成说明。详细行为见 [SPEC](02_SPEC.md)。
+
+### 4.2 B 最新接口变动
+
+- `POST /api/cases/{case_id}/debate` 必须携带 `user_id`，不同用户返回 `FORBIDDEN`。
+- `GET /api/cases/{case_id}/messages` 已有实现，要求 `user_id`，支持分页；不能继续写“尚未提供”。
+- 历史 `result` 请求字段限定 `worth / regret / neutral`。
+- `/debate` 与 `/report` 返回 `data.debate_events`；报告本身保留 `debate_events`。
+- PR #89 已补齐 Reminder 导入；创建/消息接入部分 parser 元数据，报告读取增加类型检查，观察清单删除要求 user_id 并比较所属用户。
+
+## 5. 待修复与待验收
+
+| 项目 | 状态 / 负责人 | 完成条件 |
+|---|---|---|
+| debate 提醒保存的 Reminder 导入 | 已由 B 在 PR #89 修复，路由测试通过 | 仍需浏览器核验报告、trace、观察清单与复盘 |
+| 提醒事务、到期时间、重复请求 | 待验收，B/E/C | 不重复/错误保存，失败不能声明观察清单已创建 |
+| PATCH 与 parser 完成条件不一致 | 待统一，B/C | 明确最低字段策略，更新路由及契约测试 |
+| 根目录测试收集与迁移测试隔离 | 待修复，B/测试 | 辅助脚本不在导入时写库；迁移测试与 fixture 使用同一隔离引擎 |
+| 最新消息列表前端对接 | 待验收，A/B | 与返回 id/session_id/type 对齐，分页/刷新显示正确 |
+| 最新真实 DeepSeek 路径 | 待验收，C/测试 | 区分真实调用与 fallback，记录 parser/正反方/法官说明 |
+| 当前版本 RAG 与页面展示 | 待验收，A/B/C/D | 命中、空结果、故障分开，报告与证据/事件一致 |
+| 运行和部署演练 | 待验收，E/全员 | 干净环境依赖、启动、备份、网络及完整购物流程 |
+| JWT/统一鉴权 | 未实现，后续安全工作 | 不将目前登录接口宣传为生产级安全能力 |
+| time 主流程 | 延期，全员 | 不要求本次补齐；未来恢复需重新评审范围 |
+
+2026-09-09 同步 PR #88、#89 后，`tests/` 回归为 292 passed、5 failed，两个辩论失败已消失；剩余为迁移测试隔离问题。旧基线的 283 passed、7 failed 和根目录收集 1 error 保留为历史记录，详情见 [实际验证记录](05_TestPlan.md#9-本轮实际验证记录)。本次只改文档，不代替业务修复或完整页面验收。
+
+## 6. 里程碑验收看板
+
+| 里程碑 | 当前代码状态 | 本轮交付要求 |
+|---|---|---|
+| M1 基础工程 | 已实现 | 记录干净环境启动 |
+| M2 案件/前端基础 | 已实现 | 注册、创建、补充可用 |
+| M3 LLM 接入 | 已实现 | 真实 API 与 mock 分别取证 |
+| M4 Agent 主流程 | 已实现 | 规则决定、独立陈述和四事件正确 |
+| M5 历史种子 | 已有 | 演示数据来源明确，不冒充真实用户 |
+| M6 RAG 检索 | 已实现 | 购物命中/空/故障 |
+| M7 成本与评分 | 已实现 | 计算可复现，不影响规则结论所有权 |
+| M8 提醒闭环 | 工具与B保存已实现，页面闭环待验收 | 从 debate 到观察清单再到复盘 |
+| M9 跨模块接入 | 已有实现 | 当前版本端到端回归 |
+| M10 页面全流程 | 已有实现 | 两个购物案例和错误状态 |
+| M11 测试与缺陷 | 有测试代码 | 记录本次实际结果和未关闭项 |
+| M12 演示冻结/部署 | 有脚本配置 | 选定版本、复现演练、组员 review |
+
+看板不使用“接口完成率 100%”来替代运行验证。健康检查成功也不证明模型、提醒和页面链路全部成功。
+
+## 7. 交付与协作
+
+1. C 维护编排、字段、模型和证据契约；B 维护 HTTP 与存储；D/E/A 校对各自模块。
+2. 功能改动同步 [API](04_API.md)，范围变更同步 [MVP](01_MVP.md) 和 [SPEC](02_SPEC.md)。
+3. 已同步 B 的 PR #89 并重跑辩论用例；后续业务变化继续更新基线和受影响测试，本次文档不代替 B 提交。
+4. 冻结演示版本后更新截图、测试记录和 PPT，之后只替换受影响部分，不虚构“已全部完成”。
+5. 功能分支 → PR → 组员 review → dev；main 仅保留稳定版本。不自动提交本地 Key、数据库和缓存。
+
+## 8. 历史记录处理
+
+旧文档中的“C 约90%”“RAG仍为mock”“登录待实现”“Docker尚未编写”等阶段性描述已不适合作为当前事实，原文可在 Git 历史中追溯。早期测试数量不覆盖当前新增 parser、庭审、评分和消息契约，测试文件存在不等于当前执行通过。
+
+D 的历史测量及提交记录保留在 [D 模块进度](06_Role_D_RAG_Progress.md)，必须与本轮静态同步和未来重新验收区分。

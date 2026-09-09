@@ -1,277 +1,119 @@
-# DecisionJury API 契约文档 v0.2
+# DecisionJury API 契约文档 v0.3
 
-## 1. 文档目的
+> 文档核对基线：`dev@53d70bc`。v0.3 是文档同步编号，不改变 URL 或运行时代码。本次仅交付 `shopping`；`time` 枚举、工具和数据兼容保留，不承诺时间案件主流程。以下示例为契约说明，不是本轮真实 API 验收记录。
 
-本文档用于统一前端、后端、Agent、RAG、MCP 工具之间的接口契约。A/B/C/D/E 开发时必须以本文档为准。
+## 1. 维护与当前限制
 
-接口字段发生变化时，必须先更新本文档，再修改代码和测试。
+B 维护 HTTP/存储，C 维护 Agent 和 adapter，D 维护检索，E 维护工具，A 校对页面消费字段。文档与代码不一致时先记录差异，不把期望行为伪装成现状。
 
-接口维护规则：
+- B 已在 PR #89 补齐 `/debate` 提醒保存所需的 `Reminder` 导入，路由回归通过；页面闭环与重复保存等仍需验收。
+- `PATCH /cases/{case_id}` 仍按七项字段计算状态，与创建/消息使用的 C 最低三项条件不一致。以下分别说明，不声称本轮已统一代码。
+- 注册登录存在，但无 JWT/统一会话鉴权。部分接口比较 `user_id`，另一些没有所属用户校验，不构成生产级权限保护。
+- 不因接口/工具返回 HTTP 200 就认定业务、模型或数据库保存成功。
 
-- B 后端 API 与状态管理负责维护本文档。
-- A 前端提出页面展示字段需求。
-- C Agent 编排提出 AgentStep、DecisionReport、TraceItem、RAG/MCP 接入字段需求。
-- D RAG 提出 RagEvidence 字段需求。
-- E MCP 提出 ToolResult 字段需求。
-- 跨模块接口变更必须在 PR 中说明影响范围。
+## 2. 通用约定
 
-## 2. 命名与通用约定
+### 2.1 路径与服务
 
-### 2.1 基础路径
+B 业务接口前缀为 `/api`，注册登录为 `/auth`。RAG 的 `/api/rag/search` 在独立 D 服务（本地默认8001），不是默认后端8000的同名路由。
 
-```text
-/api
-```
+### 2.2 命名与时间
 
-### 2.2 接口命名规则
+JSON字段和枚举使用 `snake_case`。时间用ISO 8601字符串；C/工具常含时区，B数据库返回可能不带时区，消费方需按项目时区约定处理，不假设每条都有偏移量。
 
-- 路径采用 REST 风格。
-- 资源名使用英文小写复数，例如 `cases`、`messages`、`reports`。
-- 动作作为子资源，例如 `debate`、`search`、`feedback`。
-- JSON 字段统一使用 `snake_case`。
-- 枚举值统一使用小写 `snake_case`。
-- 时间统一使用 ISO 8601。
+### 2.3 HTTP方法
 
-不使用以下风格：
+GET查询，POST创建或触发，PATCH局部修改，DELETE删除/软删除。案件、历史和观察清单已经有DELETE接口，不再是“暂不使用”。
 
-```text
-/api/createCase
-/api/getReport
-/api/startAgent
-```
-
-### 2.3 HTTP 方法规则
-
-| 方法 | 用途 |
-|---|---|
-| GET | 查询资源 |
-| POST | 创建资源或触发动作 |
-| PATCH | 局部更新资源 |
-| DELETE | 删除资源，MVP 暂不使用 |
-
-### 2.4 通用成功响应
+### 2.4 成功响应
 
 ```json
-{
-  "success": true,
-  "data": {},
-  "message": ""
-}
+{"success": true, "data": {}, "message": ""}
 ```
 
-### 2.5 通用错误响应
+### 2.5 失败响应
 
 ```json
-{
-  "success": false,
-  "data": null,
-  "message": "CASE_NOT_FOUND"
-}
+{"success": false, "data": null, "message": "CASE_NOT_FOUND"}
 ```
 
-### 2.6 时间格式
+`data` 不保证为null：缺失字段/风险拒绝可携带说明。工具HTTP异常可能是外层success=true、内层status=failed，见§11。
+
+### 2.6 身份前提
+
+创建案件、历史和提醒前，`user_id` 必须存在于users表，否则可触发外键错误。登录返回用户信息而非token；客户端不能凭此宣称服务端已验证后续请求身份。
+
+## 3. 枚举
+
+| 名称 | 值与解释 |
+|---|---|
+| case_type | 本轮为shopping；time仅兼容/延期 |
+| case_status | collecting、ready_for_debate、debating、completed、rejected、archived |
+| shopping final_decision | buy购买、delay暂缓、reject不建议购买、alternative考虑替代 |
+| time final_decision | accept/partial_accept/delay/reject为历史预留，不承诺当前主流程产出 |
+| agent | input_parser、pro_agent、con_agent、judge_agent |
+| tool_name | cost_analyzer、decision_score、cooling_reminder |
+| risk_level | low、medium、high；工具不适用时可为null |
+| history result | worth、regret、neutral（新增历史请求由Literal校验） |
+| reminder表状态 | waiting、reviewed、cancelled |
+| 提醒工具metrics.status | scheduled，与表状态不同 |
+
+`final_decision=reject` 是建议不买，不等于 `case_status=rejected` 的拒绝处理。`archived` 枚举存在，但不是每次复盘自动归档。
+
+## 4. 状态与字段合并
+
+创建/消息使用 C parser，C最低字段 `product_name / price / monthly_budget_left` 齐全且无冲突即可ready；增强字段仍可列在missing_fields中。B高风险路径可以覆盖C状态为rejected。创建已读取is_complete；消息在非高风险分支使用 `is_complete or not missing_fields` 判定ready，而非直接照搬C的case_status。后一兼容分支未单独检查conflicts，不能描述为B已完整实现C的所有状态约束。
 
 ```text
-2026-07-04T20:00:00+08:00
+collecting → ready_for_debate → debating → completed
+collecting / ready_for_debate → rejected（B风险判断）
 ```
 
-## 3. 核心枚举
+`POST /debate` 先比较user_id，再检查状态；非ready状态可能统一返回MISSING_FIELDS，不可据错误码假设每次都缺购物字段。成功后保存结果；失败回滚、重复请求和状态恢复需按实际路由验证。
 
-### 3.1 case_type
-
-| 值 | 说明 |
-|---|---|
-| shopping | 购物决策 |
-| time | 时间决策 |
-
-### 3.2 case_status
-
-| 值 | 说明 |
-|---|---|
-| collecting | 正在收集信息 |
-| ready_for_debate | 达到最低决策字段要求且无未解决冲突，可以进入 Agent 分析 |
-| debating | Agent 分析中 |
-| completed | 已完成判决 |
-| rejected | 高风险或不支持，拒绝处理 |
-| archived | 已归档 |
-
-### 3.3 shopping final_decision
-
-| 值 | 说明 |
-|---|---|
-| buy | 建议购买 |
-| delay | 建议暂缓 |
-| reject | 建议不购买 |
-| alternative | 建议寻找替代方案 |
-
-### 3.4 time final_decision
-
-| 值 | 说明 |
-|---|---|
-| accept | 建议接受 |
-| partial_accept | 建议部分接受 |
-| delay | 建议延后 |
-| reject | 建议拒绝 |
-
-### 3.5 agent_name
-
-| 值 | 说明 |
-|---|---|
-| input_parser | 输入解析 Agent |
-| pro_agent | 正方 Agent |
-| con_agent | 反方 Agent |
-| judge_agent | 法官 Agent |
-
-### 3.6 tool_name
-
-| 值 | 说明 |
-|---|---|
-| cost_analyzer | 成本计算工具 |
-| cooling_reminder | 冷静期提醒工具 |
-| decision_score | 决策评分工具，可选 |
-
-### 3.7 risk_level
-
-| 值 | 说明 |
-|---|---|
-| low | 低风险 |
-| medium | 中风险 |
-| high | 高风险 |
-
-## 4. 状态流转
-
-```text
-collecting
-  -> ready_for_debate
-  -> debating
-  -> completed
-
-collecting
-  -> rejected
-
-completed
-  -> archived
-```
-
-规则：
-
-- 信息不足时保持 `collecting`。
-- 购物 parser 的 `product_name`、`price`、`monthly_budget_left` 齐全且 `conflicts` 为空时进入 `ready_for_debate`；其余字段可继续列在 `missing_fields` 中，详见 5.8。
-- 调用 `POST /api/cases/{case_id}/debate` 后进入 `debating`。
-- Agent 分析和判决书生成完成后进入 `completed`。
-- 医疗、法律、投资、贷款、辞职、亲密关系、重大人生决策等高风险输入进入 `rejected`。
+`PATCH /cases/{case_id}` 的本地七字段判断尚未采用上述最低规则，详见§8.3。
 
 ## 5. 公共数据结构
 
 ### 5.1 Case
 
-```json
-{
-  "case_id": "case_001",
-  "user_id": "u001",
-  "case_type": "shopping",
-  "title": "是否购买降噪耳机",
-  "description": "我想买一副 1299 元的降噪耳机，最近学习需要安静。",
-  "status": "ready_for_debate",
-  "collected_fields": {
-    "price": 1299,
-    "monthly_budget_left": 2000,
-    "owned_alternatives": "普通耳机"
-  },
-  "missing_fields": [],
-  "final_decision": null,
-  "report_id": null,
-  "created_at": "2026-07-01T10:00:00+08:00",
-  "updated_at": "2026-07-01T10:05:00+08:00"
-}
-```
+详情/更新响应直接在data下返回：case_id、user_id、case_type、title、description、**case_status**、collected_fields、missing_fields、final_decision、report_id、created_at、updated_at。
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| case_id | string | 是 | 案件 ID |
-| user_id | string | 是 | 用户 ID |
-| case_type | string | 是 | `shopping` 或 `time` |
-| title | string | 是 | 案件标题 |
-| description | string | 是 | 用户原始描述 |
-| status | string | 是 | 案件状态 |
-| collected_fields | object | 是 | 已收集的结构化字段 |
-| missing_fields | string[] | 是 | 仍缺失的字段 |
-| final_decision | string/null | 是 | 最终裁决，未完成时为 null |
-| report_id | string/null | 是 | 判决书 ID，未生成时为 null |
-| created_at | string | 是 | 创建时间 |
-| updated_at | string | 是 | 更新时间 |
+案件列表项仅包含 `case_id / title / case_type / status / description / updated_at / message_count / has_report`，不是完整详情。列表使用 **status** 而非case_status，两种返回不能直接混用。数据库内部status不意味着HTTP详情也使用这个名字。
 
 ### 5.2 Message
 
+最新GET messages的item形状：
+
 ```json
 {
-  "message_id": "msg_001",
-  "case_id": "case_001",
+  "id": "msg_001",
+  "session_id": "case_001",
   "role": "user",
-  "content": "我本月预算还剩 2000 元。",
-  "created_at": "2026-07-01T10:03:00+08:00"
+  "type": "text",
+  "content": "价格大概是2500元。",
+  "created_at": "2026-07-01T10:03:00"
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| message_id | string | 是 | 消息 ID |
-| case_id | string | 是 | 案件 ID |
-| role | string | 是 | `user`、`assistant`、`agent` |
-| content | string | 是 | 消息内容 |
-| created_at | string | 是 | 创建时间 |
+当前路由不是message_id/case_id/message_type命名，前端需要显式适配。role通常为user/assistant；存储模型也允许其他角色字符串。
 
 ### 5.3 AgentStep
 
-```json
-{
-  "agent": "judge_agent",
-  "status": "completed",
-  "summary": "建议暂缓购买 3 天。",
-  "confidence": 0.75,
-  "arguments": ["预算占比较高", "已有普通耳机"],
-  "used_rag_ids": ["history_001"],
-  "used_tool_names": ["cost_analyzer", "cooling_reminder"],
-  "error": null
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| agent | string | 是 | Agent 名称 |
-| status | string | 是 | `completed` 或 `failed` |
-| summary | string | 是 | 当前 Agent 输出摘要 |
-| confidence | number | 是 | 置信度，范围 0 到 1 |
-| arguments | string[] | 是 | 主要理由、风险或裁决依据 |
-| used_rag_ids | string[] | 是 | 使用的 RAG 证据 ID |
-| used_tool_names | string[] | 是 | 使用的工具名 |
-| error | string/null | 是 | 失败原因，成功时为 null |
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| agent | string | 四个Agent之一 |
+| status | string | completed / failed |
+| summary | string | 摘要 |
+| confidence | number | 0～1启发式值，不是校准概率 |
+| arguments | string[] | 论点或判决说明 |
+| used_rag_ids | string[] | 关联证据ID |
+| used_tool_names | string[] | 关联工具名 |
+| error | string/null | 错误 |
 
 ### 5.4 RagEvidence
 
-```json
-{
-  "id": "history_001",
-  "title": "历史闲置记录",
-  "content": "用户曾购买蓝牙键盘后使用频率较低。",
-  "score": 0.82,
-  "source": "decision_history",
-  "case_type": "shopping",
-  "tags": ["electronics", "idle"],
-  "created_at": "2026-06-20T12:00:00+08:00"
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| id | string | 是 | 证据 ID |
-| title | string | 是 | 证据标题 |
-| content | string | 是 | 可引用证据内容 |
-| score | number | 是 | 检索相关性分数 |
-| source | string | 是 | 来源，例如 `decision_history` 或 `rule_knowledge` |
-| case_type | string | 是 | 关联案件类型 |
-| tags | string[] | 是 | 标签 |
-| created_at | string/null | 是 | 创建时间，无时间时为 null |
+字段为 `id / title / content / score / source / case_type / tags / created_at`。前六项分别为字符串（score为number），tags为字符串数组，created_at可为null。score为BM25相关性分数，不要求0～1；证据内容是content，不是旧SPEC中的text。
 
 ### 5.5 ToolResult
 
@@ -279,88 +121,35 @@ completed
 {
   "tool_name": "cost_analyzer",
   "status": "success",
-  "summary": "该商品占剩余预算约 65%，预算压力中等。",
-  "risk_level": "medium",
-  "metrics": {
-    "budget_ratio": 0.65,
-    "budget_left_after_purchase": 701
-  },
+  "summary": "该商品占剩余预算约 65%，风险等级为 high。",
+  "risk_level": "high",
+  "metrics": {"budget_ratio": 0.65, "budget_left_after_purchase": 701},
   "error": null
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| tool_name | string | 是 | 工具名称 |
-| status | string | 是 | `success` 或 `failed` |
-| summary | string | 是 | 工具结果摘要 |
-| risk_level | string/null | 是 | 风险等级，无风险等级时为 null |
-| metrics | object | 是 | 工具结构化指标 |
-| error | string/null | 是 | 失败原因，成功时为 null |
+所有字段均为稳定结构；status为success/failed，risk_level及error可为null，metrics为对象。成功工具数据不等于数据库写入成功。
 
 ### 5.6 DecisionReport
 
-```json
-{
-  "report_id": "report_001",
-  "case_id": "case_001",
-  "case_type": "shopping",
-  "final_decision": "delay",
-  "confidence": 0.75,
-  "summary": "本案建议暂缓购买 3 天。",
-  "case_summary": "用户想购买 1299 元降噪耳机用于学习。",
-  "pro_points": ["存在学习降噪场景，可能提高专注度。"],
-  "con_points": ["价格占剩余预算较高，且已有普通耳机。"],
-  "rag_evidence": [],
-  "tool_results": [],
-  "next_actions": ["加入观察清单，3 天后复盘。"],
-  "created_at": "2026-07-01T10:10:00+08:00"
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| report_id | string | 是 | 判决书 ID |
-| case_id | string | 是 | 案件 ID |
-| case_type | string | 是 | 案件类型 |
-| final_decision | string | 是 | 最终裁决 |
-| confidence | number | 是 | 法官 Agent 置信度 |
-| summary | string | 是 | 判决摘要 |
-| case_summary | string | 是 | 案件摘要 |
-| pro_points | string[] | 是 | 正方观点 |
-| con_points | string[] | 是 | 反方观点 |
-| rag_evidence | RagEvidence[] | 是 | 引用的 RAG 证据 |
-| tool_results | ToolResult[] | 是 | 工具调用结果 |
-| next_actions | string[] | 是 | 后续动作 |
-| created_at | string | 是 | 创建时间 |
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| report_id / case_id / case_type | string | 报告与案件标识，当前shopping |
+| final_decision | string | 本地规则唯一决定 |
+| confidence | number | 本地置信度，不采用法官LLM返回值覆盖 |
+| summary / case_summary | string | 判决说明与案件摘要 |
+| pro_points / con_points | string[] | 双方论点 |
+| rag_evidence | RagEvidence[] | 证据 |
+| tool_results | ToolResult[] | 工具结果，包括失败结果 |
+| next_actions | string[] | 本地后续动作 |
+| created_at | string | 生成时间 |
+| debate_events | DebateEvent[] | 默认空列表；当前完整庭审4条 |
 
 ### 5.7 TraceItem
 
-```json
-{
-  "trace_id": "trace_001",
-  "step": 1,
-  "type": "agent",
-  "name": "input_parser",
-  "input_summary": "用户想购买降噪耳机",
-  "output_summary": "识别为 shopping，缺少预算和替代品信息",
-  "duration_ms": 900,
-  "status": "completed",
-  "error": null
-}
-```
+C内部包含 `trace_id / step / type / name / input_summary / output_summary / duration_ms / status / error`。type为agent/rag_search/tool_call，step从1开始；error可为null。
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| trace_id | string | 是 | 轨迹 ID |
-| step | number | 是 | 执行顺序 |
-| type | string | 是 | `agent`、`rag_search`、`tool_call` |
-| name | string | 是 | Agent 名称、工具名或检索名 |
-| input_summary | string | 是 | 输入摘要 |
-| output_summary | string | 是 | 输出摘要 |
-| duration_ms | number | 是 | 耗时 |
-| status | string | 是 | `completed` 或 `failed` |
-| error | string/null | 是 | 错误信息，成功时为 null |
+B另行生成数据库trace ID，并在GET trace中增加created_at。不要用C内存trace ID等同数据库ID。正常调用包含decision_score，cooling_reminder条件触发，通常7或8条，不固定七条。
 
 ### 5.8 ParserResult（C 内部调用契约）
 
@@ -410,657 +199,251 @@ completed
 HTTP 暴露范围（本次保持不变）：
 
 - `POST /api/cases` 选择返回 `case_status / collected_fields / missing_fields / next_question` 等字段；`collected_fields` 来自 C 的 `merged_fields`。
-- `POST /api/cases/{case_id}/messages` 保存 `merged_fields`、缺失字段和状态，并以 `reply` 返回回复；未整体透传上述七个扩展字段。
-- `DebateResult`、`DecisionReport` 不因此新增 parser 元数据。前端当前无需读取这些扩展字段；如需展示歧义或记录跨轮来源，由 B 明确增加透传/保存，再与前端对齐。
+- `POST /api/cases/{case_id}/messages` 保存 `merged_fields`、缺失字段和状态，并以 `reply` 返回回复；非高风险分支使用 `is_complete or not missing_fields` 判断就绪。七个扩展字段未全部按原名透传。
+- B 创建案件时，在值非空时把 conflicts / next_question_key / termination_reason / parser_used 分别存为 collected_fields 中的 `_conflicts / _current_question_key / _termination_reason / _parser_used`。消息路径只写 `_conflicts / _current_question_key / _parser_used`，不更新 `_termination_reason`。这些内部键可随 collected_fields 响应暴露，不是新增顶层响应字段。
+- `field_meta` 没有整体持久化；已有下划线键的清理和跨轮刷新仍需验证，不能保证记录永远对应最新一轮。`DebateResult`、`DecisionReport` 不因此新增 parser 元数据。前端要展示歧义时应与 B 明确内部键的消费契约。
+
+### 5.9 DebateEvent
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| event_id | string | 如event_001，不是数据库消息ID |
+| order | integer | 从1递增，按此排序 |
+| speaker | string | clerk / pro_agent / con_agent / judge_agent |
+| phase | string | case_summary / opening_statement / closing_argument / verdict |
+| content | string | 可展示的发言文本 |
+| evidence | string[] | 关联RAG ID或工具名，默认[] |
+| status | string | completed / failed，默认completed |
+
+完整案件四条顺序：clerk/case_summary、pro_agent/opening_statement、con_agent/closing_argument、judge_agent/verdict。正反方独立陈述，无互相反驳。旧报告缺事件时调用方兼容[]，不伪造历史发言。
+
+### 5.10 DebateResult（C内部结果）
+
+`success / message / case_id / case_status / steps / rag_evidence / tool_results / report / trace / reason / debate_events`。
+
+report在未完成时可为null，reason可为null，debate_events默认[]。C的顶层事件与report.debate_events一致。B持久化完整结果，但HTTP响应按§9、§12选择字段，不整体透传这个结构。
 
 ## 6. 接口总览
 
-| 方法 | 路径 | 用途 | 实现方 | 主要调用方 |
-|---|---|---|---|---|
-| GET | `/api/health` | 健康检查 | B | 全员 |
-| POST | `/api/cases` | 创建案件 | B | A |
-| GET | `/api/cases/{case_id}` | 查询案件详情 | B | A/C |
-| PATCH | `/api/cases/{case_id}` | 更新案件字段 | B | A/B |
-| POST | `/api/cases/{case_id}/messages` | 多轮补充信息 | B/C | A |
-| POST | `/api/cases/{case_id}/debate` | 启动 Agent 分析 | B/C | A |
-| GET | `/api/cases/{case_id}/trace` | 查询执行轨迹 | B/C | A |
-| GET | `/api/cases/{case_id}/report` | 查询判决书 | B/C | A |
-| POST | `/api/cases/{case_id}/feedback` | 提交复盘 | B | A |
-| GET | `/api/history?user_id=u001` | 查询历史记录 | B/D | A/D |
-| POST | `/api/history` | 添加历史记录 | B/D | A |
-| POST | `/api/rag/search` | RAG 检索 | D | C |
-| POST | `/api/tools/cost-analyzer` | 成本计算 | E | C |
-| POST | `/api/tools/cooling-reminder` | 冷静期提醒 | E | C |
-| POST | `/api/tools/decision-score` | 决策评分 | E | C |
-| GET | `/api/watchlist?user_id=u001` | 查询观察清单 | B/E | A |
-| DELETE | `/api/watchlist/{reminder_id}` | 删除观察清单项 | B/E | A |
-| POST | `/auth/register` | 用户注册 | B | A |
-| POST | `/auth/login` | 用户登录 | B | A |
+| 方法 | 路径 | 责任 |
+|---|---|---|
+| GET | /api/health | B |
+| POST | /auth/register | B |
+| POST | /auth/login | B |
+| POST / GET | /api/cases | B |
+| GET / PATCH / DELETE | /api/cases/{case_id} | B |
+| POST / GET | /api/cases/{case_id}/messages | B/C |
+| POST | /api/cases/{case_id}/debate | B/C |
+| GET | /api/cases/{case_id}/report | B/C |
+| GET | /api/cases/{case_id}/trace | B/C |
+| POST | /api/cases/{case_id}/feedback | B |
+| POST / GET | /api/history | B/D |
+| DELETE | /api/history/{history_id} | B |
+| PATCH | /api/history/{history_id}/restore | B |
+| GET | /api/watchlist | B |
+| DELETE | /api/watchlist/{reminder_id} | B |
+| POST | /api/tools/cost-analyzer | E/B |
+| POST | /api/tools/cooling-reminder | E/B |
+| POST | /api/tools/decision-score | E/B |
+| POST | /api/rag/search（独立RAG服务） | D |
+
+没有恢复旧 `/api/chat`，没有新增SSE/WebSocket路由。
 
 ## 7. 健康检查
 
-```text
-GET /api/health
-```
-
-返回：
+`GET /api/health`：
 
 ```json
-{
-  "success": true,
-  "data": {
-    "status": "ok",
-    "version": "1.0.0"
-  },
-  "message": ""
-}
+{"success": true, "data": {"status": "ok", "version": "1.0.0"}, "message": ""}
 ```
 
-## 8. 案件接口
+只验证进程/API，不验证模型、检索命中或提醒存储。
+
+## 8. 案件与身份接口
 
 ### 8.1 创建案件
 
-```text
-POST /api/cases
-```
-
-请求：
+`POST /api/cases`，以下四个字符串字段必填：
 
 ```json
 {
-  "user_id": "u001",
+  "user_id": "demo_user",
   "case_type": "shopping",
   "title": "是否购买降噪耳机",
-  "description": "我想买一副 1299 元的降噪耳机，最近学习需要安静。"
+  "description": "我想买一副1299元的降噪耳机，最近学习需要安静，预计每天使用，这次是刚需。"
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| case_type | string | 是 | `shopping` 或 `time` |
-| title | string | 是 | 案件标题 |
-| description | string | 是 | 用户原始描述 |
+data包含case_id、case_status、collected_fields、missing_fields、next_question、is_high_risk、reject_reason；collected_fields是累计字段，不只是description。next_question及模型提取文案不是固定值。空description可进入收集；不要从title必然推断已经得到product_name。
 
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "case_id": "case_xxxxxxxx",
-    "case_status": "collecting",
-    "collected_fields": {
-      "description": "我想买一副1299元的降噪耳机，最近学习需要安静。"
-    },
-    "missing_fields": ["monthly_budget_left", "owned_alternatives"],
-    "next_question": "你本月预算还剩多少？"
-  },
-  "message": "case created"
-}
-```
+请求模型的case_type为str，不等于任意类型有主流程。当前用户操作只提交shopping。
 
 ### 8.2 查询案件详情
 
-```text
-GET /api/cases/{case_id}
-```
-
-路径参数：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| case_id | string | 是 | 案件 ID |
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "case": {
-      "case_id": "case_001",
-      "user_id": "u001",
-      "case_type": "shopping",
-      "title": "是否购买降噪耳机",
-      "description": "我想买一副 1299 元的降噪耳机，最近学习需要安静。",
-      "status": "completed",
-      "collected_fields": {
-        "price": 1299,
-        "monthly_budget_left": 2000,
-        "owned_alternatives": "普通耳机"
-      },
-      "missing_fields": [],
-      "final_decision": "delay",
-      "report_id": "report_001",
-      "created_at": "2026-07-01T10:00:00+08:00",
-      "updated_at": "2026-07-01T10:10:00+08:00"
-    }
-  },
-  "message": ""
-}
-```
+`GET /api/cases/{case_id}`：data直接是§5.1详情，无data.case包装。不存在返回CASE_NOT_FOUND。当前没有该路由所属用户参数校验，不把它视为已鉴权。
 
 ### 8.3 更新案件字段
 
-```text
-PATCH /api/cases/{case_id}
-```
-
-请求：
+`PATCH /api/cases/{case_id}`：user_id、title、description、collected_fields均可选。collected_fields按key更新，不是整对象替换；非空本轮字段可以覆盖旧值。
 
 ```json
-{
-  "title": "更新后的标题",
-  "collected_fields": {
-    "monthly_budget_left": 3000
-  }
-}
+{"title": "更新后的标题", "collected_fields": {"monthly_budget_left": 3000}}
 ```
 
-返回：更新后的完整案件信息，格式与 `GET /api/cases/{case_id}` 一致。
+data与详情一致，message为case updated。当前实现仍检查七个购物字段来切换状态，与parser最低三项策略不同；普通对话补充应走/messages，不能声称两条路径已完全等价。
 
 ### 8.4 多轮补充信息
 
-```text
-POST /api/cases/{case_id}/messages
-```
-
-请求：
+`POST /api/cases/{case_id}/messages`：
 
 ```json
-{
-  "user_id": "u001",
-  "message": "我本月预算还剩 2000 元，已有一副普通耳机。"
-}
+{"user_id": "demo_user", "message": "本月预算还剩3000元，已有普通耳机。"}
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| message | string | 是 | 用户补充信息 |
+data包含reply、case_status、collected_fields、missing_fields、is_high_risk、reject_reason。检查price仍为1299、budget为3000；reply可能是模型或本地文本，不能逐字断言。保存C的merged_fields，不要求extracted_fields包含全部旧字段。
 
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "reply": "信息已补充完整，可以进入正反方分析。",
-    "case_status": "ready_for_debate",
-    "collected_fields": {
-      "monthly_budget_left": 2000,
-      "owned_alternatives": "普通耳机"
-    },
-    "missing_fields": []
-  },
-  "message": ""
-}
-```
 ### 8.5 用户注册
 
-```text
-POST /auth/register
-```
-
-请求：
-
-```json
-{
-  "user_id": "test_user",
-  "name": "测试用户",
-  "password": "123456"
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| name | string | 是 | 用户昵称 |
-| password | string | 是 | 用户密码 |
-
-返回（成功）：
-
-```json
-{
-  "success": true,
-  "data": {
-    "user_id": "test_user",
-    "name": "测试用户"
-  },
-  "message": "注册成功"
-}
-```
-
-返回（失败-用户已存在）：
-
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "用户已存在"
-}
-```
+`POST /auth/register`：user_id/name/password为必填字符串。成功data为user_id/name，message为“注册成功”；重复为success=false、data=null、message“用户已存在”。只在隔离环境使用测试账号。
 
 ### 8.6 用户登录
 
-```text
-POST /auth/login
-```
+`POST /auth/login`：user_id/password必填；成功data为user_id/name，message“登录成功”。失败为“用户不存在”或“密码错误”。没有返回Bearer token/JWT，也没有统一cookie会话。
 
-请求：
+### 8.7 分页消息
 
-```json
-{
-  "user_id": "test_user",
-  "password": "123456"
-}
-```
+`GET /api/cases/{case_id}/messages?user_id=demo_user&page=1&page_size=20`。
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| password | string | 是 | 用户密码 |
+user_id必填；page≥1，page_size为1～100、默认20；按created_at升序。data为items/total/page/page_size，item见§5.2。无案件为CASE_NOT_FOUND，不匹配用户为FORBIDDEN。
 
-返回（成功）：
+### 8.8 案件列表与删除
 
-```json
-{
-  "success": true,
-  "data": {
-    "user_id": "test_user",
-    "name": "测试用户"
-  },
-  "message": "登录成功"
-}
-```
+`GET /api/cases?user_id=demo_user&page=1&page_size=10`：user_id必填，page_size最大100，按updated_at倒序；data为items/total/page/page_size，列表项见§5.1。
 
-返回（失败-用户不存在）：
+`DELETE /api/cases/{case_id}?user_id=demo_user`：比较所属用户，成功data为deleted=true。删除案件并级联消息/轨迹/提醒，关联历史软删除。当前历史查询过滤软删除记录，不能承诺删除后RAG仍会通过该接口得到记录。
+
+## 9. Agent分析接口
+
+### 9.1 启动多Agent分析
+
+`POST /api/cases/{case_id}/debate`：
 
 ```json
-{
-  "success": false,
-  "data": null,
-  "message": "用户不存在"
-}
+{"user_id": "demo_user"}
 ```
 
-返回（失败-密码错误）：
+| data字段 | 类型 | 说明 |
+|---|---|---|
+| case_id | string | 案件ID |
+| case_status | string | 成功为completed |
+| steps | AgentStep[] | parser、正方、反方、法官 |
+| rag_evidence | RagEvidence[] | 本次证据 |
+| tool_results | ToolResult[] | 成本、评分、条件提醒结果 |
+| report | DecisionReport | 判决书 |
+| debate_events | DebateEvent[] | 四条庭审事件 |
 
-```json
-{
-  "success": false,
-  "data": null,
-  "message": "密码错误"
-}
-```
+顶层证据/工具与report对应列表保持一致。C内部trace不在此HTTP响应中返回，请调用§12.2。一次性JSON返回，不是实时token/事件流。失败时使用success/message及data中的说明，不能无条件访问report。
 
-## 9. Agent 分析接口
+PR #89 已修复 Reminder 导入，成功路径路由测试通过；该表仍不是实际部署或完整页面闭环的验收证明。
 
-### 9.1 启动多 Agent 分析
+### 9.2 高风险拒绝
 
-```text
-POST /api/cases/{case_id}/debate
-```
-
-请求：
-
-```json
-{
-  "user_id": "u001"
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "case_id": "case_xxxxxxxx",
-    "case_status": "completed",
-    "steps": [
-      {
-        "agent": "input_parser",
-        "status": "completed",
-        "summary": "识别为 shopping，信息完整。",
-        "confidence": 0.95,
-        "arguments": [],
-        "used_rag_ids": [],
-        "used_tool_names": [],
-        "error": null
-      },
-      {
-        "agent": "pro_agent",
-        "status": "completed",
-        "summary": "...",
-        "confidence": 0.7,
-        "arguments": [],
-        "used_rag_ids": [],
-        "used_tool_names": [],
-        "error": null
-      },
-      {
-        "agent": "con_agent",
-        "status": "completed",
-        "summary": "...",
-        "confidence": 0.8,
-        "arguments": [],
-        "used_rag_ids": [],
-        "used_tool_names": ["cost_analyzer"],
-        "error": null
-      },
-      {
-        "agent": "judge_agent",
-        "status": "completed",
-        "summary": "建议暂缓购买3天。",
-        "confidence": 0.85,
-        "arguments": [],
-        "used_rag_ids": [],
-        "used_tool_names": ["cost_analyzer", "cooling_reminder"],
-        "error": null
-      }
-    ],
-    "rag_evidence": [...],
-    "tool_results": [...],
-    "report": {
-      "report_id": "report_xxxxxxxx",
-      "case_type": "shopping",
-      "final_decision": "delay",
-      "confidence": 0.85,
-      "summary": "本案建议暂缓购买3天。",
-      "case_summary": "用户想购买1299元降噪耳机用于学习。",
-      "pro_points": ["购买目的较明确：降噪", "预期使用频率为每天，可能支撑长期价值"],
-      "con_points": ["价格占剩余预算约43%，风险等级为medium", "已有替代品"],
-      "rag_evidence": [...],
-      "tool_results": [...],
-      "next_actions": ["加入观察清单，3天后复盘"],
-      "created_at": "..."
-    },
-    "trace": [...]
-  },
-  "message": "debate completed"
-}
-```
-
-字段说明：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| case_id | string | 是 | 案件 ID |
-| case_status | string | 是 | 分析后的案件状态 |
-| steps | AgentStep[] | 是 | Agent 执行结果 |
-| rag_evidence | RagEvidence[] | 是 | 本次使用的证据 |
-| tool_results | ToolResult[] | 是 | 本次工具调用结果 |
-| report | DecisionReport | 是 | 生成的判决书 |
-
-说明：
-
-- `rag_evidence` 和 `tool_results` 是顶层字段，便于前端快速展示本次使用的证据和工具结果。
-- `report.rag_evidence` 和 `report.tool_results` 是判决书内部引用，必须与顶层对应字段保持一致。
-- `report` 必须使用完整公共结构 `DecisionReport`，不能返回空对象。
-
-### 9.2 高风险输入返回示例
-
-当输入属于医疗、法律、投资、贷款、辞职、亲密关系、重大人生决策等高风险范围时，不进入正反方辩论。
+当B已将案件标记为rejected，/debate拒绝并返回：
 
 ```json
 {
   "success": false,
   "data": {
-    "case_id": "case_001",
     "case_status": "rejected",
-    "reason": "high_risk_domain"
+    "is_high_risk": true,
+    "reject_reason": "该决策超出系统支持范围。"
   },
   "message": "HIGH_RISK_DECISION"
 }
 ```
 
-## 10. RAG 接口
+原因字符串可变化。C返回HIGH_RISK_DECISION时B另有兼容分支，data可能为null；不要将C风险元数据与所有HTTP失败结构混为一谈。
 
-### 10.1 RAG 检索
-
-```text
-POST /api/rag/search
-```
-
-请求：
+### 9.3 缺失信息与用户校验
 
 ```json
 {
-  "user_id": "u001",
-  "case_id": "case_001",
-  "case_type": "shopping",
-  "query": "降噪耳机 学习 电子产品 冲动消费",
-  "top_k": 3
-}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| case_id | string | 是 | 案件 ID |
-| case_type | string | 是 | 案件类型 |
-| query | string | 是 | 检索查询文本 |
-| top_k | number | 否 | 返回条数，默认 3 |
-
-返回：
-
-```json
-{
-  "success": true,
+  "success": false,
   "data": {
-    "results": [
-      {
-        "id": "history_001",
-        "title": "历史闲置记录",
-        "content": "用户曾购买蓝牙键盘后使用频率较低。",
-        "score": 0.82,
-        "source": "decision_history",
-        "case_type": "shopping",
-        "tags": ["electronics", "idle"],
-        "created_at": "2026-06-20T12:00:00+08:00"
-      }
-    ]
+    "case_status": "collecting",
+    "missing_fields": ["monthly_budget_left"],
+    "next_question": "请补充本月剩余预算。"
   },
-  "message": ""
+  "message": "MISSING_FIELDS"
 }
 ```
 
-规则：
+实际missing_fields可含增强字段，问题文本可变化。请求缺user_id由Pydantic返回422；user_id与案件不符返回业务FORBIDDEN。非ready状态同样可能返回MISSING_FIELDS，检查data.case_status。
 
-- 返回结果必须符合 `RagEvidence`。
-- 没有结果时返回空数组 `[]`。
-- RAG 不允许编造历史记录。
-- RAG 只返回证据，不直接输出最终建议。
+## 10. RAG接口
 
-## 11. MCP 工具接口
+### 10.1 RAG检索
 
-MVP 阶段先用 HTTP 接口模拟 MCP 工具调用，后续可以封装为 MCP tool schema。工具输出必须符合 `ToolResult`。
+D服务的 `POST /api/rag/search`：
+
+```json
+{"user_id": "demo_user", "case_id": "case_001", "case_type": "shopping", "query": "降噪耳机 学习", "top_k": 3}
+```
+
+user_id/case_id/case_type/query必填，top_k默认3。成功data为results数组，每项为§5.4；无命中results=[]。BM25不负责最终建议。C通过RAG_SEARCH_URL访问；RAG通过BACKEND_HISTORY_URL尝试加载当前用户历史。
+
+time检索仍是组件兼容能力，不作为本轮完整时间案件服务。不要将种子、实时用户历史和外部知识库来源混称为真实用户证据。
+
+## 11. MCP工具接口
+
+当前有两个入口：C通过Python `call_tool(name, arguments)` 调用；下列HTTP路由独立存在。二者不经过同一路由，提醒持久化也不相同。尚不宣称标准MCP Server协议传输已实现。
+
+HTTP工具异常可能返回success=true且data.status=failed；调用方必须同时检查两层。参数校验失败也可能返回success=false或422。C adapter中的失败ToolResult保证主流程可降级，不等于HTTP调用必然成功。
 
 ### 11.1 成本计算工具
 
-```text
-POST /api/tools/cost-analyzer
-```
-
-购物场景请求：
+`POST /api/tools/cost-analyzer`：
 
 ```json
-{
-  "case_id": "case_001",
-  "case_type": "shopping",
-  "price": 1299,
-  "monthly_budget_left": 2000
-}
+{"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000}
 ```
 
-时间场景请求：
+case_type必填；case_id可选。购物必需price/monthly_budget_left且非负；预算0是合法边界，实现以占比1.0处理。结果data为§5.5，1299/2000约0.65、high、余额701。阈值按未舍入占比计算：≤0.2 low、≤0.6 medium、其余high。
 
-```json
-{
-  "case_id": "case_002",
-  "case_type": "time",
-  "hours_required": 16,
-  "free_hours_this_week": 20,
-  "urgent_tasks": 2
-}
-```
-
-字段说明：
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| case_id | string | 是 | 案件 ID |
-| case_type | string | 是 | `shopping` 或 `time` |
-| price | number | shopping 必填 | 商品价格 |
-| monthly_budget_left | number | shopping 必填 | 本月剩余预算 |
-| hours_required | number | time 必填 | 需要投入小时数 |
-| free_hours_this_week | number | time 必填 | 本周可支配时间 |
-| urgent_tasks | number | time 必填 | 紧急任务数量 |
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "tool_name": "cost_analyzer",
-    "status": "success",
-    "summary": "该商品占剩余预算约 65%，预算压力中等。",
-    "risk_level": "medium",
-    "metrics": {
-      "budget_ratio": 0.65,
-      "budget_left_after_purchase": 701
-    },
-    "error": null
-  },
-  "message": ""
-}
-```
+历史兼容的time分支要求hours_required/free_hours_this_week/urgent_tasks，仍可组件调用，但不代表本轮时间主流程可用。
 
 ### 11.2 冷静期提醒工具
 
-```text
-POST /api/tools/cooling-reminder
-```
-
-请求：
+`POST /api/tools/cooling-reminder`：
 
 ```json
 {
-  "user_id": "u001",
+  "user_id": "demo_user",
   "case_id": "case_001",
   "title": "降噪耳机冷静期复盘",
   "cooling_days": 3,
-  "reason": "预算占比较高，建议冷静 3 天后复盘。",
-  "watch_items": ["是否仍然需要", "是否有低价替代品"]
+  "reason": "预算占比较高。",
+  "watch_items": ["是否仍然需要", "是否有替代品"]
 }
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| case_id | string | 是 | 案件 ID |
-| title | string | 是 | 提醒标题 |
-| cooling_days | number | 是 | 冷静期天数 |
-| reason | string | 是 | 设置提醒的原因 |
-| watch_items | string[] | 是 | 冷静期观察项 |
+user_id/case_id/title必填；cooling_days默认3、reason默认空字符串、watch_items默认[]。HTTP路径成功写入Reminder表后返回ToolResult，metrics含reminder_id/cooling_days/due_at/watch_items。业务或存储失败可能外层success=true、内层status=failed，error含REMINDER_CREATE_FAILED。
 
-返回：
+#### C编排返回数据与B落库
 
-```json
-{
-  "success": true,
-  "data": {
-    "tool_name": "cooling_reminder",
-    "status": "success",
-    "summary": "已创建 3 天冷静期提醒。",
-    "risk_level": null,
-    "metrics": {
-      "reminder_id": "reminder_001",
-      "cooling_days": 3,
-      "due_at": "2026-07-04T20:00:00+08:00",
-      "watch_items": ["是否仍然需要", "是否有低价替代品"]
-    },
-    "error": null
-  },
-  "message": ""
-}
-```
+C adapter在成功ToolResult.metrics中补充实际title/reason，保留reminder_id/due_at/cooling_days/status/watch_items；失败结果不补。它们随tool_results及report.tool_results返回。这不表示E原始call_tool或独立HTTP结果已经新增相同字段。
 
-工具失败时：
-
-```json
-{
-  "success": true,
-  "data": {
-    "tool_name": "cooling_reminder",
-    "status": "failed",
-    "summary": "冷静期提醒创建失败。",
-    "risk_level": null,
-    "metrics": {},
-    "error": "REMINDER_CREATE_FAILED"
-  },
-  "message": ""
-}
-```
-
-规则：
-
-- 工具失败不应导致 Agent 主流程中断。
-- 法官 Agent 必须在判决书中标记工具结果缺失。
-- 工具只提供结构化依据，不直接决定最终裁决。
-
-#### C 编排返回的提醒补充数据与 B 落库对接
-
-`backend/app/services/mcp_adapter.py` 的 `create_cooling_reminder()` 在工具成功时，
-向 `ToolResult.metrics` 补充本次调用的 `title` 和 `reason` 字符串，保留原有
-`reminder_id / due_at / cooling_days / status / watch_items`。失败结果不增加这些字段。
-这两个补充字段会随 C 的 `tool_results` 和 `report.tool_results` 返回。
-
-此扩展只针对 C adapter；不表示 E 的 `call_tool()` 原始输出或上述工具 HTTP
-响应已经新增同名字段。工具调用成功只代表生成了提醒数据，不能据此断言已写入数据库。
-
-当前 `POST /api/tools/cooling-reminder` 会写入 `Reminder`；`/debate` 路径尚未保存
-提醒，本次 C 修改不包含数据库持久化。B 后续需要：
-
-- 仅持久化 `tool_name=cooling_reminder` 且 `status=success` 的结果。
-- 使用当前案件的 `user_id / case_id`，以及 metrics 的提醒 ID、标题、原因、到期时间；兼容旧结果缺少 `title / reason` 的情况。
-- 将工具 `metrics.status=scheduled` 映射为数据库 `waiting`，以匹配 `/api/watchlist` 查询条件；正确解析 `due_at` 的时区。
-- 处理重复请求的幂等性和事务失败，避免生成重复提醒或在保存失败后声称已加入观察清单。
+B的/debate已有保存分支：读取这些metrics，用案件user/case ID，保存为表内waiting。PR #89已补齐Reminder导入；日期解析、外键、事务、幂等和页面回放仍需专项验收，不能将“工具成功”或“代码已合入”当作所有存储边界已验收。
 
 ### 11.3 决策评分工具
 
-```text
-POST /api/tools/decision-score
-```
-
-请求：
+`POST /api/tools/decision-score`：
 
 ```json
-{
-  "case_type": "shopping",
-  "cost_risk_level": "high",
-  "history_risk": 0.7,
-  "usage_value": 0.6,
-  "impulse_trigger": true
-}
+{"case_type": "shopping", "cost_risk_level": "high", "history_risk": 0.7, "usage_value": 0.6, "impulse_trigger": true}
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| case_type | string | 是 | `shopping` 或 `time` |
-| cost_risk_level | string | 是 | 来自 cost_analyzer 的 `low` / `medium` / `high` |
-| history_risk | number | 是 | 0 表示历史支持，1 表示历史警示，取 0~1 |
-| usage_value | number | 是 | 0 表示价值低，1 表示价值高，取 0~1 |
-| impulse_trigger | boolean | 是 | 是否因促销/种草/情绪等冲动触发 |
-
-返回：
+只有case_type必填；默认cost_risk_level=medium、history_risk=0.5、usage_value=0.5、impulse_trigger=false。两个数值范围0～1，触发标记为boolean。time只作组件兼容。
 
 ```json
 {
@@ -1068,17 +451,12 @@ POST /api/tools/decision-score
   "data": {
     "tool_name": "decision_score",
     "status": "success",
-    "summary": "综合评分中等，建议暂缓后再决定。",
-    "risk_level": "medium",
+    "summary": "综合评分偏低，建议放弃或寻找替代方案。",
+    "risk_level": "high",
     "metrics": {
-      "score": 54,
-      "risk_level": "medium",
-      "dimensions": {
-        "cost": -20,
-        "history": -6,
-        "usage_value": 4,
-        "impulse": -10
-      }
+      "score": 18,
+      "risk_level": "high",
+      "dimensions": {"cost": -20, "history": -6, "usage_value": 4, "impulse": -10}
     },
     "error": null
   },
@@ -1086,267 +464,92 @@ POST /api/tools/decision-score
 }
 ```
 
-说明：
+50-20-6+4-10=18；得分≥70为low、≥45为medium、更低为high。纯规则，不是LLM或概率。C在正反方之前调用，作为上下文参考；当前法官_decide不直接以该分数决定结论。
 
-- `decision_score` 是纯规则方法，不依赖 LLM，输出 0~100 综合分。
-- 分数仅供法官 Agent 参考，不直接决定最终裁决。
-
-## 12. 判决书与轨迹接口
+## 12. 判决书与轨迹
 
 ### 12.1 查询判决书
 
-```text
-GET /api/cases/{case_id}/report
-```
+`GET /api/cases/{case_id}/report` 返回 **data直接平铺报告字段**，并合并data.debate_events；不是data.report。这是与POST debate的返回层级区别。
 
-返回：
+B读取case.debate_result.report与顶层debate_events，无案件/无报告分别返回CASE_NOT_FOUND/REPORT_NOT_FOUND。非空debate_result若不是对象，返回REPORT_DATA_CORRUPTED；非对象report按空报告处理，非数组debate_events按[]处理。历史结果没有事件时返回[]；当前C完整报告应含四条。该接口没有重新调用模型。
 
-返回 C 模块生成的真实 `report`，结构同 `report` 字段。
+### 12.2 查询执行轨迹
 
-```json
-{
-  "success": true,
-  "data": {
-    "report": {
-      "report_id": "report_001",
-      "case_id": "case_001",
-      "case_type": "shopping",
-      "final_decision": "delay",
-      "confidence": 0.75,
-      "summary": "本案建议暂缓购买 3 天。",
-      "case_summary": "用户想购买 1299 元降噪耳机用于学习。",
-      "pro_points": ["存在学习降噪场景，可能提高专注度。"],
-      "con_points": ["价格占剩余预算较高，且已有普通耳机。"],
-      "rag_evidence": [],
-      "tool_results": [],
-      "next_actions": ["加入观察清单，3 天后复盘。"],
-      "created_at": "2026-07-01T10:10:00+08:00"
-    }
-  },
-  "message": ""
-}
-```
+`GET /api/cases/{case_id}/trace` 返回data.case_id及data.trace，按step升序；item为§5.7加created_at。无案件返回CASE_NOT_FOUND；不要把技术轨迹与庭审发言混用。
 
-### 12.2 查询 Agent 执行轨迹
+## 13. 历史记录
 
-```text
-GET /api/cases/{case_id}/trace
-```
+### 13.1 查询历史
 
-返回：
+`GET /api/history?user_id=demo_user&page=1&page_size=10`。
+
+user_id必填；page≥1，page_size实际允许1～1000（默认10）；可选case_type/result筛选。只返回is_deleted=0，按created_at倒序。data为items/total/page/page_size；item字段为history_id/user_id/case_type/title/summary/result/tags/case_id/report_id/created_at。
+
+### 13.2 添加历史
+
+`POST /api/history`：
 
 ```json
-{
-  "success": true,
-  "data": {
-    "case_id": "case_xxxxxxxx",
-    "trace": [
-      {
-        "trace_id": "trace_xxxxxxxx",
-        "step": 1,
-        "type": "agent",
-        "name": "input_parser",
-        "input_summary": "...",
-        "output_summary": "...",
-        "duration_ms": 100,
-        "status": "completed",
-        "error": null,
-        "created_at": "..."
-      }
-    ]
-  },
-  "message": ""
-}
+{"user_id": "demo_user", "case_type": "shopping", "summary": "购买前评估了耳机预算。", "result": "neutral", "tags": ["electronics"]}
 ```
 
-## 13. 历史记录接口
+user_id/case_type/summary/result必填，result只允许worth/regret/neutral。可选title/price/usage_frequency/context/pros/cons/final_decision/case_id/report_id/tags。成功data返回保存的完整历史信息（含history_id），message=history created。
 
-### 13.1 查询历史记录
+### 13.3 删除与恢复
 
-```text
-GET /api/history?user_id=u001
-```
+`DELETE /api/history/{history_id}?user_id=demo_user`：比较所属用户，标记is_deleted=1，data.deleted=true。
 
-返回：
+`PATCH /api/history/{history_id}/restore?user_id=demo_user`：比较所属用户，恢复is_deleted=0，data.restored=true。失败消息包括HISTORY_NOT_FOUND、FORBIDDEN、HISTORY_ALREADY_DELETED、HISTORY_NOT_DELETED。
 
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "history_id": "history_xxxxxxxx",
-        "user_id": "local_user",
-        "case_type": "shopping",
-        "title": "降噪耳机",
-        "summary": "用户复盘：购买降噪耳机，实际行为：bought，满意度：4★",
-        "result": "worth",
-        "tags": [],
-        "case_id": "case_xxxxxxxx",
-        "report_id": "report_xxxxxxxx",
-        "created_at": "..."
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "page_size": 10
-  },
-  "message": ""
-}
-```
+软删除保留数据库记录，但当前历史HTTP查询会过滤；RAG经该HTTP入口拉取也受过滤影响，不宣称删除后依旧能检索。
 
-### 13.2 添加历史记录
-
-```text
-POST /api/history
-```
-
-```json
-{
-  "user_id": "local_user",
-  "case_type": "shopping",
-  "summary": "购买降噪耳机，建议暂缓3天",
-  "result": "neutral",
-  "tags": ["electronics"],
-  "title": "索尼降噪耳机",
-  "price": 1299,
-  "context": "考研期间每天学习需要降噪",
-  "case_id": "case_xxxxxxxx",
-  "report_id": "report_xxxxxxxx"
-}
-```
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "history_id": "history_xxxxxxxx"
-  },
-  "message": "history created"
-}
-```
-
-## 14. 观察清单与复盘接口
+## 14. 观察清单与复盘
 
 ### 14.1 查询观察清单
 
-```text
-GET /api/watchlist?user_id=u001
-```
+`GET /api/watchlist?user_id=demo_user`，user_id必填。data.items只含该用户waiting提醒，按due_at升序；字段为reminder_id/case_id/title/reason/due_at/status/created_at。
 
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "items": [
-      {
-        "case_id": "case_001",
-        "title": "降噪耳机",
-        "reason": "预算占比较高，建议冷静 3 天。",
-        "due_at": "2026-07-04T20:00:00+08:00",
-        "status": "waiting"
-      }
-    ]
-  },
-  "message": ""
-}
-```
+提醒页面为空可能因为尚无符合条件的记录、已复盘/取消或保存失败，不应一概归因于C工具未被调用。
 
 ### 14.2 删除观察清单项
 
-```text
-DELETE /api/watchlist/{reminder_id}
-```
-
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| reminder_id | string | 是 | 观察清单项 ID（来自 14.1 返回的 reminder_id） |
-
-返回：
-
-```json
-{
-  "success": true,
-  "data": {
-    "deleted": true,
-    "reminder_id": "reminder_001"
-  },
-  "message": ""
-}
-```
-
-说明：
-
-- 对应前端观察清单的“删除”操作。
-- 软删除：将提醒 `status` 置为 `cancelled`，该提醒不再出现在待复盘列表（`status == waiting` 条件）。
-- 删除不存在的提醒返回 `success:false`、`message: "REMINDER_NOT_FOUND"`。
+`DELETE /api/watchlist/{reminder_id}?user_id=demo_user` 将状态设为cancelled；data为deleted=true、reminder_id。PR #89起user_id必填，缺少返回422；所属用户不符返回FORBIDDEN，无记录为REMINDER_NOT_FOUND。前端需携带该参数；这种ID比较仍不等于可信的登录会话鉴权。
 
 ### 14.3 提交决策复盘
 
-```text
-POST /api/cases/{case_id}/feedback
-```
-
-请求：
+`POST /api/cases/{case_id}/feedback`：
 
 ```json
-{
-  "user_id": "u001",
-  "actual_action": "not_buy",
-  "satisfaction": 5,
-  "review": "冷静三天后发现不是刚需，没有购买。"
-}
+{"user_id": "demo_user", "actual_action": "not_bought", "satisfaction": 5, "review": "冷静后选择先用已有耳机。"}
 ```
 
-| 字段 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| user_id | string | 是 | 用户 ID |
-| actual_action | string | 是 | 用户实际行为 |
-| satisfaction | number | 是 | 满意度，1 到 5 |
-| review | string | 是 | 复盘文本 |
+user_id/actual_action/satisfaction必填，review可选。actual_action为字符串，界面约定bought/not_bought/delayed/other；satisfaction建议1～5，但当前Pydantic仅声明int，没有范围约束，不将建议误写为服务端已校验。
 
-返回：
+要求案件completed；按满意度≥4/≤2/其他映射worth/regret/neutral。同案未软删除的复盘可更新，关联waiting提醒改为reviewed。成功data为saved_to_history=true、history_id，message为空；不是自动将案件置为archived。
 
-```json
-{
-  "success": true,
-  "data": {
-    "saved_to_history": true,
-    "history_id": "history_003"
-  },
-  "message": "feedback saved"
-}
-```
+## 15. 错误码与失败层次
 
-## 15. 错误码
+| message / error | 层次与实际含义 |
+|---|---|
+| CASE_NOT_FOUND / REPORT_NOT_FOUND / REPORT_DATA_CORRUPTED / CASE_NOT_COMPLETED | B业务失败，通常HTTP200、success=false |
+| FORBIDDEN | 部分B路由user_id比较失败，通常HTTP200，不是统一鉴权中间件 |
+| MISSING_FIELDS / HIGH_RISK_DECISION | 业务失败，可携带data说明 |
+| UNSUPPORTED_CASE_TYPE | C adapter/部分工具不支持类型；不表示创建接口已严格枚举校验 |
+| HISTORY_NOT_FOUND / HISTORY_ALREADY_DELETED / HISTORY_NOT_DELETED | 历史业务失败 |
+| REMINDER_NOT_FOUND | 观察清单业务失败 |
+| VALIDATION_ERROR | Pydantic请求校验，HTTP422 |
+| DATABASE_ERROR / INTERNAL_SERVER_ERROR | 全局异常处理，HTTP500 |
+| INTEGRITY_ERROR | 数据库完整性错误，HTTP400 |
+| INVALID_JSON_FORMAT | JSON解码异常处理；具体入口也可能归入422验证错误 |
+| TOOL_ERROR / REMINDER_CREATE_FAILED | 可在ToolResult.error内，外层success不一定false |
+| RAG/LLM调用失败 | C按路径降级/记录trace，不保证转换成同名HTTP500错误 |
 
-| 错误码 | 含义 | HTTP 状态码 |
-| --- | --- | --- |
-| CASE_NOT_FOUND | 案件不存在 | 200（业务错误） |
-| MISSING_FIELDS | 案件信息不完整 | 200（业务错误） |
-| UNSUPPORTED_CASE_TYPE | 不支持的案件类型 | 200（业务错误） |
-| HIGH_RISK_DECISION | 高风险决策 | 200（业务错误） |
-| REPORT_NOT_FOUND | 判决书不存在 | 200（业务错误） |
-| CASE_NOT_COMPLETED | 案件未完成 | 200（业务错误） |
-| LLM_ERROR | 大模型调用失败 | 500 |
-| RAG_ERROR | 检索失败 | 500 |
-| TOOL_ERROR | 工具调用失败 | 500 |
-| VALIDATION_ERROR | 请求字段错误 | 422 |
-| DATABASE_ERROR | 数据库错误 | 500 |
-| INTERNAL_SERVER_ERROR | 服务器内部错误 | 500 |
-| INVALID_JSON_FORMAT | JSON 格式错误 | 400 |
-| INTEGRITY_ERROR | 数据库完整性错误 | 400 |
+## 16. 联调与验收
 
-## 16. 联调要求
-
-- A 前端必须能展示 `steps`、`rag_evidence`、`tool_results`、`trace`、`report`。
-- B 后端必须保证接口路径、字段名、枚举值与本文档一致。
-- C Agent 编排必须输出 `AgentStep`、`DecisionReport`、`TraceItem`。
-- D RAG 必须返回 `RagEvidence[]`，无结果时返回空数组。
-- E MCP 工具必须返回 `ToolResult`，失败时返回 `status: failed` 和 `error`。
-- 所有模块必须使用 `snake_case` 字段名。
-- 接口变更必须先改本文档，再改代码。
+- A区分POST debate的data.report与GET report的平铺data；对空事件、旧报告、消息字段差异做兼容。
+- B保存C完整结果和trace，Reminder导入已修复；继续验证元数据更新/清理、持久化和观察清单删除参数，后续统一PATCH与parser完成条件。
+- C保证最低字段、合并、四庭审事件和本地规则所有权；不为本次time延期修改协议。
+- D返回真实RagEvidence，E返回ToolResult；HTTP与本地调用的额外字段/副作用分开说明。
+- 契约变化同步测试。Swagger的ApiResponse.data为宽类型，OpenAPI存在不等于所有嵌套字段和业务路径已获验证。
+- 最新验收按 [测试计划](05_TestPlan.md) 记录；本次只同步文档，不修复业务代码。

@@ -1,622 +1,176 @@
 # DecisionJury SPEC 项目规格说明书
 
-## 1. 项目概述
+> 实现基线：`dev@53d70bc`。本次只交付购物决策；`time` 为延期范围，保留的工具、枚举、数据不代表时间主流程可用。本文描述已检查的代码机制，不替代 [测试计划](05_TestPlan.md) 中的运行验收。
 
-DecisionJury 是一个面向日常低风险决策的多 Agent 冷静决策助手。系统聚焦购物决策和时间决策，通过正反方 Agent 辩论、历史记录 RAG 检索、MCP 工具调用和法官 Agent 裁决，帮助用户在冲动或犹豫时获得更理性的辅助建议。
+## 1. 产品定位与边界
 
-项目不追求替用户做决定，而是帮助用户完成一套可解释的决策流程：
+面向日常购物，帮助用户整理用途、价格、预算和替代品，看到正反两面理由、相关历史和计算依据。输出是辅助建议，不是消费效果保证或法律意义上的判决。
 
-```text
-看清动机 -> 补全信息 -> 检索历史 -> 计算成本 -> 正反分析 -> 输出建议 -> 设置冷静期
-```
+不扩展医疗、法律、投资、借贷、辞职、亲密关系等高风险场景。C parser 保留 `is_high_risk` 标记，C 主流程本身不以该标记直接停止；B 的创建、消息和辩论路由仍有拒绝路径。不得将 C 的行为描述成整个项目已取消高风险边界。该分类采用关键词/模型判断，不保证覆盖或准确识别所有风险语境。
 
-## 2. 项目目标
-
-### 2.1 产品目标
-
-- 帮助用户减少冲动消费。
-- 帮助用户评估时间安排是否合理。
-- 让用户能看到正反两方面理由，而不是只听单一建议。
-- 通过历史记录提醒用户避免重复踩坑。
-- 通过冷静期提醒把建议转化为后续行动。
-
-### 2.2 技术目标
-
-- 调用至少一个 LLM API。
-- 实现至少一个 RAG 检索功能。
-- 实现至少两个 MCP 工具并被 Agent 调用。
-- 支持多轮对话和基本状态管理。
-- 能生成结构化判决书。
-- 能通过前端完成完整演示。
-
-## 3. 目标用户
-
-### 3.1 购物决策用户
-
-- 大学生。
-- 年轻消费者。
-- 数码、服饰、课程、会员服务等消费频率较高的人。
-- 容易因为促销、种草内容、情绪上头而购买的人。
-
-### 3.2 时间决策用户
-
-- 大学生。
-- 社团成员。
-- 学生干部。
-- 小组项目成员。
-- 容易接太多任务、难以拒绝的人。
-
-## 4. 用户痛点
-
-### 4.1 购物决策痛点
-
-- 商品种草信息太多，用户容易只看到优点。
-- 用户很难记住自己过去买过哪些闲置物品。
-- 购物前很少认真计算预算占比。
-- 购买动机可能是情绪驱动，而不是真实需求。
-- 普通 AI 问答缺少用户个人历史记录。
-
-### 4.2 时间决策痛点
-
-- 用户容易低估活动或任务占用的时间。
-- 用户常常忽略已有任务和截止时间。
-- 用户不擅长评估机会成本。
-- 用户很难根据历史拖延记录调整当前决策。
-- 普通待办工具只记录任务，不帮助判断是否值得接。
-
-## 5. 项目边界
-
-### 5.1 支持范围
-
-系统只处理：
-
-- 购物决策。
-- 时间决策。
-
-### 5.2 不支持范围
-
-系统不处理：
-
-- 医疗决策。
-- 法律决策。
-- 投资理财决策。
-- 借贷决策。
-- 就业离职决策。
-- 亲密关系决策。
-- 其他可能带来重大现实后果的高风险决策。
-
-### 5.3 输出边界
-
-系统输出是辅助建议，不是强制结论。  
-系统应该使用“建议”“可以考虑”“风险较高”等表述，避免“必须”“一定”“保证”等绝对化表述。
-
-## 6. 核心业务流程
-
-### 6.1 总流程
+## 2. 架构与职责
 
 ```text
-用户提交决策问题
-  |
-输入解析 Agent 判断案件类型
-  |
-系统判断信息是否完整
-  |
-多轮追问补全关键字段
-  |
-RAG 检索历史记录和规则知识
-  |
-调用 MCP 工具计算成本或设置提醒
-  |
-正方 Agent 分析收益
-  |
-反方 Agent 分析风险
-  |
-法官 Agent 综合裁决
-  |
-生成判决书
-  |
-保存历史记录和观察清单
+浏览器（React / TypeScript / Vite）
+  → B FastAPI（/api 业务接口、/auth 注册登录）
+    → SQLAlchemy / SQLite
+    → C adapter → Python 顺序编排
+      → DeepSeek HTTPS API
+      → D RAG HTTP 服务 → BM25 → 种子 + B 历史接口
+      → C 工具 adapter → E call_tool → 规则工具与日志
 ```
 
-### 6.2 购物决策流程
+| 层 | 实现与职责 | 不承担的职责 |
+|---|---|---|
+| A 前端 | 案件、消息、判决、庭审回放、历史和观察清单展示 | 不直接持有模型 Key 或调用模型 |
+| B 后端 | API、用户记录、案件状态、JSON/trace/历史/提醒持久化 | 不替代 C 的字段解析和判决规则 |
+| C Agent | parser、正反方、法官、LLM 协议、RAG/MCP adapter | 不直接向数据库写提醒 |
+| D RAG | jieba + BM25，返回可引用记录 | 不生成最终建议、不编造个人历史 |
+| E 工具 | 成本、评分、提醒数据、调用日志、工程脚本 | 不决定完整案件状态或最终结论 |
+
+基础框架为 Python + uv/pytest、FastAPI、SQLAlchemy、SQLite，前端为 React 18 + TypeScript + Vite。Python 版本/依赖以根目录 `pyproject.toml` 为准。没有使用 LangGraph/LangChain 编排，也没有 ChromaDB/FAISS 向量库；不能将原方案候选技术列成当前技术栈。
+
+## 3. 端到端流程
+
+1. 注册演示用户，再用其真实 `user_id` 创建购物案件，避免外键失败。
+2. B 调用 `parse_input`，保存 C 的 `merged_fields`、缺失字段与案件状态；消息轮次同时保存用户和助手消息。
+3. 三个最低字段齐全、无冲突且未被 B 拒绝后，允许调用 `POST /api/cases/{case_id}/debate`，请求体包含所属用户 ID。
+4. B 将案件置为 `debating`，调用 `run_case_decision_flow`；C adapter 只接受 `shopping`。
+5. C 重新解析累计输入，依序调用检索、工具和 Agent，形成报告、事件与 trace。
+6. B 保存完整结果、trace 和成功提醒；PR #89 已补齐 `Reminder` 导入。路由测试通过不等于浏览器完整闭环已验收。
+7. 前端通过报告/trace 接口读取结果。用户反馈写入历史，RAG 下次请求尝试拉取实时历史作为候选。
+
+C 真实调用顺序：
 
 ```text
-用户提交购物想法
-  |
-提取商品、价格、购买动机
-  |
-追问预算、已有替代品、预计使用频率
-  |
-检索历史购物记录、闲置记录、预算偏好
-  |
-调用成本计算工具
-  |
-正方 Agent 分析购买价值
-  |
-反方 Agent 分析冲动风险、闲置风险和平替方案
-  |
-法官 Agent 输出 buy / delay / reject / alternative
-  |
-如需暂缓，调用冷静期提醒工具
+input_parser
+  → rag_search
+  → cost_analyzer
+  → decision_score
+  → pro_agent
+  → con_agent
+  → cooling_reminder（条件触发）
+  → judge_agent
 ```
 
-### 6.3 时间决策流程
+提醒在法官之前生成，不是法官生成 `delay` 后才调用。当前触发条件见 `backend/app/orchestrator/decision_flow.py` 的 `_should_create_reminder`：成本风险为 medium/high，或触发原因是促销、种草、情绪。实际 trace 通常为 7 或 8 步，不能固定写成七步。
+
+## 4. 输入解析与状态
+
+### 4.1 字段
+
+| 字段 | 意义 | 最低必需 |
+|---|---|---|
+| product_name | 商品或服务名称 | 是 |
+| price | 商品价格 | 是 |
+| monthly_budget_left | 本月剩余预算 | 是 |
+| purpose | 用途 | 否 |
+| owned_alternatives | 已有替代品 | 否 |
+| expected_usage_frequency | 预计频率 | 否 |
+| trigger_reason | 购买触发原因 | 否 |
+
+默认路径先构建本地解析结果，再尝试模型；无 Key 用本地规则，模型请求/校验失败时返回本地结果。支持的口语、中文金额和明确纠正都有规则及对应测试，但不保证理解任意表达。
+
+### 4.2 合并与结束条件
+
+- `extracted_fields` 是本轮提取，`merged_fields` 才是累计结果。
+- 保留本轮未提及的历史值；同名非空本轮字段可覆盖旧值；`correction_fields` 最后覆盖。
+- `MINIMUM_DECISION_FIELDS` 为商品名、价格、剩余预算；最低字段齐全且 `conflicts` 为空时，C 的购物结果可进入 `ready_for_debate`。
+- `missing_fields` 仍列七项中未收集的增强字段，所以可以非空；`is_complete` 指最低条件满足，不是七项全齐。
+- B 还执行自身风险/状态判断；UI 不应仅凭有缺失字段就重新阻塞分析。
+
+`ParserResult` 还提供 `field_meta / conflicts / next_question_key / termination_reason / parser_used`。详情见 [API §5.8](04_API.md#58-parserresultc-内部调用契约)。B 已在 collected_fields 中保存部分下划线前缀元数据，并通过 is_complete 判断就绪；field_meta 未整体持久化，创建和消息路径的元数据更新范围也不同，不宣称完整字段置信度记忆或最大三轮退出机制。本地分支在最低字段满足时仍可能带增强字段追问，状态是能否开始分析的重要依据。
+
+### 4.3 价格与预算回归示例
 
 ```text
-用户提交时间安排问题
-  |
-提取活动、占用时间、动机
-  |
-追问当前任务、截止时间、活动收益、是否可部分参加
-  |
-检索历史任务延期记录、活动复盘、时间偏好
-  |
-调用成本计算工具
-  |
-正方 Agent 分析参加收益
-  |
-反方 Agent 分析时间成本和机会成本
-  |
-法官 Agent 输出 accept / partial_accept / delay / reject
-  |
-如需后续提醒，调用冷静期提醒工具
+想买降噪耳机，价格 1299 元，本月预算还剩 2000 元
 ```
 
-## 7. Agent 角色设计
+本地价格 1299、预算 2000；金额上下文限制在标点分句内，防止后面的预算关键词吞掉价格。纠正“不是2500，是2200”应更新价格，而“预算不是3000，是2500”应更新预算。歧义金额不得被当作两个确定字段使用。
 
-### 7.1 输入解析 Agent
+## 5. Agent 与 DeepSeek
 
-职责：
+| 角色 | 处理方式 |
+|---|---|
+| input_parser | 专用 `complete_parser_json` + 字段校验，本地重算合并、缺失与状态 |
+| pro_agent | `complete_json("pro_agent", payload)`，输出支持购买的摘要与论点 |
+| con_agent | `complete_json("con_agent", payload)`，独立分析风险，不接收正方陈述 |
+| judge_agent | 本地 `_decide / _confidence`，再调用 `complete_json("judge_agent", payload)` 生成说明 |
 
-- 判断案件类型。
-- 提取关键字段。
-- 判断缺失字段。
-- 决定是否继续追问。
+通用模型协议是 `summary / arguments / confidence`，parser 使用独立结构与校验规则。`backend/app/prompts/` 保存角色提示词说明；当前请求没有读取这些 Markdown 文件，实际 system/user 提示词由 `backend/app/services/llm_client.py` 的 `_build_system_prompt / _build_user_prompt` 构造，并在同文件校验响应。仅修改提示词 Markdown 不会改变实际模型请求，运行行为以这些函数和 Agent 传入的 payload 为准。
 
-输出格式：
+默认模型 `deepseek-v4-flash`，地址 `https://api.deepseek.com/chat/completions`；使用 JSON 响应格式，默认超时 30 秒，`DEEPSEEK_TIMEOUT_SECONDS` 支持 1～120 秒，非法值回退默认。当前工厂读取 Key/timeout，不读取自定义 Base URL/model 环境变量；类构造参数可用于受控验证，不等于部署已支持任意网关切换。
 
-```json
-{
-  "case_type": "shopping",
-  "extracted_fields": {
-    "item_name": "降噪耳机",
-    "price": 1299,
-    "motivation": "学习需要安静"
-  },
-  "missing_fields": ["monthly_budget_left", "owned_alternatives"],
-  "next_question": "你本月预算还剩多少？是否已经有类似耳机？"
-}
-```
+无 Key 或远端失败时，正反方使用 mock；法官使用本地说明。有效 JSON 只证明结构符合要求，不能证明模型结论必然正确，也不能从 HTTP 200 推断没有发生 fallback。
 
-### 7.2 正方 Agent
+### 5.1 法官规则
 
-职责：
+按当前 `_decide` 的优先顺序：
 
-- 分析执行该决策的收益。
-- 说明它为什么可能值得做。
-- 不允许忽略预算和时间约束。
-- 必须结合用户动机输出观点。
+1. 成本工具成功且风险 high → `reject`。
+2. 成本风险 medium、触发原因为促销/种草/情绪，或证据带 idle/regret/budget 标签 → `delay`。
+3. 有非空且不是“无/没有”的替代品 → `alternative`。
+4. 使用频率为每天/每日/经常/高频 → `buy`。
+5. 其他 → `delay`。
 
-购物场景关注：
+LLM 接收规则结论、双方观点、RAG 和工具上下文，只生成说明，不能覆盖规则结果。评分工具会进入上下文，但当前 `_decide` 不直接使用 `decision_score` 的数值。法官置信度也是本地启发式，不是模型输出的置信度或统计校准概率。
 
-- 商品能解决的问题。
-- 使用频率是否足够。
-- 长期价值是否明显。
-- 是否符合用户当前目标。
+## 6. 简化模拟法庭
 
-时间场景关注：
-
-- 活动收益。
-- 成长价值。
-- 人际价值。
-- 是否与长期目标一致。
-
-### 7.3 反方 Agent
-
-职责：
-
-- 分析风险、成本和替代方案。
-- 主动寻找冲动因素。
-- 主动引用历史记录。
-- 不允许只输出情绪化反对。
-
-购物场景关注：
-
-- 闲置风险。
-- 预算压力。
-- 溢价风险。
-- 平替方案。
-
-时间场景关注：
-
-- 作业或项目延期风险。
-- 精力消耗。
-- 机会成本。
-- 是否可以拒绝或部分参加。
-
-### 7.4 法官 Agent
-
-职责：
-
-- 综合正方、反方、RAG 证据和工具结果。
-- 输出明确但非强制的辅助建议。
-- 生成结构化判决书。
-- 如果证据不足，需要说明不确定性。
-
-输出必须包含：
-
-```json
-{
-  "final_decision": "delay",
-  "confidence": 0.78,
-  "reasons": [],
-  "evidence": [],
-  "tool_results": {},
-  "next_actions": []
-}
-```
-
-## 8. RAG 设计
-
-### 8.1 知识库类型
-
-RAG 知识库分为两类：
-
-#### 用户历史库
-
-- 历史购物决策。
-- 历史时间决策。
-- 后悔记录。
-- 闲置记录。
-- 预算偏好。
-- 时间偏好。
-
-#### 决策规则库
-
-- 冲动消费判断规则。
-- 时间成本评估规则。
-- 冷静期建议规则。
-- 决策复盘模板。
-
-### 8.2 Chunk 设计
-
-每条历史记录作为一个独立 chunk。
-
-示例：
-
-```json
-{
-  "type": "shopping_history",
-  "text": "2026-06-05 用户购买机械键盘 399 元，实际使用频率较低，复盘结论为冲动购买。",
-  "tags": ["electronics", "idle", "regret"],
-  "created_at": "2026-06-05"
-}
-```
-
-### 8.3 检索策略
-
-MVP 使用以下任一方案即可：
-
-- BM25 检索。
-- 向量检索。
-- BM25 + 向量混合检索。
-
-检索返回 Top 3 到 Top 5 条结果。
-
-### 8.4 检索输出
-
-每条结果至少包含：
-
-- text。
-- score。
-- source。
-- tags。
-
-## 9. MCP 工具设计
-
-### 9.1 cost_analyzer
-
-功能：
-
-- 购物场景：计算商品价格、预算占比、剩余预算、风险等级。
-- 时间场景：计算占用时长、空闲时间占比、任务冲突等级。
-
-购物输入：
-
-```json
-{
-  "case_type": "shopping",
-  "price": 1299,
-  "monthly_budget_left": 2000
-}
-```
-
-购物输出：
-
-```json
-{
-  "risk_level": "medium",
-  "metrics": {
-    "budget_ratio": 0.65,
-    "budget_left_after_purchase": 701
-  },
-  "explanation": "该商品占剩余预算约 65%，建议进入冷静期。"
-}
-```
-
-时间输入：
-
-```json
-{
-  "case_type": "time",
-  "hours_required": 16,
-  "free_hours_this_week": 20,
-  "urgent_tasks": 2
-}
-```
-
-时间输出：
-
-```json
-{
-  "risk_level": "high",
-  "metrics": {
-    "time_ratio": 0.8,
-    "urgent_tasks": 2
-  },
-  "explanation": "该活动占用本周 80% 空闲时间，且存在紧急任务冲突。"
-}
-```
-
-### 9.2 cooling_reminder
-
-功能：
-
-- 将案件加入观察清单。
-- 设置冷静期天数。
-- 生成提醒任务。
-
-输入：
-
-```json
-{
-  "user_id": "u001",
-  "case_id": "case_001",
-  "title": "降噪耳机冷静期复盘",
-  "days": 3,
-  "reason": "预算占比较高"
-}
-```
-
-输出：
-
-```json
-{
-  "reminder_id": "r001",
-  "due_at": "2026-07-04T20:00:00+08:00",
-  "status": "scheduled"
-}
-```
-
-### 9.3 decision_score 可选工具
-
-功能：
-
-- 输出必要性评分。
-- 输出风险评分。
-- 输出冲动指数。
-- 输出推荐等级。
-
-该工具不是 MVP 必做项。
-
-## 10. 系统架构
-
-```text
-Frontend
-  |
-FastAPI Backend
-  |
-Agent Orchestrator
-  |-- LLM API
-  |-- RAG Retrieval
-  |-- MCP Tools
-  |-- State Store
-  |
-SQLite / Vector Store
-```
-
-### 10.1 C 模块当前已用技术栈
-
-本节记录 C 模块“Agent 编排与 LLM 调用”当前已经实际使用到的技术栈，避免将后续计划中的真实 RAG 误写为已完成能力。
-
-| 类型 | 当前技术/实现 | 当前状态 | 说明 |
+| order | speaker | phase | 内容来源 |
 |---|---|---|---|
-| 开发语言 | Python | 已使用 | C 模块后端编排、Agent、Schema、mock 服务和测试均使用 Python 实现。 |
-| Python 环境管理 | uv | 已使用 | 使用 `uv` 管理项目环境和命令运行。 |
-| Python 版本要求 | `>=3.11` | 已配置 | 以 `pyproject.toml` 中 `requires-python = ">=3.11"` 为准。 |
-| 测试框架 | pytest | 已使用 | C 模块测试文件包括 `tests/test_agent_flow.py`、`tests/test_mcp_adapter.py` 和 `tests/test_llm_client.py`，用于验证 Agent 主流程、MCP 适配、DeepSeek LLM 调用和异常兜底。 |
-| Agent 编排 | 本地 Python 编排函数 | 已实现购物主流程 | 当前由 `backend/app/orchestrator/decision_flow.py` 串联输入解析、RAG、MCP 工具、正反方 Agent 和法官 Agent。 |
-| Agent 输出结构 | Python 数据类/Schema | 已使用 | 当前使用 `ParserResult`、`AgentStep`、`RagEvidence`、`ToolResult`、`DecisionReport`、`TraceItem`、`DebateResult` 等结构化对象。 |
-| Prompt 管理 | Markdown Prompt 文件 | 已使用 | Prompt 存放在 `backend/app/prompts/`，包括 `input_parser.md`、`pro_agent.md`、`con_agent.md`、`judge_agent.md`。 |
-| LLM 调用 | DeepSeek + mock fallback | 已接入真实 LLM | 当前使用 `backend/app/services/llm_client.py` 接入 DeepSeek `deepseek-v4-flash`；未配置 `DEEPSEEK_API_KEY`、API 异常、超时或输出不合法时自动 fallback 到 `MockLLMClient`。 |
-| RAG 接入 | mock RAG 检索 + D 模块 BM25 服务待对接 | C 主流程仍为 mock，D 模块已提供初版 | 当前 C 主流程仍使用 `backend/app/services/mock_rag.py`；D 模块已在 `rag/` 下提供 BM25 检索服务雏形，下一步需要通过 C-D adapter 或 HTTP 调用替换当前 mock RAG。 |
-| MCP 工具调用 | E 模块本地工具 + C 适配层 | 已接入 | 当前通过 `backend/app/services/mcp_adapter.py` 调用 `mcp_tools.cost_analyzer` 和 `mcp_tools.cooling_reminder`，并统一转换为 C 对外稳定的 `ToolResult`。 |
-| 后端对接入口 | C-B adapter | 已接入 | 当前通过 `backend/app/orchestrator/adapter.py` 向 B 后端提供 `run_case_decision_flow` 调用入口。 |
-| 可观测性 | trace 执行轨迹 | 已实现 | 当前记录 Agent、RAG、工具调用的步骤、耗时、状态和错误信息，便于答辩展示与排查。 |
-| 本地演示 | Python module demo | 已使用 | 可通过 `uv run python -m backend.app.orchestrator.demo` 运行 C 模块购物法庭 demo。 |
+| 1 | clerk | case_summary | 累计字段和当前证据/工具概览，本地构造 |
+| 2 | pro_agent | opening_statement | 正方摘要和论点 |
+| 3 | con_agent | closing_argument | 反方摘要和论点 |
+| 4 | judge_agent | verdict | 规则最终建议和判决说明 |
 
-C 模块当前验证命令：
+`DebateResult.debate_events` 与 `DecisionReport.debate_events` 内容一致，新增字段默认空列表。事件还包含 `event_id / content / evidence / status`，evidence 关联证据 ID 和工具名。缺失信息/不支持类型不生成完整庭审。
 
-```bash
-uv run pytest tests/test_agent_flow.py tests/test_mcp_adapter.py tests/test_llm_client.py
-uv run python -m backend.app.orchestrator.demo
-uv run python -m compileall backend tests mcp_tools
-```
+本版只组织已有输出，非交叉质询、多轮辩论或实时推送。页面渐进播放是客户端展示，不代表后端流式生成。
 
-C 模块当前边界：
+## 7. RAG 实现
 
-- 当前已跑通购物决策 `shopping` 的 Agent 主流程，并已完成与 B 后端 adapter、E MCP 工具 adapter 的集成。
-- 当前已接入 DeepSeek 真实 LLM API，模型为 `deepseek-v4-flash`，并保留 mock fallback。
-- 当前尚未完成 C-D 真实 RAG 检索联调；D 模块已有 BM25 检索服务雏形，但 C 主流程仍在调用 `mock_rag`。
-- 当前 MCP 工具已通过 C 侧 adapter 接入 E 模块本地工具；后续如改为 HTTP/MCP Server 形式，需要保持 `ToolResult` 输出结构不变。
-- 当前前端完整链路展示仍需等待 A/B 完成真实接口联调后再验收。
-- 时间决策 `time` 不属于当前 C 模块已完成范围。
+- D 的 `rag/retriever.py` 提供 `POST /api/rag/search`；C 经 HTTP adapter 调用，主流程 `top_k=3`。
+- `rag/data_loader.py` 读取静态种子，尝试按用户请求 B 历史接口，再按 ID 合并；实时拉取失败则保留静态记录。
+- jieba 搜索分词，BM25 排序，按标题去重，返回 `RagEvidence`：id、title、content、score、source、case_type、tags、created_at。
+- `score` 是检索分数，不是 0～1 概率；无命中返回空数组。
+- 检索服务故障与正常空结果分开记录：前者 trace failed，后者 completed。两者都允许后续分析，不允许生成伪造历史。
+- `RAG_LIVE_RECORDS / BACKEND_HISTORY_URL / HISTORY_TIMEOUT` 控制实时历史；前端新复盘在后端成功保存、拉取成功并通过过滤后才可能被检索，不保证每次命中。
+- 时间样例和组件检索保留，仅为历史兼容；向量与混合检索延期。
 
-### 10.2 仓库目录结构
+## 8. 工具实现
 
-项目仓库采用前后端、Agent、RAG、MCP 工具和文档分层的结构。所有成员开发时必须按照目录职责提交代码，避免把不同模块混在一起。
+C 通过 `backend/app/services/mcp_adapter.py` 调用 E 的 `mcp_tools.mcp.call_tool(name, arguments)`，结果映射为 `ToolResult`。独立 `/api/tools/*` HTTP 接口存在，但 C 主流程不绕回这些 HTTP 路由；尚未实现标准 MCP Server 传输。
 
-```text
-DecisionJury/
-  backend/
-    后端 API、Agent 编排、LLM 调用、多轮状态管理、判决书生成。
-  frontend/
-    Web 前端页面、用户输入表单、对话界面、证据展示、判决书展示。
-  mcp_tools/
-    MCP 工具实现，包括 cost_analyzer、cooling_reminder，以及可选 decision_score。
-  rag/
-    历史记录数据处理、文本切分、向量化、检索逻辑、RAG 评测脚本。
-  data/
-    演示数据、历史决策样例、规则知识样例。禁止提交真实隐私数据。
-  tests/
-    后端测试、RAG 测试、MCP 工具测试、端到端验收测试。
-  docs/
-    MVP、SPEC、Milestones、API、测试计划、AI 协作规则等项目文档。
-  README.md
-    项目总览、启动说明、协作入口。
-  AGENTS.md
-    AI 辅助开发和 Git 协作规矩。
-```
+### 8.1 成本与评分
 
-### 10.3 模块职责边界
+购物成本按原始预算占比判定：≤0.2 为 low，≤0.6 为 medium，更高为 high；预算为 0 时实现使用占比 1.0。1299/2000 ≈ 0.65 是 high，不是 medium；1299/3000 ≈ 0.43 为 medium。
 
-| 模块 | 主要职责 | 不负责 |
-|---|---|---|
-| frontend | 收集用户输入、展示多轮对话、展示 RAG 证据、展示工具调用结果和判决书 | 直接调用 LLM、直接读写向量库 |
-| backend | 提供 API、管理案件状态、编排 Agent 工作流、统一调用 LLM/RAG/MCP | 前端样式、离线数据标注 |
-| rag | 构建历史记录库、执行 BM25/向量/混合检索、返回可引用证据 | 生成最终建议、直接修改案件状态 |
-| mcp_tools | 提供成本计算、冷静期提醒、观察清单等可调用工具 | 负责完整对话流程、决定最终裁决 |
-| data | 保存演示样例、测试样例和规则知识 | 保存密钥、真实隐私数据、大型运行产物 |
-| tests | 验证核心流程、接口、RAG、MCP 工具和演示链路 | 替代人工 Review |
-| docs | 记录范围、接口、计划、验收标准和协作规则 | 记录虚假的完成情况 |
+`decision_score` 用成本、历史风险、使用价值、冲动触发四维规则产生 0～100 分；不依赖 LLM。成本工具失败时 C 可以返回失败评分结果，不用默认分冒充真实计算。
 
-### 10.4 核心调用关系
+### 8.2 提醒与数据库
 
-```text
-frontend
-  -> backend API
-    -> Agent Orchestrator
-      -> LLM Provider
-      -> rag search
-      -> mcp_tools/cost_analyzer
-      -> mcp_tools/cooling_reminder
-    -> SQLite state store
-    -> decision report
-```
+E 生成提醒 ID、到期时间等数据；C 成功结果的 metrics 补充实际调用的 `title / reason`。工具状态 `scheduled` 与 B 表内 `waiting` 不是同一层的枚举。
 
-调用约束：
+独立工具 HTTP 路由与 B 的 `/debate` 均有落库逻辑；PR #89 已修复后者的 `Reminder` 导入。仍需验证外键、日期、事务、重复提交和观察清单页面读取。工具成功不等于落库成功，提醒数据不等于邮件/系统通知服务。
 
-- 前端只调用后端 API，不直接调用 LLM、RAG 或 MCP 工具。
-- Agent 编排层负责决定何时调用 RAG 和 MCP 工具。
-- RAG 返回的是证据，不直接给最终裁决。
-- MCP 工具返回结构化计算结果，不直接生成长文本建议。
-- 判决书必须同时整合用户输入、Agent 辩论、RAG 证据和 MCP 工具结果。
-- 所有关键调用需要记录 trace，方便答辩展示工作流和问题排查。
+## 9. 存储与接口
 
-## 11. 数据存储设计
+SQLite 表包含 `users / cases / messages / histories / traces / reminders`。案件 `debate_result` JSON 保存 C 完整结果；trace 另存表供查询；反馈写入历史并更新相关待复盘提醒。
 
-建议使用：
+- `POST /api/cases/{case_id}/debate`：返回 data.steps、rag_evidence、tool_results、report、debate_events。
+- `GET /api/cases/{case_id}/report`：报告字段直接平铺在 data，包含 data.debate_events；不同于 POST debate 的 data.report。
+- `GET /api/cases/{case_id}/trace`：返回数据库轨迹；不要从 /debate HTTP 响应直接读取 trace。
+- `GET /api/cases/{case_id}/messages`：已有分页、用户比较和按时间升序查询，响应项使用 id/session_id/type。
+- 注册/登录是 `/auth` 前缀，不是 `/api/auth`。当前无 JWT/统一会话认证，不能将用户 ID 参数视为可靠鉴权。
 
-- SQLite：保存用户、案件、观察清单、提醒任务。
-- ChromaDB 或 FAISS：保存历史记录向量。
+完整字段、HTTP 错误及兼容行为以 [API](04_API.md) 为准。
 
-### 11.1 users
+## 10. 可靠性、部署与验收
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | string | 用户 ID |
-| name | string | 用户昵称 |
-| created_at | datetime | 创建时间 |
+开发环境结构不一致可能自动重建数据库；演示/部署保留数据时使用 `ENV=production` 并备份。SQLite 迁移只覆盖当前实现，不承诺任意模型变更自动安全升级。
 
-### 11.2 cases
+Windows 使用根目录 `.venv` 和启动脚本，Linux screen 为开发服务器演示，Docker 使用 nginx 静态前端及独立后端/RAG 服务。已有配置不证明已对公网部署或达到生产安全要求。
 
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | string | 案件 ID |
-| user_id | string | 用户 ID |
-| case_type | string | shopping 或 time |
-| title | string | 案件标题 |
-| description | text | 用户原始描述 |
-| status | string | collecting、ready_for_debate、debating、completed |
-| final_decision | string | 最终裁决 |
-| created_at | datetime | 创建时间 |
-| updated_at | datetime | 更新时间 |
-
-### 11.3 case_messages
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | string | 消息 ID |
-| case_id | string | 案件 ID |
-| role | string | user、assistant、agent |
-| content | text | 消息内容 |
-| created_at | datetime | 创建时间 |
-
-### 11.4 decision_history
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | string | 历史记录 ID |
-| user_id | string | 用户 ID |
-| case_type | string | shopping 或 time |
-| summary | text | 历史摘要 |
-| result | string | worth、regret、neutral |
-| tags | string | 标签 |
-| created_at | datetime | 创建时间 |
-
-### 11.5 reminders
-
-| 字段 | 类型 | 说明 |
-|---|---|---|
-| id | string | 提醒 ID |
-| user_id | string | 用户 ID |
-| case_id | string | 案件 ID |
-| title | string | 提醒标题 |
-| due_at | datetime | 到期时间 |
-| status | string | scheduled、done、cancelled |
-
-## 12. 状态管理
-
-系统需要保存：
-
-- 当前案件状态。
-- 已收集字段。
-- 缺失字段。
-- 历史对话。
-- Agent 输出。
-- RAG 检索结果。
-- 工具调用结果。
-- 最终裁决。
-
-## 13. 非功能需求
-
-- 响应时间：单次普通对话建议控制在 10 秒内。
-- 可解释性：裁决书必须说明依据。
-- 可演示性：核心流程必须能稳定复现。
-- 可维护性：Prompt、工具、数据结构分文件管理。
-- 可扩展性：后续可以增加订阅决策，但 MVP 不做。
-
-## 14. 异常处理
-
-- LLM 调用失败：返回友好提示，允许用户重试。
-- RAG 无结果：明确说明“未找到相关历史记录”，不能编造。
-- MCP 工具失败：保留 Agent 分析，但标记工具结果缺失。
-- 用户输入高风险决策：拒绝裁决，提示项目仅支持低风险日常决策。
-
-## 15. 成功标准
-
-- 两类案件流程均可完整运行。
-- RAG 和 MCP 工具能被 Agent 实际调用。
-- 判决书结果可解释。
-- 前端能展示多 Agent 过程。
-- 项目能完成答辩演示。
+本次只更新人读文档，不修改 Prompt、路由、模型、数据库或测试行为。运行验收覆盖购物信息收集、四事件、规则判决、模型兜底、RAG、三个工具和 B 持久化，见 [测试计划](05_TestPlan.md)。不再以时间流程作为本次完成条件。
