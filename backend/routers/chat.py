@@ -75,12 +75,42 @@ def send_message(
             message=""
         )
     
+
+    # 5. 使用 C 模块的 merged_fields
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
-    case.missing_fields = result_dict.get("missing_fields", [])
-    case.status = result_dict.get("case_status", CaseStatus.COLLECTING)
 
-    # 5. 根据状态生成回复
+    # 6. 获取缺失字段（只赋值一次）
+    missing_fields = result_dict.get("missing_fields", [])
+    case.missing_fields = missing_fields
+
+    # 7. 接入 is_complete 判断状态
+    is_complete = result_dict.get("is_complete", False)
+
+    if is_complete or not missing_fields:
+        case.status = CaseStatus.READY_FOR_DEBATE
+    else:
+        case.status = CaseStatus.COLLECTING
+
+    # 8. 接入 conflicts
+    conflicts = result_dict.get("conflicts", [])
+    if conflicts:
+        safe_fields["_conflicts"] = conflicts
+        case.collected_fields = safe_fields
+
+    # 9. 接入 next_question_key
+    next_question_key = result_dict.get("next_question_key")
+    if next_question_key:
+        safe_fields["_current_question_key"] = next_question_key
+        case.collected_fields = safe_fields
+
+    # 10. 接入 parser_used
+    parser_used = result_dict.get("parser_used", "")
+    if parser_used:
+        safe_fields["_parser_used"] = parser_used
+        case.collected_fields = safe_fields
+
+    # 11. 根据状态生成回复
     if case.status == CaseStatus.READY_FOR_DEBATE:
         reply = "信息已补充完整，可以进入正反方分析。"
     else:
@@ -89,10 +119,13 @@ def send_message(
         if next_question:
             reply = next_question
         else:
-            # 如果 C 模块没有返回追问，使用通用提示（不暴露字段名）
-            reply = "信息仍在收集中，请继续补充相关细节。"
+            # 如果有冲突，生成冲突确认追问
+            if conflicts:
+                reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
+            else:
+                reply = "信息仍在收集中，请继续补充相关细节。"
 
-    # 6. 保存助手消息
+    # 12. 保存助手消息
     assistant_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -102,14 +135,14 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 7. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    # 13. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')
     except Exception as e:
         print(f"[WARN] flag_modified 失败: {e}")
 
-    # 8. 提交事务
+    # 14. 提交事务
     db.commit()
     print(f"[DEBUG] COMMIT 成功，case_id={case_id}")
 

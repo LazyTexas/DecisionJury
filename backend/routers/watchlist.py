@@ -44,14 +44,37 @@ def get_watchlist(
 
 
 @router.delete("/watchlist/{reminder_id}", response_model=ApiResponse)
-def delete_watchlist_item(reminder_id: str, db: Session = Depends(get_db)):
+def delete_watchlist_item(
+    reminder_id: str,
+    user_id: str = Query(..., description="用户 ID"),
+    db: Session = Depends(get_db)
+):
     """
     删除观察清单项：将提醒标记为已取消（不再出现在待复盘列表）。
     对应前端“删除”操作；软删除，保留记录。
     """
+    # 1. 查询提醒
     reminder = db.query(Reminder).filter(Reminder.id == reminder_id).first()
     if not reminder:
-        return ApiResponse(success=False, data=None, message="REMINDER_NOT_FOUND")
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="REMINDER_NOT_FOUND"
+        )
+
+    # 2. 权限校验：确保该提醒属于当前用户
+    if reminder.user_id != user_id:
+        return ApiResponse(
+            success=False,
+            data=None,
+            message="FORBIDDEN"
+        )
+    
+    # 3. 软删除：标记为已取消
     reminder.status = "cancelled"
     db.commit()
-    return ApiResponse(success=True, data={"deleted": True, "reminder_id": reminder_id}, message="")
+    return ApiResponse(
+        success=True,
+        data={"deleted": True, "reminder_id": reminder_id},
+        message=""
+    )

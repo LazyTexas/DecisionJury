@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from backend.database import get_db
-from backend.models import Case, Trace
+from backend.models import Case, Trace, Reminder
 from backend.schemas import ApiResponse, CaseStatus, DebateRequest
 from backend.app.orchestrator.adapter import run_case_decision_flow
 from datetime import datetime

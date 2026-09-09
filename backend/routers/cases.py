@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 import uuid
 from backend.database import get_db
 from backend.models import Case, Message, Reminder, History, Trace
-from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest
+from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest, SHOPPING_REQUIRED_FIELDS
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 
@@ -67,26 +67,43 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_missing = parser_dict.get("missing_fields", [])
         initial_status = parser_dict.get("case_status", CaseStatus.COLLECTING)
 
-        # 防呆：LLM 对购物输入可能误判为“不支持/拒绝”。只要不是高风险主题，
-        # 就不应直接把正常决策设为 rejected（reject 只应由高风险触发）。
-        # 因此这里把“非高风险却 rejected”的异常状态降级为 collecting，转成继续收集信息。
+        # 获取 C 模块新字段
+        is_complete = parser_dict.get("is_complete", False)
+        conflicts = parser_dict.get("conflicts", [])
+        next_question_key = parser_dict.get("next_question_key")
+        termination_reason = parser_dict.get("termination_reason", "")
+        parser_used = parser_dict.get("parser_used", "")
+
+        # 防呆：非高风险被误判为 rejected 时降级
         if not is_high_risk and initial_status == CaseStatus.REJECTED:
             initial_status = CaseStatus.COLLECTING
-            if not initial_missing:
-                initial_missing = [
-                    "product_name", "price", "purpose", "monthly_budget_left",
-                    "owned_alternatives", "expected_usage_frequency", "trigger_reason",
-                ]
+            # 保留已提取的字段，只补充真正缺失的字段
+            required_fields = SHOPPING_REQUIRED_FIELDS.copy()
+            collected_keys = set(initial_collected.keys())
+            initial_missing = [f for f in required_fields if f not in collected_keys]
             initial_collected.pop("is_high_risk", None)
             initial_collected.pop("reject_reason", None)
             reject_reason = ""
 
+        # ===== 高风险 / 完整判断 =====
         if is_high_risk:
             initial_status = CaseStatus.REJECTED
             initial_missing = []
-            # 保存拒绝原因到 collected_fields
             initial_collected["is_high_risk"] = True
             initial_collected["reject_reason"] = reject_reason
+        elif is_complete:
+            initial_status = CaseStatus.READY_FOR_DEBATE
+
+        # ===== 接入新字段到 collected_fields =====
+        if conflicts:
+            initial_collected["_conflicts"] = conflicts
+        if next_question_key:
+            initial_collected["_current_question_key"] = next_question_key
+        if termination_reason:
+            initial_collected["_termination_reason"] = termination_reason
+        if parser_used:
+            initial_collected["_parser_used"] = parser_used
+
     except Exception as e:
         print(f"[WARN] create_case parse_input 调用失败: {e}")
         initial_collected = {}
@@ -94,7 +111,6 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         initial_status = CaseStatus.COLLECTING
         is_high_risk = False
         reject_reason = ""
-        # 解析失败时兜底：不产生追问，交由后续对话收集（避免 parser_dict 未定义导致 UnboundLocalError）
         parser_dict = {}
 
     # 确保 description 保留
@@ -231,9 +247,22 @@ def get_report(case_id: str, db: Session = Depends(get_db)):
     if not case.debate_result:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
+    # 类型安全：确保 debate_result 是 dict
+    if not isinstance(case.debate_result, dict):
+        print(f"[WARN] debate_result 格式异常: {type(case.debate_result)}")
+        return ApiResponse(success=False, data=None, message="REPORT_DATA_CORRUPTED")
+    
     # 3. 从 debate_result 中提取 report 和 debate_events
-    report_data = case.debate_result.get("report", {})
-    debate_events = case.debate_result.get("debate_events", [])
+    # 安全提取 report，确保是 dict
+    report_data = case.debate_result.get("report")
+    if not isinstance(report_data, dict):
+        report_data = {}
+
+    # 安全提取 debate_events，确保是 list
+    debate_events = case.debate_result.get("debate_events")
+    if not isinstance(debate_events, list):
+        debate_events = []
+
     if not report_data:
         return ApiResponse(success=False, data=None, message="REPORT_NOT_FOUND")
 
