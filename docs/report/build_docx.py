@@ -102,13 +102,13 @@ def add_paragraph(doc: Document, text: str, size=BODY_SIZE, bold=False, indent=T
 
 
 def add_heading(doc: Document, text: str, level: int):
-    sizes = {1: 15, 2: 13, 3: 11.5, 4: 10.5}
+    # 学校模板要求标题为五号宋体加粗；这里统一用 10.5pt，避免改变模板字号约定。
     p = doc.add_paragraph()
     run = p.add_run(clean_inline(text))
-    set_run_font(run, size=sizes.get(level, 10.5), bold=True)
+    set_run_font(run, size=BODY_SIZE, bold=True)
     pf = p.paragraph_format
-    pf.space_before = Pt(12 if level == 1 else 8)
-    pf.space_after = Pt(6)
+    pf.space_before = Pt(10 if level == 1 else 6)
+    pf.space_after = Pt(4)
     pf.line_spacing = 1.15
     return p
 
