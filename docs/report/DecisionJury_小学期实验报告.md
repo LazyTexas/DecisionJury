@@ -942,7 +942,7 @@ export PYTHONIOENCODING=utf-8
 # 全量测试
 uv run --frozen pytest -p no:cacheprovider tests -q --tb=line --show-capture=no
 
-# C 模块、LLM、adapter 定向测试
+# C Agent/LLM/adapter 定向测试
 uv run --frozen pytest -p no:cacheprovider tests/test_input_parser.py \
   tests/test_llm_client.py tests/test_judge_agent.py tests/test_agent_flow.py \
   tests/test_mcp_adapter.py tests/test_rag_adapter.py
@@ -957,7 +957,7 @@ uv run --frozen pytest -p no:cacheprovider tests/test_cost_analyzer.py \
   tests/test_cooling_reminder.py tests/test_decision_score.py \
   tests/test_mcp_tools.py tests/test_tools_router.py
 
-# B 路由与迁移测试
+# B 后端路由与迁移测试
 uv run --frozen pytest -p no:cacheprovider tests/test_cases_router.py \
   tests/test_chat_router.py tests/test_debate_router.py tests/test_history_router.py \
   tests/test_watchlist_router.py tests/test_feedback_router.py \
@@ -1027,12 +1027,14 @@ Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG
 
 | 测试分组 | 实际结果 | 耗时 |
 |---|---|---|
-| C 模块、LLM、RAG/MCP adapter | 139 passed | 28.97s |
-| RAG 检索、数据加载、评测指标 | 18 passed | 1.12s |
-| MCP 工具、评分、提醒、工具路由 | 59 passed | 0.28s |
-| B 路由、消息、辩论、历史、观察清单、轨迹、迁移 | 58 passed, 18 failed | 6.61s |
+| C Agent/LLM/RAG-MCP adapter | 139 passed | 28.97s |
+| D RAG 检索、数据加载、评测指标 | 18 passed | 1.12s |
+| E MCP 工具、评分、提醒、工具路由 | 59 passed | 0.28s |
+| B 后端路由、消息、辩论、历史、观察清单、轨迹、迁移 | 58 passed, 18 failed | 6.61s |
 
-从分组结果可以看出，Agent 编排、LLM 客户端、RAG 检索、工具模块和 adapter 相关测试全部通过；失败集中在 B 路由和迁移测试中。
+> 说明：前四行按 A/B/C/D/E 模块负责人标注；最后一行“全量 tests/”是五个模块的汇总结果，因此不单独标注成员。为保持命名一致，下面统一使用“成员 + 模块/功能”的格式。
+
+从分组结果可以看出，Agent 编排、LLM 客户端、RAG 检索、工具模块和 adapter 相关测试全部通过；失败集中在 B 后端路由和迁移测试中。
 
 ### 5.3.3 失败项与原因分析
 
@@ -1224,7 +1226,7 @@ RAG 测试覆盖以下场景：
 
 ## 6.3 后续计划
 
-1. 答辩前优先修复 B 路由与 JWT 行为不一致的测试，修复迁移测试引擎隔离问题，争取全量测试回到稳定通过状态。
+1. 答辩前优先修复 B 后端路由与 JWT 行为不一致的测试，修复迁移测试引擎隔离问题，争取全量测试回到稳定通过状态。
 2. 在受控环境完成一轮真实 DeepSeek API 验收，分别记录 parser、正方、反方和法官说明的调用结果，区分真实调用和 mock fallback。
 3. 按两个购物案例完成浏览器全流程演示和截图，重点验证提醒落库、观察清单查询和复盘写入历史。
 4. 补充 RAG 生成侧评测，优化 recall 和忠实度，作为答辩时的量化证据。
@@ -1327,11 +1329,11 @@ uv run --frozen pytest -p no:cacheprovider tests -q --tb=line --show-capture=no
 
 | 测试分组 | 实际结果 |
 |---|---|
-| C 模块、LLM、RAG/MCP adapter | 139 passed |
-| RAG 检索、数据加载、评测指标 | 18 passed |
-| MCP 工具、评分、提醒、工具路由 | 59 passed |
-| B 路由、消息、辩论、历史、观察清单、轨迹、迁移 | 58 passed, 18 failed |
-| 全量 `tests/` | 279 passed, 18 failed, 7 warnings |
+| C Agent/LLM/RAG-MCP adapter | 139 passed |
+| D RAG 检索、数据加载、评测指标 | 18 passed |
+| E MCP 工具、评分、提醒、工具路由 | 59 passed |
+| B 后端路由、消息、辩论、历史、观察清单、轨迹、迁移 | 58 passed, 18 failed |
+| 全量 `tests/`（A-E 汇总） | 279 passed, 18 failed, 7 warnings |
 
 已知失败项集中在 JWT 接入后的路由断言和迁移测试引擎隔离问题，具体分析见第 5 章第 5.3 节。RAG 四组标准查询在 top_k=5 内均命中预期关键词，检索指标见第 5 章第 5.4 节。
 

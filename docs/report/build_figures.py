@@ -252,11 +252,11 @@ def build_test_results() -> None:
     d.text((w // 2 - d.textbbox((0, 0), "测试结果统计", font=title_font)[2] // 2, 24), "测试结果统计", font=title_font, fill="#111111")
 
     groups = [
-        ("C/LLM/adapter", 139, 0),
-        ("RAG", 18, 0),
-        ("MCP 工具", 59, 0),
-        ("B 路由/迁移", 58, 18),
-        ("全量 tests/", 279, 18),
+        ("C Agent/LLM/adapter", 139, 0),
+        ("D RAG 检索/评测", 18, 0),
+        ("E MCP 工具/评分/提醒", 59, 0),
+        ("B 后端路由/迁移", 58, 18),
+        ("全量 tests/（汇总）", 279, 18),
     ]
     max_val = max(p + f for _, p, f in groups)
     left, right, top, bottom = 260, w - 80, 150, h - 150
