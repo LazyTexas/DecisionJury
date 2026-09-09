@@ -400,13 +400,21 @@ input_parser(识别类型、提取字段、风险标记)
 
 ### 3.3.3 RAG 检索算法（D 模块）
 
-- 分词：jieba 中文分词。
-- 检索模型：BM25Okapi（rank_bm25），当前 MVP 未使用向量库。
-- 数据来源：`data/history_records.json` 静态 500 条 + 实时拉取后端 `/api/history`，按 `user_id` 过滤合并。
-- 返回格式：`RagEvidence[]`，按相关性分数排序，case_type 隔离。
-- 无结果时返回空数组，不允许编造历史记录。
+- 分词：`jieba` 中文分词，**query 与语料统一使用 `jieba.lcut_for_search`**（避免“社团活动/学习用品”
+  被切成单一整词而与语料细粒词（社团/活动、学习/用品）无法匹配，导致漏检）。
+- 语料构成：`title + content + tags` 拼接后切分；按 `case_type`（shopping/time）做类型隔离。
+- 检索模型：BM25Okapi（`rank_bm25`），当前 MVP 未使用向量库。
+- 排序与去重：按 BM25 得分降序；**按 `title` 去重**（每个标题保留最高分一条），
+  避免同一商品/活动生成的多条重复记录挤占 top-k。
+- 返回格式：只暴露 `RagEvidence` 契约字段（`id/title/content/score/source/case_type/tags/created_at`），
+  按相关性分数排序，case_type 隔离；无结果时返回空数组，不允许编造历史记录。
+- 数据来源：`data/history_records.json` 静态 500 条（购物 250 + 时间 250）+ 实时拉取后端 `/api/history`，
+  按 `user_id` 过滤、字段映射（`summary→content`、`history_id→id`）、按 `id` 去重合并，后端不可用时回退静态数据。
+- 量化评估：`rag/evaluate_rag_standard.py` 输出检索侧 `context_precision/recall@k`、`MRR`、`NDCG@k`
+  与生成侧 `faithfulness`、`answer_relevancy`、`latency_ms`；`rag/evaluate_dialogue_quality.py` 输出
+  “是否进入法官上下文 / 判决书是否引用证据 / 关键词接地”。
 
-【代码片段：`rag/retriever.py` 检索主函数与 `rag/data_loader.py` 数据合并/去重逻辑】
+【代码片段：`rag/retriever.py` 检索主函数（查询分词/语料构建/标题去重）与 `rag/data_loader.py` 数据合并/去重逻辑】
 
 ### 3.3.4 成本计算算法（E 模块）
 
@@ -588,11 +596,20 @@ input_parser(识别类型、提取字段、风险标记)
 
 实现要点：
 
-- 使用 jieba 分词 + rank_bm25 的 BM25Okapi 检索。
-- 数据合并：静态 500 条 + 后端实时历史，按 user_id 拉取，按 id 去重。
-- 检索结果按 `RagEvidence` 返回，case_type 隔离，无结果返回空数组。
+- 独立 FastAPI 服务（`rag/retriever.py`，端口 8001），对外提供 `POST /api/rag/search`。
+- 检索：jieba（`lcut_for_search`）+ rank_bm25 的 BM25Okapi；语料为 `title + content + tags`；
+  `case_type` 隔离；按 score 降序并**按 title 去重**。
+- 数据合并（`rag/data_loader.py`）：静态 500 条 `data/history_records.json` + 实时拉取后端
+  `GET /api/history`（按 user_id），字段映射 `summary→content`、`history_id→id`，按 id 去重、
+  实时优先；后端不可用时回退静态数据，可通过 `RAG_LIVE_RECORDS=0` 关闭联动。
+- 联动：`rag/retriever.py` 每次检索按请求里的 `user_id` 实时取数，前端新输入的决策复盘
+  （feedback → `histories` 表）会被 RAG 自动纳入检索候选。
+- 契约：结果只返回 `RagEvidence` 字段（`id/title/content/score/source/case_type/tags/created_at`），
+  无结果返回空数组、不编造。
+- 与 C 联调：C 通过 `backend/app/services/rag_adapter.py` 以 HTTP 调用 8001，失败时 fallback 空数组、
+  不中断主流程；端到端验证 `rag_search completed`，证据进入法官上下文并被判决书引用。
 
-【代码片段：`rag/retriever.py` 检索主流程，`rag/data_loader.py` 合并逻辑】
+【代码片段：`rag/retriever.py` 检索主流程（查询/语料/去重/契约裁剪），`rag/data_loader.py` 合并与回退逻辑】
 
 ### 4.2.3 MCP 工具（E）
 
@@ -683,7 +700,7 @@ uvicorn rag.retriever:app --port 8001     # RAG（按实际入口）
 | 多轮对话与状态流转 | `tests/test_chat_router.py` | 逐步补全、进入 ready | 【待填写】 |
 | 多 Agent 辩论 | `tests/test_debate_router.py` | 正/反/法官按序输出 | 【待填写】 |
 | 高风险输入拦截 | `tests/test_debate_router.py` | 拒绝并返回 HIGH_RISK_DECISION | 【待填写】 |
-| RAG 检索 | `tests/test_rag.py`、`tests/test_rag_data_loader.py` | BM25 命中、隔离、防幻觉 | 【待填写】 |
+| RAG 检索 | `tests/test_rag.py`、`tests/test_rag_data_loader.py` | BM25 命中、隔离、防幻觉 | 通过（含 adapter/对话质量/标准指标单测，RAG 相关共 **29 项**） |
 | MCP 工具 | `tests/test_mcp_tools.py`、`tests/test_tools_router.py` | 成本/提醒/评分正常 | 【待填写】 |
 | 执行轨迹 | `tests/test_trace_router.py` | 记录顺序与字段完整 | 【待填写】 |
 | 决策复盘 | `tests/test_feedback_router.py` | 写入历史、更新观察清单 | 【待填写】 |
@@ -712,14 +729,37 @@ N passed in X.XXs
 
 ## 5.3 RAG 评测
 
-【表格：按实际评测脚本输出填写】
+评测脚本：`rag/evaluate_rag.py`、`rag/evaluate_rag_standard.py`、`rag/evaluate_dialogue_quality.py`；
+结果文件：`data/rag_eval_result.json`、`data/rag_std_retrieval.json`、`data/rag_std_full.json`。
 
 | 指标 | 含义 | 结果 |
 |---|---|---|
-| Top-k 命中 | 检索结果是否包含预期类型 | 【待填写】 |
-| 命中类型 | 是否命中购物/时间正确类别 | 【待填写】 |
-| 是否进入法官上下文 | 证据是否被引用 | 【待填写】 |
-| P/R/MRR/NDCG（如已实现） | 检索质量指标 | 【待填写】 |
+| Top-k 命中 | 检索结果是否包含预期类型 | 4/4 组标准查询在 top_k=5 内命中预期关键词（降噪耳机/学习用品/社团活动/技术分享） |
+| 命中类型 | 是否命中购物/时间正确类别 | 全部正确（case_type 隔离通过） |
+| 是否进入法官上下文 | 证据是否被引用 | 是（端到端：`rag_evidence=3`，trace `rag_search completed`，`report.rag_evidence=3`） |
+| P/R/MRR/NDCG（如已实现） | 检索质量指标 | 见下表 |
+
+### 5.3.1 检索侧量化结果（top_k=5，离线可复现）
+
+| 查询 | context_precision@k | context_recall@k | MRR | NDCG@k |
+|---|---|---|---|---|
+| 想买降噪耳机 | 0.40 | 0.33 | 1.00 | 0.55 |
+| 想买学习用品 | 0.80 | 0.14 | 1.00 | 0.85 |
+| 参加社团活动 | 0.60 | 0.25 | 0.50 | 0.53 |
+| 参加技术分享 | 0.40 | 0.25 | 1.00 | 0.55 |
+
+### 5.3.2 生成侧量化结果（真实辩论，需 8000/8001）
+
+| 查询 | faithfulness | answer_relevancy | latency_ms |
+|---|---|---|---|
+| 想买降噪耳机 | 0.18 | 1.00 | ≈1056 |
+| 想买学习用品 | 0.11 | 0.50 | ≈127 |
+| 时间类（社团活动 / 技术分享） | 未计算 | 未计算 | 未计算（C 时间流程尚未实现） |
+
+说明：
+
+- 检索 recall 偏低（0.14~0.33）：top_k=5 相对相关池偏小，可增大 `top_k` 或改用混合检索。
+- faithfulness 偏低（0.11~0.18）：判决书对检索证据接地不足，需优化法官 Prompt 强制“严格基于提供的 RagEvidence 回答”。
 
 > 参考工具：`rag/evaluate_rag.py`、`rag/evaluate_rag_standard.py`、`rag/evaluate_dialogue_quality.py`。
 
@@ -917,8 +957,8 @@ pytest
 
 | 案例 | 用户输入 | 关键字段 | 预期/实际裁决 |
 |---|---|---|---|
-| 购物-降噪耳机 | 想买 1299 元降噪耳机，学习需要安静 | 预算剩余、已有普通耳机 | 【待填写】 |
-| 时间-社团活动 | 是否参加占用周末两天的社团活动 | 当前任务、活动收益 | 【待填写；按实际完成度】 |
+| 购物-降噪耳机 | 想买 1299 元降噪耳机，学习需要安静 | 预算剩余、已有普通耳机 | 实际：`delay`（RAG 命中 3 条历史证据，成本工具 `medium`，判决书引用 RAG 证据） |
+| 时间-社团活动 | 是否参加占用周末两天的社团活动 | 当前任务、活动收益 | 实际：时间链路未完整实现（C 时间流程未完成），但 RAG 时间检索已可命中社团/技术类记录 |
 
 ### 附录 D 团队成员分工表
 
@@ -929,7 +969,7 @@ pytest
 | A | 前端 | 【待填写】 | 2、3.4、4.2、5.3 |
 | B | 后端 | 【待填写】 | 3.1、4.1、4.2 |
 | C | Agent | 【待填写】 | 1、3.3、4.2 |
-| D | RAG | 【待填写】 | 3.1、3.3、4.2、5 |
+| D | RAG | 构建并维护 500 条历史样本（购物 250 + 时间 250）；实现 BM25 检索服务 `rag/retriever.py` 与 `POST /api/rag/search`；打通后端历史联动 `rag/data_loader.py`（静态 + `/api/history` 实时合并）；检索结果契约化（仅 `RagEvidence` 字段）；实现 RAG 量化评测（P/R/MRR/NDCG、忠实度、答案相关性、延迟）与端到端联调脚本 | 3.1、3.3、4.2、5 |
 | E | 工具/工程化 | 【待填写】 | 3.3、4.2、5 |
 
 <!-- TODO: 提交 Word 前删除模板中的“参考目录（提交时请删除该内容）”等说明。 -->
