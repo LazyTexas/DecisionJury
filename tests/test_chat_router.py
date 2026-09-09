@@ -1,7 +1,11 @@
 # tests/test_chat_router.py
 """
-测试 chat 路由（POST /api/cases/{case_id}/messages）
+测试 chat 路由
+- POST /api/cases/{case_id}/messages（发送消息）
+- GET  /api/cases/{case_id}/messages（消息列表）
 """
+
+from datetime import datetime, timedelta
 
 from backend.models import Case, Message
 from backend.schemas import CaseStatus
@@ -305,3 +309,129 @@ def test_messages_budget_correction(client, db_session):
     assert data["data"]["collected_fields"]["monthly_budget_left"] == 2500
     # 确保 price 没有被错误覆盖
     assert data["data"]["collected_fields"]["price"] == 1299
+
+
+# ============================================================
+# GET /api/cases/{case_id}/messages —— 消息列表
+# 契约：Query 参数 user_id（必填）、page（>=1）、page_size（1~100）；
+# 返回 data.items[{id, session_id, role, type, content, created_at}]、total、page、page_size
+# ============================================================
+
+def _add_message(db, message_id, content, role="user", case_id="case_chat_test",
+                 offset_seconds=0, message_type="text"):
+    """辅助：插入一条带确定时间戳的消息，保证排序断言稳定。"""
+    message = Message(
+        id=message_id,
+        case_id=case_id,
+        role=role,
+        content=content,
+        message_type=message_type,
+        created_at=datetime(2026, 1, 1, 12, 0, 0) + timedelta(seconds=offset_seconds),
+    )
+    db.add(message)
+    db.commit()
+    return message
+
+
+def test_get_messages_success(client, db_session):
+    """按创建时间升序返回消息列表，字段与契约一致"""
+    _create_test_case(db_session)
+    _add_message(db_session, "msg_001", "想买降噪耳机", role="user", offset_seconds=0)
+    _add_message(db_session, "msg_002", "请补充预算", role="assistant", offset_seconds=1)
+
+    response = client.get("/api/cases/case_chat_test/messages", params={"user_id": "u001"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    data = body["data"]
+    assert data["total"] == 2
+    assert data["page"] == 1
+    assert data["page_size"] == 20
+    assert [m["id"] for m in data["items"]] == ["msg_001", "msg_002"]
+    first = data["items"][0]
+    assert first["session_id"] == "case_chat_test"
+    assert first["role"] == "user"
+    assert first["type"] == "text"
+    assert first["content"] == "想买降噪耳机"
+    assert first["created_at"]
+
+
+def test_get_messages_empty(client, db_session):
+    """没有消息时返回空列表而不是报错"""
+    _create_test_case(db_session)
+
+    response = client.get("/api/cases/case_chat_test/messages", params={"user_id": "u001"})
+
+    assert response.status_code == 200
+    data = response.json()["data"]
+    assert data["items"] == []
+    assert data["total"] == 0
+
+
+def test_get_messages_pagination(client, db_session):
+    """分页参数生效，且 total 为全量条数"""
+    _create_test_case(db_session)
+    for index in range(3):
+        _add_message(db_session, f"msg_{index}", f"消息{index}", offset_seconds=index)
+
+    page1 = client.get(
+        "/api/cases/case_chat_test/messages",
+        params={"user_id": "u001", "page": 1, "page_size": 2},
+    ).json()["data"]
+    assert page1["total"] == 3
+    assert page1["page"] == 1
+    assert page1["page_size"] == 2
+    assert [m["id"] for m in page1["items"]] == ["msg_0", "msg_1"]
+
+    page2 = client.get(
+        "/api/cases/case_chat_test/messages",
+        params={"user_id": "u001", "page": 2, "page_size": 2},
+    ).json()["data"]
+    assert page2["total"] == 3
+    assert [m["id"] for m in page2["items"]] == ["msg_2"]
+
+
+def test_get_messages_case_not_found(client):
+    """案件不存在返回 CASE_NOT_FOUND"""
+    response = client.get("/api/cases/case_not_exist/messages", params={"user_id": "u001"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["message"] == "CASE_NOT_FOUND"
+
+
+def test_get_messages_forbidden_for_other_user(client, db_session):
+    """非本人案件返回 FORBIDDEN，不泄漏消息内容"""
+    _create_test_case(db_session)
+    _add_message(db_session, "msg_001", "想买降噪耳机")
+
+    response = client.get("/api/cases/case_chat_test/messages", params={"user_id": "u002"})
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["message"] == "FORBIDDEN"
+
+
+def test_get_messages_missing_user_id(client, db_session):
+    """缺少 user_id 时返回验证错误"""
+    _create_test_case(db_session)
+
+    response = client.get("/api/cases/case_chat_test/messages")
+
+    assert response.status_code == 422
+    assert response.json()["success"] is False
+
+
+def test_get_messages_invalid_page_params(client, db_session):
+    """page / page_size 越界时返回验证错误"""
+    _create_test_case(db_session)
+
+    for params in ({"page": 0}, {"page_size": 0}, {"page_size": 101}):
+        response = client.get(
+            "/api/cases/case_chat_test/messages",
+            params={"user_id": "u001", **params},
+        )
+        assert response.status_code == 422, params
