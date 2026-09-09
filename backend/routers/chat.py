@@ -1,5 +1,5 @@
 # backend/routers/chat.py
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
 from backend.database import get_db
@@ -122,6 +122,53 @@ def send_message(
             "missing_fields": case.missing_fields,
             "is_high_risk": False,
             "reject_reason": None,
+        },
+        message=""
+    )
+
+@router.get("/cases/{case_id}/messages", response_model=ApiResponse)
+def get_messages(
+    case_id: str,
+    user_id: str = Query(..., description="用户 ID"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页条数"),
+    db: Session = Depends(get_db)
+):
+    # 1. 查询案件是否存在
+    case = db.query(Case).filter(Case.id == case_id).first()
+    if not case:
+        return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
+
+    # 2. 权限校验
+    if case.user_id != user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
+
+    # 3. 分页查询消息
+    query = db.query(Message).filter(Message.case_id == case_id)
+    total = query.count()
+    items = query.order_by(Message.created_at.asc()) \
+                 .offset((page - 1) * page_size) \
+                 .limit(page_size) \
+                 .all()
+
+    # 4. 组装返回
+    return ApiResponse(
+        success=True,
+        data={
+            "items": [
+                {
+                    "id": m.id,
+                    "session_id": m.case_id,
+                    "role": m.role,
+                    "type": m.message_type,
+                    "content": m.content,
+                    "created_at": m.created_at.isoformat() if m.created_at else None,
+                }
+                for m in items
+            ],
+            "total": total,
+            "page": page,
+            "page_size": page_size,
         },
         message=""
     )

@@ -3,19 +3,28 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from backend.database import get_db
 from backend.models import Case, Trace
-from backend.schemas import ApiResponse, CaseStatus
+from backend.schemas import ApiResponse, CaseStatus, DebateRequest
 from backend.app.orchestrator.adapter import run_case_decision_flow
+from datetime import datetime
 import uuid
 
 router = APIRouter(prefix="/api", tags=["debate"])
 
 @router.post("/cases/{case_id}/debate", response_model=ApiResponse)
-def start_debate(case_id: str, db: Session = Depends(get_db)):
+def start_debate(
+    case_id: str,
+    req: DebateRequest,
+    db: Session = Depends(get_db)
+):
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
+    # 校验 user_id
+    if req.user_id != case.user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
+    
     # 2. 检查状态
     if case.status == CaseStatus.REJECTED:
         # 从 collected_fields 获取拒绝原因
@@ -106,6 +115,24 @@ def start_debate(case_id: str, db: Session = Depends(get_db)):
                 error=step.get("error"),
             )
             db.add(trace)
+
+        # 保存 Reminder
+        tool_results = result.get("tool_results", [])
+        for tool in tool_results:
+            if tool.get("tool_name") == "cooling_reminder" and tool.get("status") == "success":
+                metrics = tool.get("metrics", {})
+                # 从 metrics 中提取字段
+                reminder = Reminder(
+                    id=metrics.get("reminder_id", f"reminder_{uuid.uuid4().hex[:8]}"),
+                    user_id=case.user_id,
+                    case_id=case.id,
+                    title=metrics.get("title", case.title),        # C 的 PR #86 已加
+                    reason=metrics.get("reason", ""),              # C 的 PR #86 已加
+                    due_at=datetime.fromisoformat(metrics.get("due_at")) if metrics.get("due_at") else None,
+                    status="waiting"
+                )
+                db.add(reminder)
+                break  # 只有一个 cooling_reminder
 
         db.commit()
         # ===== 保存 trace 结束 =====
