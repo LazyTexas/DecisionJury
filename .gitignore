@@ -29,6 +29,8 @@ pnpm-debug.log*
 .env
 .env.*
 !.env.example
+!deploy/.env.example
+!deploy/.env.docker.example
 *.pem
 *.key
 

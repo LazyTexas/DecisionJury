@@ -1,6 +1,8 @@
 # tests/test_input_parser.py
 """Input Parser 单元测试 —— 纯逻辑，无外部依赖"""
 
+import pytest
+
 from backend.app.agents import input_parser
 from backend.app.agents.input_parser import parse_input
 from backend.app.services.llm_client import DeepSeekLLMClient
@@ -408,3 +410,60 @@ def test_llm_parser_failure_falls_back_to_local_rules(monkeypatch):
 
     assert result.extracted_fields["price"] == 399.0
     assert result.extracted_fields["product_name"] == "台灯"
+
+
+def test_c_module_required_examples_and_optional_metadata():
+    product = parse_input("我要买冰箱")
+    assert product.extracted_fields["product_name"] == "冰箱"
+
+    budget = parse_input("预算大概还有三千左右")
+    assert budget.extracted_fields["monthly_budget_left"] == 3000.0
+    assert budget.field_meta["monthly_budget_left"]["approximate"] is True
+
+    price = parse_input("价格是2500元")
+    assert price.extracted_fields["price"] == 2500.0
+
+    trigger = parse_input("别人有，我也想买")
+    assert trigger.extracted_fields["trigger_reason"]
+
+    frequency = parse_input("我不是每天用，大概一周两次")
+    assert frequency.extracted_fields["expected_usage_frequency"] == "一周两次"
+
+
+def test_ambiguous_amounts_are_candidates_with_one_question():
+    result = parse_input("2000，冰可乐，3块")
+    assert result.extracted_fields["product_name"] == "冰可乐"
+    assert result.conflicts and result.next_question_key == "price_or_budget"
+    assert result.next_question.count("？") == 1
+    assert "price" not in result.merged_fields
+    assert "monthly_budget_left" not in result.merged_fields
+
+
+def test_price_correction_chain_replaces_previous_value():
+    result = parse_input("价格不是2500，是2200", {"product_name": "冰箱", "price": 2500})
+    assert result.correction_fields["price"] == 2200.0
+    assert result.merged_fields["price"] == 2200.0
+
+
+def test_minimum_fields_complete_even_when_suggested_fields_missing():
+    result = parse_input("", {"product_name": "冰箱", "price": 2200, "monthly_budget_left": 3000})
+    assert result.is_complete is True
+    assert result.case_status == "ready_for_debate"
+    assert result.missing_fields == ["purpose", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
+
+
+# ========== 已知缺陷（xfail，待 Agent 编排修复）==========
+
+@pytest.mark.xfail(
+    reason=(
+        "已知缺陷：价格数字后 8 个字符内出现“预算”时，_is_budget_context() 会把该价格"
+        "误判为预算并丢弃。价格在前、预算紧随其后时 price 提取为 None；"
+        "把预算写在价格之前（或两者之间多几个字）则正常。待 input_parser 修复后移除本标记。"
+    ),
+    strict=False,
+)
+def test_price_kept_when_budget_follows_closely():
+    """价格在前、预算紧随其后时，price 与 monthly_budget_left 都应被提取。"""
+    result = parse_input("想买降噪耳机，价格 1299 元，本月预算还剩 2000 元")
+    assert result.extracted_fields.get("price") == 1299.0
+    assert result.extracted_fields.get("monthly_budget_left") == 2000.0

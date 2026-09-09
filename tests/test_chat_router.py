@@ -3,25 +3,12 @@
 测试 chat 路由（POST /api/cases/{case_id}/messages）
 """
 
-import pytest
-from fastapi.testclient import TestClient
-from backend.main import app
-from backend.database import SessionLocal
 from backend.models import Case, Message
 from backend.schemas import CaseStatus
 
-client = TestClient(app)
-
-
-@pytest.fixture(scope="function")
-def db_session():
-    """提供数据库会话，测试结束后回滚"""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.rollback()
-        db.close()
+# client / db_session 统一由 tests/conftest.py 提供（内存 SQLite + get_db 依赖覆盖）。
+# 原先本文件自建的 db_session 用真实 SessionLocal，指向 data/decisionjury.db，
+# 与 conftest 的 TestClient 用的内存库不是同一个数据库，用例必然失败。
 
 
 def _create_test_case(
@@ -101,31 +88,31 @@ def test_messages_extracts_alternatives(client, db_session):
 
 
 def test_messages_transitions_to_ready(client, db_session):
-    """补全所有字段后，status 变为 ready_for_debate"""
+    """补齐最小决策字段（商品/价格/预算）后，status 变为 ready_for_debate"""
     _create_test_case(
         db_session,
         collected_fields={"description": "想买个降噪耳机"},
-        missing_fields=["monthly_budget_left", "owned_alternatives"],
+        missing_fields=["price", "monthly_budget_left"],
     )
 
-    # 第一次：补充预算
+    # 第一次：补充商品与价格 -> 仍缺预算
     response1 = client.post(
         "/api/cases/case_chat_test/messages",
         json={
             "user_id": "u001",
-            "message": "预算还剩 1000 元",
+            "message": "想买降噪耳机，价格 800 元",
         }
     )
     body1 = response1.json()
     assert body1["success"] is True
     assert body1["data"]["case_status"] == CaseStatus.COLLECTING
 
-    # 第二次：补充替代品
+    # 第二次：补充预算 -> 达到最小决策字段
     response2 = client.post(
         "/api/cases/case_chat_test/messages",
         json={
             "user_id": "u001",
-            "message": "已有旧耳机替代",
+            "message": "预算还剩 1000 元",
         }
     )
     body2 = response2.json()
@@ -212,18 +199,20 @@ def test_messages_saves_user_and_assistant_messages(client, db_session):
 
 
 def test_messages_extracts_multiple_fields(client, db_session):
-    """一条消息同时提取多个字段"""
+    """一条消息同时提取多个字段，并达到最小决策字段"""
     _create_test_case(db_session)
 
     response = client.post(
         "/api/cases/case_chat_test/messages",
         json={
             "user_id": "u001",
-            "message": "预算还剩 2000 元，已有普通耳机，每天都会用",
+            "message": "想买降噪耳机，预算还剩 2000 元，价格 800 元，已有普通耳机，每天都会用",
         }
     )
     body = response.json()
     collected = body["data"]["collected_fields"]
+    assert collected.get("product_name")
+    assert collected.get("price") == 800
     assert collected.get("monthly_budget_left") == 2000
     assert "owned_alternatives" in collected
     assert body["data"]["case_status"] == CaseStatus.READY_FOR_DEBATE

@@ -6,7 +6,7 @@
 - POST /api/tools/cooling-reminder
 """
 
-from backend.models import Reminder, User
+from backend.models import Reminder
 
 
 def test_cost_analyzer_shopping_success(client):
@@ -77,9 +77,7 @@ def test_cost_analyzer_unsupported_case_type(client):
 
 def test_cooling_reminder_success_persists_to_db(client, db_session):
     """创建冷静期提醒成功，并写入 reminders 表（观察清单可查到）。"""
-    # cases.user_id 外键指向 users.id，需先插入用户
-    db_session.add(User(id="u001", name="测试用户", hashed_password="not-used"))
-    db_session.commit()
+    # cases.user_id 外键指向 users.id；测试用户 u001 由 conftest 统一预置。
 
     # 先创建案件，满足 reminders.case_id 外键约束
     create_resp = client.post(

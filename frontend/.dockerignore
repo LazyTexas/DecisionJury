@@ -1,0 +1,8 @@
+node_modules
+dist
+_BACKUP_old_ui
+.vite
+coverage
+.env
+.env.*
+*.log
