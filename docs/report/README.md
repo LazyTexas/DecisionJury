@@ -146,6 +146,11 @@ docs/report/DecisionJury_小学期实验报告.docx
 python docs/report/build_docx.py
 ```
 
+> 重要：原始模板文件 `小学期实验报告模板(1).docx` 不会被修改。`build_docx.py` 只读取仓库内副本
+> `docs/report/templates/小学期实验报告模板.docx`，并把结果写到
+> `docs/report/DecisionJury_小学期实验报告.docx`；脚本会拒绝把输出路径写成模板路径。
+> 如果学校模板有更新，请手动替换 `templates/` 下的副本，不要改动原始文件。
+
 生成的 `docs/report/DecisionJury_小学期实验报告.docx` 已经保留学校模板的封面和成绩页，并替换为报告正文。生成后仍需人工完成以下检查：
 
 1. 打开 `docs/report/DecisionJury_小学期实验报告.docx`，填写封面中的班级、专业、学号、姓名。

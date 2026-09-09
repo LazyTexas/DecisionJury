@@ -8,7 +8,8 @@
         --out docs/report/DecisionJury_小学期实验报告.docx
 
 说明：
-- 使用 docs/report/templates/小学期实验报告模板.docx 作为封面和成绩页模板。
+- 脚本只读取 `docs/report/templates/小学期实验报告模板.docx`（学校模板的只读副本），
+  绝不写回模板文件；原始模板 `小学期实验报告模板(1).docx` 不会被修改。
 - 模板中“说明：指导教师评分后……”之后的内容会被替换为报告正文。
 - 图片路径相对于 docs/report/ 解析。
 """
@@ -305,6 +306,11 @@ def build_docx(md_path: Path, out_path: Path, template_path: Path) -> None:
         raise FileNotFoundError(f"缺少模板文件：{template_path}")
     if not md_path.exists():
         raise FileNotFoundError(f"缺少合并报告：{md_path}")
+    # 安全保护：只读模板，绝不写回模板文件。
+    if out_path.resolve() == template_path.resolve():
+        raise SystemExit("输出文件不能与模板文件相同，请通过 --out 指定其他路径。")
+    if template_path.resolve().parent in out_path.resolve().parents:
+        raise SystemExit("输出文件不能写入 templates/ 目录，以免覆盖模板副本。")
 
     text = md_path.read_text(encoding="utf-8")
     # 从 "# 00" 章节开始，跳过合并文件头部说明
