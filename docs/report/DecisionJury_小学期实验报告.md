@@ -621,11 +621,7 @@ score = 50 + cost_delta + history_delta + usage_delta + impulse_delta
 
 ### 4.1.1 系统总体架构
 
-系统由前端、后端主服务、Agent 编排层、RAG 服务、工具模块和 SQLite 数据库组成。前端运行在 5173 端口，只调用后端 REST API；后端运行在 8000 端口，负责业务接口、状态管理、持久化和 Agent 编排；RAG 服务运行在 8001 端口，通过 HTTP 接口提供 BM25 检索；工具模块以 Python 函数和统一 `call_tool` 入口被编排层调用；大语言模型通过 HTTPS 调用 DeepSeek API，未配置密钥或调用失败时回退到 mock。
-
-![图 4-1 系统总体架构图](assets/fig_3_1_architecture.png)
-
-图 4-1 系统总体架构图
+系统总体架构如图 3-1 所示。前端运行在 5173 端口，只调用后端 REST API；后端运行在 8000 端口，负责业务接口、状态管理、持久化和 Agent 编排；RAG 服务运行在 8001 端口，通过 HTTP 接口提供 BM25 检索；工具模块以 Python 函数和统一 `call_tool` 入口被编排层调用；大语言模型通过 HTTPS 调用 DeepSeek API，未配置密钥或调用失败时回退到 mock。
 
 ### 4.1.2 项目目录结构
 
