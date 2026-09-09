@@ -354,6 +354,12 @@ def test_cooling_reminder_is_available_to_judge_before_judge_runs(monkeypatch: A
     assert "cooling_reminder" in report_tool_names
     assert "cooling_reminder" in judge_step["used_tool_names"]
     assert trace_names.index("cooling_reminder") < trace_names.index("judge_agent")
+    reminder = next(item for item in result["tool_results"] if item["tool_name"] == "cooling_reminder")
+    report_reminder = next(item for item in result["report"]["tool_results"] if item["tool_name"] == "cooling_reminder")
+    cost = next(item for item in result["tool_results"] if item["tool_name"] == "cost_analyzer")
+    assert reminder["metrics"]["title"] == "study headphones冷静期复盘"
+    assert reminder["metrics"]["reason"] == cost["summary"]
+    assert report_reminder["metrics"] == reminder["metrics"]
 
 
 def test_cooling_reminder_failure_does_not_interrupt_main_flow(monkeypatch: Any) -> None:

@@ -89,7 +89,7 @@
 | 值 | 说明 |
 |---|---|
 | collecting | 正在收集信息 |
-| ready_for_debate | 信息完整，可以进入 Agent 分析 |
+| ready_for_debate | 达到最低决策字段要求且无未解决冲突，可以进入 Agent 分析 |
 | debating | Agent 分析中 |
 | completed | 已完成判决 |
 | rejected | 高风险或不支持，拒绝处理 |
@@ -156,7 +156,7 @@ completed
 规则：
 
 - 信息不足时保持 `collecting`。
-- 信息完整后进入 `ready_for_debate`。
+- 购物 parser 的 `product_name`、`price`、`monthly_budget_left` 齐全且 `conflicts` 为空时进入 `ready_for_debate`；其余字段可继续列在 `missing_fields` 中，详见 5.8。
 - 调用 `POST /api/cases/{case_id}/debate` 后进入 `debating`。
 - Agent 分析和判决书生成完成后进入 `completed`。
 - 医疗、法律、投资、贷款、辞职、亲密关系、重大人生决策等高风险输入进入 `rejected`。
@@ -361,6 +361,57 @@ completed
 | duration_ms | number | 是 | 耗时 |
 | status | string | 是 | `completed` 或 `failed` |
 | error | string/null | 是 | 错误信息，成功时为 null |
+
+### 5.8 ParserResult（C 内部调用契约）
+
+定义位置：`backend/app/schemas/decision.py`。调用入口为
+`parse_input(raw_input, existing_collected_fields=None)`，返回 dataclass；
+`to_dict()` 可将其序列化。以下字段不是新增 HTTP 请求参数。
+
+| 字段 | 类型 | 说明 |
+|---|---|---|
+| case_type | string/null | 识别的案件类型，当前购物解析为 `shopping` |
+| is_supported | boolean | 是否在 parser 支持范围内 |
+| is_high_risk | boolean | 高风险主题标记；B 路由另有拦截逻辑 |
+| reject_reason | string/null | 拒绝原因或风险标记原因 |
+| extracted_fields | object | 本轮提取的购物字段，不等于累计字段 |
+| merged_fields | object | 合并历史、本轮提取与纠正后的累计字段，供 B 保存 |
+| missing_fields | string[] | 七个购物字段中仍缺失的项目，包括非最低必需项 |
+| next_question | string/null | 追问候选文案；已就绪时应以 `case_status` 为准 |
+| case_status | string | `collecting`、`ready_for_debate` 或 `rejected` |
+| agent_step | AgentStep | 本次解析执行记录；解析置信度在此结构内 |
+
+以下扩展字段均有默认值，旧调用方无需增加构造参数：
+
+| 字段 | 类型 | 默认值 | 说明 |
+|---|---|---|---|
+| correction_fields | object | `{}` | 本轮明确纠正，合并时优先于同名提取值与历史值 |
+| field_meta | object | `{}` | 字段状态与来源的可选说明，按购物字段名索引 |
+| conflicts | object[] | `[]` | 尚未解决的歧义；当前本地规则记录 `amount_ambiguity` 及金额候选 |
+| next_question_key | string/null | `null` | 追问关联的购物字段名，或金额澄清用的 `price_or_budget` |
+| is_complete | boolean | `false` | 在支持的购物分支中，最低字段齐全且无冲突；不代表七项全部齐全 |
+| termination_reason | string/null | `null` | `complete_minimum_fields`、`missing_required_fields`、`uncertain_required_fields`；默认/不支持分支可为 `null` |
+| parser_used | string/null | `null` | `local` 为本地解析，`deepseek` 为模型解析，`local_fallback` 为模型失败后回退；默认/不支持分支可为 `null` |
+
+`field_meta` 单项可包含 `status`（`confirmed` / `uncertain` / `missing`）、
+`confidence`、`provenance`、`value`、`raw_text`、`approximate`、`unit`、`candidates`；
+商品替换记录还可包含 `action`、`old_value`、`new_value`。这些子项并非每次齐全，
+也不是跨轮持久化状态；不应以模型自报置信度单独决定是否进入分析。
+
+完成条件与合并规则：
+
+- 七项字段为 `product_name / price / purpose / monthly_budget_left / owned_alternatives / expected_usage_frequency / trigger_reason`。
+- 最低必需项仅为 `product_name / price / monthly_budget_left`。`is_complete` 与 `case_status` 由 C 计算，不直接采用模型返回的同名值。
+- 当前实现保留本轮未提及的历史字段，同名非空本轮字段覆盖历史值，`correction_fields` 最后覆盖。不要将其误写成“普通提取永远不会覆盖历史值”。
+- 价格与预算按各自语义提取；邻近分句中的预算关键词不应使明确价格消失。
+- 当三个最低字段齐全而用途等信息缺失时，`case_status=ready_for_debate` 与非空 `missing_fields` 可以同时成立。当前本地分支仍可能返回选填项追问候选，调用方不应因此重新阻塞分析。
+- `termination_reason` 是本轮收集条件的说明，不表示已实现最大轮数或无进展熔断。
+
+HTTP 暴露范围（本次保持不变）：
+
+- `POST /api/cases` 选择返回 `case_status / collected_fields / missing_fields / next_question` 等字段；`collected_fields` 来自 C 的 `merged_fields`。
+- `POST /api/cases/{case_id}/messages` 保存 `merged_fields`、缺失字段和状态，并以 `reply` 返回回复；未整体透传上述七个扩展字段。
+- `DebateResult`、`DecisionReport` 不因此新增 parser 元数据。前端当前无需读取这些扩展字段；如需展示歧义或记录跨轮来源，由 B 明确增加透传/保存，再与前端对齐。
 
 ## 6. 接口总览
 
@@ -964,6 +1015,24 @@ POST /api/tools/cooling-reminder
 - 工具失败不应导致 Agent 主流程中断。
 - 法官 Agent 必须在判决书中标记工具结果缺失。
 - 工具只提供结构化依据，不直接决定最终裁决。
+
+#### C 编排返回的提醒补充数据与 B 落库对接
+
+`backend/app/services/mcp_adapter.py` 的 `create_cooling_reminder()` 在工具成功时，
+向 `ToolResult.metrics` 补充本次调用的 `title` 和 `reason` 字符串，保留原有
+`reminder_id / due_at / cooling_days / status / watch_items`。失败结果不增加这些字段。
+这两个补充字段会随 C 的 `tool_results` 和 `report.tool_results` 返回。
+
+此扩展只针对 C adapter；不表示 E 的 `call_tool()` 原始输出或上述工具 HTTP
+响应已经新增同名字段。工具调用成功只代表生成了提醒数据，不能据此断言已写入数据库。
+
+当前 `POST /api/tools/cooling-reminder` 会写入 `Reminder`；`/debate` 路径尚未保存
+提醒，本次 C 修改不包含数据库持久化。B 后续需要：
+
+- 仅持久化 `tool_name=cooling_reminder` 且 `status=success` 的结果。
+- 使用当前案件的 `user_id / case_id`，以及 metrics 的提醒 ID、标题、原因、到期时间；兼容旧结果缺少 `title / reason` 的情况。
+- 将工具 `metrics.status=scheduled` 映射为数据库 `waiting`，以匹配 `/api/watchlist` 查询条件；正确解析 `due_at` 的时区。
+- 处理重复请求的幂等性和事务失败，避免生成重复提醒或在保存失败后声称已加入观察清单。
 
 ### 11.3 决策评分工具
 
