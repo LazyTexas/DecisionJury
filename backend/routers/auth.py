@@ -2,15 +2,12 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from passlib.context import CryptContext
 from backend.database import get_db
 from backend.models import User
 from backend.schemas import ApiResponse
+from backend.security import get_password_hash, verify_password, create_access_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-
-# 密码哈希上下文（使用 sha256_crypt）
-pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 
 # ===== 请求模型 =====
@@ -37,8 +34,8 @@ def register(req: RegisterRequest, db: Session = Depends(get_db)):
             message="用户已存在"
         )
 
-    # 2. 哈希加密密码
-    hashed = pwd_context.hash(req.password)
+    # 2. 哈希加密密码（使用 bcrypt）
+    hashed = get_password_hash(req.password)
 
     # 3. 创建用户
     user = User(
@@ -68,16 +65,24 @@ def login(req: LoginRequest, db: Session = Depends(get_db)):
             message="用户不存在"
         )
 
-    # 2. 验证密码
-    if not pwd_context.verify(req.password, user.hashed_password):
+    # 2. 验证密码（使用 bcrypt）
+    if not verify_password(req.password, user.hashed_password):
         return ApiResponse(
             success=False,
             data=None,
             message="密码错误"
         )
 
+    # 3. 生成 JWT Token
+    access_token = create_access_token(data={"sub": user.id})
+
     return ApiResponse(
         success=True,
-        data={"user_id": user.id, "name": user.name},
+        data={
+            "user_id": user.id,
+            "name": user.name,
+            "access_token": access_token,
+            "token_type": "bearer"
+        },
         message="登录成功"
     )
