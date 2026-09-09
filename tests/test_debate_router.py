@@ -143,8 +143,8 @@ def test_debate_missing_user_id(client, db_session):
     assert data["message"] == "VALIDATION_ERROR"
 
 
-def test_debate_response_contains_trace(client, db_session):
-    """debate 响应中包含 trace 字段"""
+def test_debate_response_contains_steps(client, db_session):
+    """debate 响应按契约返回 steps / rag_evidence / tool_results（完整轨迹另由 GET /trace 提供）"""
     case = Case(
         id="case_trace_test",
         user_id="u001",
@@ -174,13 +174,19 @@ def test_debate_response_contains_trace(client, db_session):
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
-    assert "trace" in data["data"]
-    assert len(data["data"]["trace"]) >= 7  # 至少 7 步
-    trace_steps = [t["name"] for t in data["data"]["trace"]]
-    assert "input_parser" in trace_steps
-    assert "rag_search" in trace_steps
-    assert "pro_agent" in trace_steps
-    assert "con_agent" in trace_steps
-    assert "judge_agent" in trace_steps
-    assert "cost_analyzer" in trace_steps
-    assert "cooling_reminder" in trace_steps
+
+    # 契约依据 docs/04_API.md：/debate 响应含 steps / rag_evidence / tool_results，
+    # 不含 trace 字段（完整执行轨迹由 GET /api/cases/{case_id}/trace 单独提供）。
+    # 原断言 trace 与文档不一致，属于用例过期。
+    payload = data["data"]
+    assert {"steps", "rag_evidence", "tool_results"} <= set(payload)
+
+    step_agents = [step["agent"] for step in payload["steps"]]
+    assert "input_parser" in step_agents
+    assert "pro_agent" in step_agents
+    assert "con_agent" in step_agents
+    assert "judge_agent" in step_agents
+
+    tool_names = [tool["tool_name"] for tool in payload["tool_results"]]
+    assert "cost_analyzer" in tool_names
+    assert "cooling_reminder" in tool_names
