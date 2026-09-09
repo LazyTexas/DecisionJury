@@ -452,18 +452,69 @@ def test_minimum_fields_complete_even_when_suggested_fields_missing():
     assert result.missing_fields == ["purpose", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
 
 
-# ========== 已知缺陷（xfail，待 Agent 编排修复）==========
+# ========== 相邻价格和预算的回归测试 ==========
 
-@pytest.mark.xfail(
-    reason=(
-        "已知缺陷：价格数字后 8 个字符内出现“预算”时，_is_budget_context() 会把该价格"
-        "误判为预算并丢弃。价格在前、预算紧随其后时 price 提取为 None；"
-        "把预算写在价格之前（或两者之间多几个字）则正常。待 input_parser 修复后移除本标记。"
-    ),
-    strict=False,
-)
 def test_price_kept_when_budget_follows_closely():
     """价格在前、预算紧随其后时，price 与 monthly_budget_left 都应被提取。"""
     result = parse_input("想买降噪耳机，价格 1299 元，本月预算还剩 2000 元")
     assert result.extracted_fields.get("price") == 1299.0
     assert result.extracted_fields.get("monthly_budget_left") == 2000.0
+    assert result.case_status == "ready_for_debate"
+    assert result.is_complete is True
+
+
+@pytest.mark.parametrize("separator", ["，", ",", "；", ";", "。"])
+@pytest.mark.parametrize("budget_first", [False, True])
+def test_price_and_budget_stay_separate_across_clauses(monkeypatch, separator, budget_first):
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    clauses = ["价格 1299.50 元", "预算还剩 2000 元"]
+    if budget_first:
+        clauses.reverse()
+    result = parse_input("想买降噪耳机，" + separator.join(clauses))
+
+    assert result.extracted_fields["price"] == 1299.5
+    assert result.extracted_fields["monthly_budget_left"] == 2000.0
+    assert result.merged_fields["price"] == 1299.5
+    assert result.merged_fields["monthly_budget_left"] == 2000.0
+
+
+@pytest.mark.parametrize("message", [
+    "想买降噪耳机，价格 1299 元",
+    "想买降噪耳机，价格 1299 元，我打算通勤用，本月预算还剩 2000 元",
+])
+def test_price_remains_with_separate_or_absent_budget(monkeypatch, message):
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input(message)
+
+    assert result.extracted_fields["price"] == 1299.0
+    assert result.extracted_fields.get("monthly_budget_left") == (2000.0 if "预算" in message else None)
+
+
+@pytest.mark.parametrize("message", [
+    "本月预算还剩 2000 元",
+    "本月还有 2000 元的预算",
+    "想买降噪耳机，预算金额 2000 元",
+])
+def test_budget_context_still_blocks_budget_as_price(monkeypatch, message):
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input(message, {"price": 1299.0})
+
+    assert result.extracted_fields["monthly_budget_left"] == 2000.0
+    assert "price" not in result.extracted_fields
+    assert result.merged_fields["price"] == 1299.0
+
+
+def test_adjacent_price_and_budget_survive_deepseek_failure(monkeypatch):
+    client = DeepSeekLLMClient(api_key="test-key")
+
+    def fail_request(payload):
+        raise TimeoutError("parser timeout")
+
+    monkeypatch.setattr(client, "complete_parser_json", fail_request)
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+    result = parse_input("想买降噪耳机，价格 1299 元，本月预算还剩 2000 元")
+
+    assert result.parser_used == "local_fallback"
+    assert result.extracted_fields["price"] == 1299.0
+    assert result.extracted_fields["monthly_budget_left"] == 2000.0
+    assert result.case_status == "ready_for_debate"
