@@ -44,17 +44,26 @@ def test_create_case_success(client):
 
 
 def test_create_case_ready_for_debate(client):
-    """description 含 budget 和替代时，status 直接为 ready_for_debate。"""
+    """description 覆盖最小决策字段（商品/价格/预算）时，status 直接为 ready_for_debate。
+
+    注意：input_parser 的完成判定基于 MINIMUM_DECISION_FIELDS
+    （product_name / price / monthly_budget_left），而不是 REQUIRED_SHOPPING_FIELDS 全齐。
+    """
     resp = client.post("/api/cases", json={
         "user_id": "u001",
         "case_type": "shopping",
         "title": "买耳机",
-        "description": "想买降噪耳机，budget 还够，已有替代的旧耳机",
+        "description": "想买降噪耳机，本月预算还剩 2000 元，价格 1299 元，已有替代的旧耳机",
     })
     body = resp.json()
     assert body["success"] is True
     assert body["data"]["case_status"] == "ready_for_debate"
-    assert body["data"]["missing_fields"] == []
+    collected = body["data"]["collected_fields"]
+    assert collected.get("product_name")
+    assert collected.get("price") == 1299
+    assert collected.get("monthly_budget_left") == 2000
+    # 最小决策字段不应出现在 missing_fields 中（其余字段允许继续追问）
+    assert not set(body["data"]["missing_fields"]) & {"product_name", "price", "monthly_budget_left"}
 
 
 def test_create_case_missing_budget(client):
