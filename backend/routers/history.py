@@ -2,30 +2,37 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
+from typing import Optional
 from backend.database import get_db
-from backend.models import History
-from backend.schemas import ApiResponse, CreateHistoryRequest, HistoryItem, HistoryListResponse
-from pydantic import BaseModel
-from typing import List, Optional
+from backend.models import History, User
+from backend.schemas import ApiResponse, CreateHistoryRequest, HistoryItem
+from backend.security import get_current_user_optional
 
 router = APIRouter(prefix="/api", tags=["history"])
 
 
 @router.post("/history", response_model=ApiResponse)
-def create_history(req: CreateHistoryRequest, db: Session = Depends(get_db)):
+def create_history(
+    req: CreateHistoryRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
+    db: Session = Depends(get_db)
+):
     """
     添加历史记录
     用于在决策完成后，将案件结果存入历史库，供 RAG 检索使用
     """
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else req.user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     history = History(
         id=f"history_{uuid.uuid4().hex[:8]}",
-        user_id=req.user_id,
+        user_id=effective_user_id,
         case_type=req.case_type,
         summary=req.summary,
         result=req.result,
         tags=req.tags or [],
-
-        # 新增字段
         title=req.title,
         price=req.price,
         usage_frequency=req.usage_frequency,
@@ -63,22 +70,29 @@ def create_history(req: CreateHistoryRequest, db: Session = Depends(get_db)):
         message="history created"
     )
 
+
 @router.get("/history", response_model=ApiResponse)
 def get_history(
-    user_id: str = Query(..., description="用户 ID（必填）"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
     page: int = Query(1, ge=1, description="页码，默认 1"),
-    page_size: int = Query(10, ge=1, le=1000, description="每页条数，默认 10，最大 100"),
+    page_size: int = Query(10, ge=1, le=1000, description="每页条数，默认 10，最大 1000"),
     case_type: Optional[str] = Query(None, description="案件类型筛选：shopping / time"),
     result: Optional[str] = Query(None, description="结果筛选：worth / regret / neutral"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     获取用户的历史记录列表
     支持分页、按案件类型和结果筛选，按创建时间倒序排列
     """
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 构建基础查询
     query = db.query(History).filter(
-        History.user_id == user_id,
+        History.user_id == effective_user_id,
         History.is_deleted == 0
     )
 
@@ -125,15 +139,22 @@ def get_history(
         message=""
     )
 
+
 @router.delete("/history/{history_id}", response_model=ApiResponse)
 def delete_history(
     history_id: str,
-    user_id: str = Query(..., description="用户 ID"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     软删除历史记录（前端删除后，数据仍保留供 RAG 检索使用）
     """
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询历史记录
     history = db.query(History).filter(History.id == history_id).first()
     if not history:
@@ -144,7 +165,7 @@ def delete_history(
         )
 
     # 2. 权限校验
-    if history.user_id != user_id:
+    if history.user_id != effective_user_id:
         return ApiResponse(
             success=False,
             data=None,
@@ -169,15 +190,22 @@ def delete_history(
         message=""
     )
 
+
 @router.patch("/history/{history_id}/restore", response_model=ApiResponse)
 def restore_history(
     history_id: str,
-    user_id: str = Query(..., description="用户 ID"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
     """
     恢复已软删除的历史记录
     """
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询历史记录
     history = db.query(History).filter(History.id == history_id).first()
     if not history:
@@ -188,7 +216,7 @@ def restore_history(
         )
 
     # 2. 权限校验
-    if history.user_id != user_id:
+    if history.user_id != effective_user_id:
         return ApiResponse(
             success=False,
             data=None,

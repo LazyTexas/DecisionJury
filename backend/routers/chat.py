@@ -1,29 +1,42 @@
 # backend/routers/chat.py
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import attributes
 import uuid
+from typing import Optional
 from backend.database import get_db
-from backend.models import Case, Message
+from backend.models import Case, Message, User
 from backend.schemas import SendMessageRequest, ApiResponse, CaseStatus
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 from backend.schemas import SHOPPING_REQUIRED_FIELDS
-from sqlalchemy.orm import attributes
+from backend.security import get_current_user_optional
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
+# ========== 发送消息 ==========
 @router.post("/cases/{case_id}/messages", response_model=ApiResponse)
 def send_message(
     case_id: str,
     req: SendMessageRequest,
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else req.user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
-    # 2. 保存用户消息
+    # 2. 权限校验
+    if case.user_id != effective_user_id:
+        return ApiResponse(success=False, data=None, message="FORBIDDEN")
+
+    # 3. 保存用户消息
     user_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -33,7 +46,7 @@ def send_message(
     )
     db.add(user_msg)
 
-    # 3. 调用 input_parser
+    # 4. 调用 input_parser
     try:
         result = parse_input(
             raw_input=req.message,
@@ -49,7 +62,7 @@ def send_message(
             message="PARSE_ERROR"
         )
 
-    # 4. 检查高风险
+    # 5. 检查高风险
     if result_dict.get("is_high_risk"):
         reject_reason = result_dict.get("reject_reason", "该决策超出系统支持范围。")
         # 更新案件状态为 REJECTED
@@ -74,17 +87,16 @@ def send_message(
             },
             message=""
         )
-    
 
-    # 5. 使用 C 模块的 merged_fields
+    # 6. 使用 C 模块的 merged_fields
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
 
-    # 6. 获取缺失字段（只赋值一次）
+    # 7. 获取缺失字段（只赋值一次）
     missing_fields = result_dict.get("missing_fields", [])
     case.missing_fields = missing_fields
 
-    # 7. 接入 is_complete 判断状态
+    # 8. 接入 is_complete 判断状态
     is_complete = result_dict.get("is_complete", False)
 
     if is_complete or not missing_fields:
@@ -92,25 +104,25 @@ def send_message(
     else:
         case.status = CaseStatus.COLLECTING
 
-    # 8. 接入 conflicts
+    # 9. 接入 conflicts
     conflicts = result_dict.get("conflicts", [])
     if conflicts:
         safe_fields["_conflicts"] = conflicts
         case.collected_fields = safe_fields
 
-    # 9. 接入 next_question_key
+    # 10. 接入 next_question_key
     next_question_key = result_dict.get("next_question_key")
     if next_question_key:
         safe_fields["_current_question_key"] = next_question_key
         case.collected_fields = safe_fields
 
-    # 10. 接入 parser_used
+    # 11. 接入 parser_used
     parser_used = result_dict.get("parser_used", "")
     if parser_used:
         safe_fields["_parser_used"] = parser_used
         case.collected_fields = safe_fields
 
-    # 11. 根据状态生成回复
+    # 12. 根据状态生成回复
     if case.status == CaseStatus.READY_FOR_DEBATE:
         reply = "信息已补充完整，可以进入正反方分析。"
     else:
@@ -125,7 +137,7 @@ def send_message(
             else:
                 reply = "信息仍在收集中，请继续补充相关细节。"
 
-    # 12. 保存助手消息
+    # 13. 保存助手消息
     assistant_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -135,14 +147,14 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 13. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    # 14. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')
     except Exception as e:
         print(f"[WARN] flag_modified 失败: {e}")
 
-    # 14. 提交事务
+    # 15. 提交事务
     db.commit()
     print(f"[DEBUG] COMMIT 成功，case_id={case_id}")
 
@@ -159,21 +171,29 @@ def send_message(
         message=""
     )
 
+
+# ========== 获取消息列表 ==========
 @router.get("/cases/{case_id}/messages", response_model=ApiResponse)
 def get_messages(
     case_id: str,
-    user_id: str = Query(..., description="用户 ID"),
+    user_id: Optional[str] = Query(None, description="用户 ID（可选，有 Token 时忽略）"),
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页条数"),
+    current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
+    # ===== 获取有效用户 ID（Token 优先）=====
+    effective_user_id = current_user.id if current_user else user_id
+    if not effective_user_id:
+        return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
+
     # 1. 查询案件是否存在
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
 
     # 2. 权限校验
-    if case.user_id != user_id:
+    if case.user_id != effective_user_id:
         return ApiResponse(success=False, data=None, message="FORBIDDEN")
 
     # 3. 分页查询消息
