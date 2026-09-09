@@ -27,8 +27,8 @@ class Config:
     # ===== JWT 强制模式开关 =====
     # False: 双模式兼容（有 Token 用 Token，无 Token 降级用 user_id）
     # True:  强制 JWT 模式（无 Token 或 Token 无效直接返回 401）
-    # ENFORCE_JWT = os.getenv("ENFORCE_JWT", "false").lower() == "true"
-    ENFORCE_JWT = True
+    ENFORCE_JWT = os.getenv("ENFORCE_JWT", "false").lower() == "true"
+    # ENFORCE_JWT = True # 测试用，强制启动JWT认证，需要注释上一行
 
     @classmethod
     def is_production(cls):
