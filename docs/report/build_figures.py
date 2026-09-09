@@ -238,7 +238,7 @@ def build_rag_metrics() -> None:
         d.text((legend_x + 34, legend_y - 2), name, font=small_font, fill="#333333")
         legend_x += 220
 
-    img.save(OUT_DIR / "fig_5_1_rag_metrics.png")
+    img.save(OUT_DIR / "fig_5_2_rag_metrics.png")
 
 
 def build_test_results() -> None:
@@ -287,7 +287,7 @@ def build_test_results() -> None:
     d.rectangle((legend_x + 200, legend_y, legend_x + 224, legend_y + 24), fill="#e45756", outline="#333333")
     d.text((legend_x + 234, legend_y - 2), "failed", font=small_font, fill="#333333")
 
-    img.save(OUT_DIR / "fig_5_2_test_results.png")
+    img.save(OUT_DIR / "fig_5_1_test_results.png")
 
 
 def _wire_base(title: str):
@@ -312,7 +312,7 @@ def build_wireframes() -> None:
     img, d, body_font, small_font = _wire_base("登录 / 注册页面原型")
     _wire_box(d, (100, 180, 600, 760), "登录\n\n账号输入框\n\n密码输入框\n\n[ 登录 ]\n\n提示：登录成功后保存 Token", body_font)
     _wire_box(d, (700, 180, 1200, 760), "注册\n\n账号输入框\n\n昵称输入框\n\n密码输入框\n\n[ 注册 ]\n\n提示：注册成功后可返回登录", body_font)
-    img.save(OUT_DIR / "fig_3_4_login.png")
+    img.save(OUT_DIR / "fig_3_3_login.png")
 
     # 案件创建
     img, d, body_font, small_font = _wire_base("案件创建页面原型")
@@ -326,7 +326,7 @@ def build_wireframes() -> None:
     _wire_box(d, (80, 160, 850, 760), "对话区\n\n用户：我想买一副 1299 元的降噪耳机\n\n系统：你本月预算还剩多少？是否已有类似耳机？\n\n用户：本月预算还剩 3000 元，已有普通耳机\n\n系统：信息已满足最低要求，可以开始分析", body_font)
     _wire_box(d, (900, 160, 1220, 420), "已收集字段\nproduct_name\nprice=1299\nmonthly_budget_left=3000", small_font)
     _wire_box(d, (900, 460, 1220, 760), "缺失字段\npurpose\nowned_alternatives\nexpected_usage_frequency\ntrigger_reason", small_font)
-    img.save(OUT_DIR / "fig_3_4_chat.png")
+    img.save(OUT_DIR / "fig_3_5_chat.png")
 
     # 庭审 / 判决书
     img, d, body_font, small_font = _wire_base("庭审回放 / 判决书页面原型")
@@ -336,13 +336,13 @@ def build_wireframes() -> None:
     _wire_box(d, (80, 580, 760, 760), "④ 法官：最终建议（buy / delay / reject / alternative）与后续动作", body_font)
     _wire_box(d, (800, 160, 1220, 440), "RAG 证据\n历史闲置记录\n预算相关记录", small_font)
     _wire_box(d, (800, 480, 1220, 760), "工具结果\ncost_analyzer：占比 / 风险\nscore：综合分 / 维度", small_font)
-    img.save(OUT_DIR / "fig_3_4_verdict.png")
+    img.save(OUT_DIR / "fig_3_6_verdict.png")
 
     # 历史 / 观察清单
     img, d, body_font, small_font = _wire_base("历史记录 / 观察清单页面原型")
     _wire_box(d, (80, 160, 720, 760), "历史记录\n\n降噪耳机 消费复盘 | delay | 2026-09\n学习平板 消费复盘 | buy | 2026-08\n机械键盘 消费复盘 | regret | 2026-07", body_font)
     _wire_box(d, (760, 160, 1220, 760), "观察清单\n\n降噪耳机冷静期复盘\n到期：3 天后\n状态：waiting\n\n[ 取消提醒 ]", body_font)
-    img.save(OUT_DIR / "fig_3_4_history.png")
+    img.save(OUT_DIR / "fig_3_7_history.png")
 
 
 if __name__ == "__main__":

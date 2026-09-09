@@ -572,7 +572,7 @@ score = 50 + cost_delta + history_delta + usage_delta + impulse_delta
 
 登录页面包含账号、密码输入框和登录按钮，登录成功后保存 Token 并跳转到首页。注册页面包含账号、昵称和密码输入，注册成功后可以返回登录页。页面需要给出明确的错误提示，例如“用户不存在”“密码错误”。
 
-![图 3-3 登录 / 注册页面原型](assets/fig_3_4_login.png)
+![图 3-3 登录 / 注册页面原型](assets/fig_3_3_login.png)
 
 图 3-3 登录 / 注册页面原型
 
@@ -588,7 +588,7 @@ score = 50 + cost_delta + history_delta + usage_delta + impulse_delta
 
 多轮对话页面按时间顺序展示用户消息和系统回复，同时展示已收集字段、缺失字段和当前状态。用户补充“本月预算还剩 3000 元，已有普通耳机”后，页面更新字段并提示可以开始分析。页面支持刷新后重新拉取消息列表。
 
-![图 3-5 多轮对话页面原型](assets/fig_3_4_chat.png)
+![图 3-5 多轮对话页面原型](assets/fig_3_5_chat.png)
 
 图 3-5 多轮对话页面原型
 
@@ -596,7 +596,7 @@ score = 50 + cost_delta + history_delta + usage_delta + impulse_delta
 
 庭审回放页面按顺序展示四条结构化事件：书记员案件摘要、正方独立陈述、反方独立陈述、法官判决。判决书页面展示案件摘要、正反观点、RAG 证据、工具结果、最终裁决和后续动作。页面下方可以展示执行轨迹，帮助答辩时说明每一步的调用顺序和耗时。
 
-![图 3-6 庭审回放 / 判决书页面原型](assets/fig_3_4_verdict.png)
+![图 3-6 庭审回放 / 判决书页面原型](assets/fig_3_6_verdict.png)
 
 图 3-6 庭审回放 / 判决书页面原型
 
@@ -604,7 +604,7 @@ score = 50 + cost_delta + history_delta + usage_delta + impulse_delta
 
 历史记录页面展示用户过去的决策复盘，包括标题、摘要、结果标签和创建时间。观察清单页面展示待复盘的提醒，包括标题、原因、到期时间和状态，支持取消提醒。用户提交复盘后，历史记录增加，相关提醒状态更新。
 
-![图 3-7 历史记录 / 观察清单页面原型](assets/fig_3_4_history.png)
+![图 3-7 历史记录 / 观察清单页面原型](assets/fig_3_7_history.png)
 
 图 3-7 历史记录 / 观察清单页面原型
 
@@ -1053,7 +1053,7 @@ Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG
 
 ### 5.3.4 测试结果统计图
 
-![图 5-1 测试结果统计](assets/fig_5_2_test_results.png)
+![图 5-1 测试结果统计](assets/fig_5_1_test_results.png)
 
 图 5-1 测试结果统计
 
@@ -1087,7 +1087,7 @@ Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG
 | 参加社团活动 | 0.60 | 0.2500 | 0.50 | 0.5296 |
 | 参加技术分享 | 0.40 | 0.2500 | 1.00 | 0.5531 |
 
-![图 5-2 RAG 检索指标](assets/fig_5_1_rag_metrics.png)
+![图 5-2 RAG 检索指标](assets/fig_5_2_rag_metrics.png)
 
 图 5-2 RAG 检索指标
 
