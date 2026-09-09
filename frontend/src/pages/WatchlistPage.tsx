@@ -19,6 +19,7 @@ export default function WatchlistPage() {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +52,9 @@ export default function WatchlistPage() {
 
   const del = async (w: WatchlistItem) => {
     if (!w.reminder_id) return;
-    setDeletingId(w.reminder_id);
+    setDeletingId(w.reminder_id); setError(null);
     try { await deleteWatchlistItem(w.reminder_id); setItems((p) => p.filter((x) => x.reminder_id !== w.reminder_id)); }
-    catch (e) { /* ignore */ }
+    catch (e) { setError((e as Error).message || '删除失败，请重试'); }
     finally { setDeletingId(null); }
   };
 
@@ -63,6 +64,8 @@ export default function WatchlistPage() {
         <h2>观察清单 · 冷静期</h2>
         <span className="count-badge"><span className="num">{pending}</span>待复盘</span>
       </div>
+
+      {error && (<div className="card" style={{ marginBottom: 16, borderColor: 'var(--con)', background: 'color-mix(in srgb,var(--con) 8%,var(--panel))' }}><p style={{ color: 'var(--con)' }}>{error}</p></div>)}
 
       {loading ? (
         <div className="card"><p className="muted">加载中…</p></div>
