@@ -77,6 +77,22 @@ export enum HistoryResult {
 
 // ---- 公共数据结构 ----
 
+/**
+ * C 模块解析器在 collected_fields 里注入的扩展字段（带下划线前缀）。
+ * 后端把 ParserResult 的 is_complete/conflicts/next_question_key/termination_reason/parser_used
+ * 塞进 collected_fields，前端可按需读取这些内部键。
+ */
+export interface CCollectedFields {
+  /** 冲突项（如金额语义歧义）：可用于向用户澄清 */
+  _conflicts?: unknown[];
+  /** 当前追问所属字段 key，用于定位下一步要补什么 */
+  _current_question_key?: string;
+  /** 终止/拒绝原因（高风险场景） */
+  _termination_reason?: string;
+  /** 本次解析使用的方式（rule / llm / …），供调试展示 */
+  _parser_used?: string;
+}
+
 /** 案件 */
 export interface Case {
   case_id: string;
@@ -85,7 +101,7 @@ export interface Case {
   title: string;
   description: string;
   status: CaseStatus;
-  collected_fields: Record<string, unknown>;
+  collected_fields: Record<string, unknown> & CCollectedFields;
   missing_fields: string[];
   final_decision: string | null;
   report_id: string | null;

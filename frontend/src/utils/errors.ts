@@ -22,6 +22,8 @@ export const API_ERROR_MESSAGES: Record<string, string> = {
   USER_EXISTS: '该用户 ID 已被注册，请换一个',
   WRONG_PASSWORD: '密码错误，请重试',
   INVALID_CREDENTIALS: '用户 ID 或密码不正确',
+  FORBIDDEN: '没有权限执行该操作',
+  REMINDER_NOT_FOUND: '该观察项不存在或已被删除',
 };
 
 export function translateApiError(message: string | null | undefined, fallback = '操作失败，请稍后重试'): string {
