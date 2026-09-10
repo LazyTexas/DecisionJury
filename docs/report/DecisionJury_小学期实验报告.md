@@ -1279,23 +1279,25 @@ RAG 测试覆盖以下场景：
 
 图 5-6 创建购物案件页面
 
-![图 5-7 判决书页面（一）：案件摘要、正反方观点与最终裁决](assets/screenshots/shot_05_verdict_1.png)
+![图 5-7 多轮对话页面](assets/screenshots/shot_09_chat.png)
 
-图 5-7 判决书页面（一）：案件摘要、正反方观点与最终裁决
+图 5-7 多轮对话页面
 
-![图 5-8 判决书页面（二）：RAG 证据、工具结果与后续动作](assets/screenshots/shot_06_verdict_2.png)
+![图 5-8 判决书页面（一）：案件摘要、正反方观点与最终裁决](assets/screenshots/shot_05_verdict_1.png)
 
-图 5-8 判决书页面（二）：RAG 证据、工具结果与后续动作
+图 5-8 判决书页面（一）：案件摘要、正反方观点与最终裁决
 
-![图 5-9 执行轨迹页面](assets/screenshots/shot_07_trace.png)
+![图 5-9 判决书页面（二）：RAG 证据、工具结果与后续动作](assets/screenshots/shot_06_verdict_2.png)
 
-图 5-9 执行轨迹页面
+图 5-9 判决书页面（二）：RAG 证据、工具结果与后续动作
 
-![图 5-10 观察清单页面](assets/screenshots/shot_08_watchlist.png)
+![图 5-10 执行轨迹页面](assets/screenshots/shot_07_trace.png)
 
-图 5-10 观察清单页面
+图 5-10 执行轨迹页面
 
-> 待补截图：多轮对话页（包含“本月预算还剩 3000 元，已有普通耳机”的补充过程）。拍摄方法见 `docs/report/替换实际运行截图指南.md` 第 5 节。
+![图 5-11 观察清单页面](assets/screenshots/shot_08_watchlist.png)
+
+图 5-11 观察清单页面
 
 ### 5.6.2 多轮价格纠正流程
 
@@ -1306,8 +1308,9 @@ RAG 测试覆盖以下场景：
 3. 纠正：“刚才价格说错了，不是 2500，是 2200。”
 4. 检查系统价格更新为 2200，预算保持 3000，并达到最低字段要求进入分析。
 
-> 待补截图：多轮价格纠正后的字段展示。
+> 待补截图（图 5-14）：多轮价格纠正后的字段展示。
 > 操作路径：登录后在案件创建页输入“想买一部手机，预算 3000 元”，进入多轮对话页依次发送“价格大概是 2500 元”和“刚才价格说错了，不是 2500，是 2200”，截取价格更新为 2200、预算保持 3000 的页面。
+> 建议文件名：`docs/report/assets/screenshots/shot_12_price_correction.png`。
 
 ### 5.6.3 工具调用与 RAG 输出
 
@@ -1318,9 +1321,17 @@ RAG 测试覆盖以下场景：
 - `cooling_reminder` 返回提醒 ID、到期时间和观察项。
 - RAG 返回命中标题、内容、得分和标签。
 
-> 待补截图：工具调用日志和 RAG 检索结果。执行轨迹页面已见图 5-9。
-> - 工具调用日志：在项目根目录运行 `python -m mcp_tools.demo`，截取 `cost_analyzer`、`decision_score`、`cooling_reminder` 的调用输出；或打开后端 Swagger 调用 `/api/tools/cost-analyzer` 后截图。
-> - RAG 检索结果：运行 `python rag/evaluate_rag.py` 截取命中表格；或打开 RAG Swagger `http://127.0.0.1:8001/docs`，调用 `POST /api/rag/search`（`case_type=shopping`、`query=想买降噪耳机`、`top_k=5`）后截图返回结果。
+![图 5-12 工具调用日志](assets/screenshots/shot_10_tool_log.png)
+
+图 5-12 工具调用日志
+
+![图 5-13 RAG 检索结果](assets/screenshots/shot_11_rag_result.png)
+
+图 5-13 RAG 检索结果
+
+> 待补截图（图 5-15）：pytest 实际运行结果。
+> 运行方式：在项目根目录设置隔离数据库环境变量后执行 `uv run --frozen pytest -p no:cacheprovider tests -q --tb=line --show-capture=no`，截取命令和 `292 passed, 5 failed ...` 汇总行。
+> 建议文件名：`docs/report/assets/screenshots/shot_13_pytest.png`。
 
 ## 5.7 测试结论
 
