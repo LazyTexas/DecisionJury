@@ -65,9 +65,7 @@ def send_message(
     # 5. 检查高风险
     if result_dict.get("is_high_risk"):
         reject_reason = result_dict.get("reject_reason", "该决策超出系统支持范围。")
-        # 更新案件状态为 REJECTED
         case.status = CaseStatus.REJECTED
-        # 保存拒绝原因到 collected_fields
         collected = case.collected_fields or {}
         collected["is_high_risk"] = True
         collected["reject_reason"] = reject_reason
@@ -92,7 +90,7 @@ def send_message(
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
 
-    # 7. 获取缺失字段（只赋值一次）
+    # 7. 获取缺失字段
     missing_fields = result_dict.get("missing_fields", [])
     case.missing_fields = missing_fields
 
@@ -156,6 +154,8 @@ def send_message(
         next_question = result_dict.get("next_question")
         if next_question:
             reply = next_question
+        elif conflicts:
+            reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
         else:
             if conflicts:
                 reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
@@ -172,7 +172,7 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 14. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    # 14. 强制标记字段已修改
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')

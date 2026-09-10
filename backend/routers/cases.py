@@ -34,14 +34,18 @@ def create_case(
     if not (req.description or "").strip():
         if req.title.strip():
             # 把标题作为商品名线索，其余字段留给后续对话收集
-            initial_collected = {"product_name": req.title.strip()[:20], "description": req.description}
+            initial_collected = {
+                "product_name": req.title.strip()[:20],
+                "description": req.description,
+                "_next_question": "为了进入购物法庭分析，还需要补充：这个商品大约多少钱？ 你买它主要是为了解决什么问题，或用于什么场景？"
+            }
             initial_missing = ["price", "purpose", "monthly_budget_left", "owned_alternatives", "expected_usage_frequency", "trigger_reason"]
             is_high_risk = False
             reject_reason = ""
             initial_status = CaseStatus.COLLECTING
             case = Case(
                 id=case_id,
-                user_id=effective_user_id,  # <-- 改用 effective_user_id
+                user_id=effective_user_id,
                 case_type=req.case_type,
                 title=req.title,
                 description=req.description,
@@ -110,6 +114,8 @@ def create_case(
             initial_collected["_conflicts"] = conflicts
         if next_question_key:
             initial_collected["_current_question_key"] = next_question_key
+        if parser_dict.get("next_question"):                          # ← 新增
+            initial_collected["_next_question"] = parser_dict["next_question"]   # ← 存储文本
         if termination_reason:
             initial_collected["_termination_reason"] = termination_reason
         if parser_used:
@@ -145,8 +151,7 @@ def create_case(
 
     # 生成追问
     next_question = None
-    if not is_high_risk and initial_missing:
-        # 直接使用 C 模块返回的 next_question
+    if not is_high_risk:
         next_question = parser_dict.get("next_question")
 
     return ApiResponse(
