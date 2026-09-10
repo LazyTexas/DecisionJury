@@ -38,7 +38,7 @@ def test_get_llm_client_uses_deepseek_when_key_exists(monkeypatch: Any) -> None:
     client = llm_client.get_llm_client()
 
     assert isinstance(client, llm_client.DeepSeekLLMClient)
-    assert client.model == "deepseek-v4-flash"
+    assert client.model == "deepseek-flash"
     assert client.base_url == "https://api.deepseek.com"
 
 
@@ -190,8 +190,8 @@ def test_request_body_uses_fixed_deepseek_v4_flash_model(monkeypatch: Any) -> No
     raw = client._request_completion("pro_agent", sample_payload())
 
     assert json.loads(raw) == {"summary": "ok", "arguments": ["a"], "confidence": 0.5}
-    assert captured["body"]["model"] == "deepseek-v4-flash"
-    assert captured["timeout"] == 30
+    assert captured["body"]["model"] == "deepseek-flash"
+    assert captured["timeout"] == 120          # pro_agent 属辩论阶段，开启思考后超时放宽
     assert captured["authorization"] == "Bearer test-key"
 
 
@@ -386,7 +386,8 @@ def test_timeout_can_be_configured(monkeypatch: Any) -> None:
     assert client.timeout_seconds == 45
 
 
-def test_input_parser_request_uses_low_reasoning_effort(monkeypatch: Any) -> None:
+def test_input_parser_request_disables_thinking(monkeypatch: Any) -> None:
+    """收集阶段必须关闭思考模式（官方文档：思考默认开启，会拖慢延迟并吃掉输出额度）。"""
     client = llm_client.DeepSeekLLMClient(api_key="test-key")
     captured: dict[str, Any] = {}
 
@@ -402,16 +403,49 @@ def test_input_parser_request_uses_low_reasoning_effort(monkeypatch: Any) -> Non
 
     def fake_urlopen(request, timeout):
         captured["body"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
         return FakeResponse()
 
     monkeypatch.setattr(llm_client, "urlopen", fake_urlopen)
 
     client._request_completion("input_parser", {"current_message": "价格是2500元"})
 
-    assert captured["body"]["reasoning_effort"] == "low"
+    assert captured["body"]["thinking"] == {"type": "disabled"}
+    assert "reasoning_effort" not in captured["body"]
+    assert captured["timeout"] == 30
 
 
-def test_parser_result_rejects_invalid_amount_and_confidence() -> None:
+def test_debate_request_uses_max_reasoning_effort(monkeypatch: Any) -> None:
+    """辩论/判决阶段开启思考并给足输出额度（思维链 token 计入 max_tokens）。"""
+    client = llm_client.DeepSeekLLMClient(api_key="test-key")
+    captured: dict[str, Any] = {}
+
+    class FakeResponse:
+        def read(self) -> bytes:
+            return b'{"choices":[{"message":{"content":"{}"}}]}'
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+    def fake_urlopen(request, timeout):
+        captured["body"] = json.loads(request.data.decode("utf-8"))
+        captured["timeout"] = timeout
+        return FakeResponse()
+
+    monkeypatch.setattr(llm_client, "urlopen", fake_urlopen)
+
+    client._request_completion("judge_agent", {"collected_fields": {}})
+
+    assert captured["body"]["reasoning_effort"] == "max"
+    assert captured["body"]["max_tokens"] >= 4096
+    assert captured["timeout"] == 120
+
+
+def test_parser_result_drops_invalid_amounts_instead_of_failing_turn() -> None:
+    """单个金额非法时只丢弃该字段（字段级降级），不再让整轮解析作废。"""
     base = {
         "case_type": "shopping",
         "is_supported": True,
@@ -424,16 +458,30 @@ def test_parser_result_rejects_invalid_amount_and_confidence() -> None:
     }
 
     for invalid in (
-        {**base, "extracted_fields": {"price": "nan"}},
+        {**base, "extracted_fields": {"price": "面议"}},
         {**base, "extracted_fields": {"price": -1}},
         {**base, "extracted_fields": {"price": True}},
-        {**base, "confidence": 2},
     ):
-        try:
-            llm_client._validate_parser_result(invalid)
-        except ValueError:
-            continue
-        raise AssertionError("invalid parser result should fail validation")
+        result = llm_client._validate_parser_result(invalid)
+        assert "price" not in result["extracted_fields"]
+
+
+def test_parser_result_rejects_invalid_confidence() -> None:
+    value = {
+        "case_type": "shopping",
+        "is_supported": True,
+        "is_high_risk": False,
+        "reject_reason": None,
+        "extracted_fields": {"price": 100},
+        "correction_fields": {},
+        "next_question": None,
+        "confidence": 2,
+    }
+    try:
+        llm_client._validate_parser_result(value)
+    except ValueError:
+        return
+    raise AssertionError("out-of-range confidence should fail validation")
 
 
 def test_parser_validation_does_not_mutate_input() -> None:

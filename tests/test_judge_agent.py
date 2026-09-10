@@ -52,12 +52,12 @@ def _make_cooling_result(status="success"):
 
 
 def _make_rag(tags=None):
-    """构建 RAG 证据列表。"""
+    """构建 RAG 证据列表（标题/正文与本案商品“耳机”相关，否则不参与判决）。"""
     return [
         RagEvidence(
             id="rag_001",
-            title="测试记录",
-            content="测试内容",
+            title="无线降噪耳机 消费复盘",
+            content="测试内容：花费 899 元购买了无线降噪耳机。",
             score=0.8,
             source="history",
             case_type="shopping",
