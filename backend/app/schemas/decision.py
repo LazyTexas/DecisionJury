@@ -83,6 +83,13 @@ class DecisionReport:
     next_actions: list[str]
     created_at: str
     debate_events: list[DebateEvent] = field(default_factory=list)
+    # 判决依据：命中的规则、说明与影响，供报告与页面展示“为什么这么判”。
+    decision_basis: list[dict[str, str]] = field(default_factory=list)
+    # 结论强度：命中硬约束/高频放行等确定性高的规则更高，兜底规则最低。
+    decision_strength: float | None = None
+    # 可复算信息：规则版本与当时的判定输入，便于事后复盘“当时为什么这么判”。
+    rule_version: str | None = None
+    input_snapshot: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -118,6 +125,10 @@ class ParserResult:
     is_complete: bool = False
     termination_reason: str | None = None
     parser_used: str | None = None
+    # 收集阶段的回复计划：承接句、一个问题、快捷选项、是否可结束（见 reply_composer）。
+    reply_plan: dict[str, Any] = field(default_factory=dict)
+    # 模型给出的对话文案（ack/insight/question/chips/intent），由本地护栏裁剪后使用。
+    dialogue: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

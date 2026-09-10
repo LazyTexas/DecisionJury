@@ -48,10 +48,12 @@ def run_con_agent(
     ]
     cost_result = next((item for item in tool_results if item.tool_name == "cost_analyzer"), None)
     arguments = list(response["arguments"])
-    if cost_result and cost_result.status == "success":
-        arguments.append(cost_result.summary)
+    # 不再把工具 summary 直接塞进论点：模型已在 prompt 里拿到 tool_results，
+    # 原文照搬会出现“该商品占剩余预算约 25%，风险等级为 medium。”这种注水论点。
+    if cost_result and cost_result.status != "success":
+        arguments.append("成本工具本次不可用，预算数据需人工核对。")
     if risk_rag_ids:
-        arguments.append(f"存在可引用的历史风险证据：{', '.join(risk_rag_ids)}")
+        arguments.append(f"历史复盘中有 {len(risk_rag_ids)} 条与闲置/后悔相关的记录，值得参考。")
     return AgentStep(
         agent="con_agent",
         status="completed",
