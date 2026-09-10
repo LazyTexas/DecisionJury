@@ -49,7 +49,7 @@ def test_get_trace_success(client, db_session):
     db_session.add(trace2)
     db_session.commit()
 
-    response = client.get("/api/cases/case_trace/trace")
+    response = client.get("/api/cases/case_trace/trace", params={"user_id": "u001"})
 
     assert response.status_code == 200
     data = response.json()
@@ -117,7 +117,7 @@ def test_get_trace_sorted_by_step(client, db_session):
     db_session.add(trace3)
     db_session.commit()
 
-    response = client.get("/api/cases/case_trace_sort/trace")
+    response = client.get("/api/cases/case_trace_sort/trace", params={"user_id": "u001"})
 
     assert response.status_code == 200
     data = response.json()
@@ -128,7 +128,7 @@ def test_get_trace_sorted_by_step(client, db_session):
 
 def test_get_trace_case_not_found(client):
     """案件不存在返回 CASE_NOT_FOUND"""
-    response = client.get("/api/cases/case_not_exist/trace")
+    response = client.get("/api/cases/case_not_exist/trace", params={"user_id": "u001"})
 
     assert response.status_code == 200
     data = response.json()
@@ -151,7 +151,7 @@ def test_get_trace_empty_for_no_traces(client, db_session):
     db_session.add(case)
     db_session.commit()
 
-    response = client.get("/api/cases/case_no_trace/trace")
+    response = client.get("/api/cases/case_no_trace/trace", params={"user_id": "u001"})
 
     assert response.status_code == 200
     data = response.json()
@@ -189,7 +189,7 @@ def test_get_trace_fields_complete(client, db_session):
     db_session.add(trace)
     db_session.commit()
 
-    response = client.get("/api/cases/case_fields/trace")
+    response = client.get("/api/cases/case_fields/trace", params={"user_id": "u001"})
 
     assert response.status_code == 200
     data = response.json()

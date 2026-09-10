@@ -24,6 +24,9 @@ export const API_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIALS: '用户 ID 或密码不正确',
   FORBIDDEN: '没有权限执行该操作',
   REMINDER_NOT_FOUND: '该观察项不存在或已被删除',
+  // ---- JWT 认证 ----
+  INVALID_TOKEN: 'Token 无效或已过期，请重新登录',
+  AUTHENTICATION_REQUIRED: '请先登录后再访问此接口',
 };
 
 export function translateApiError(message: string | null | undefined, fallback = '操作失败，请稍后重试'): string {

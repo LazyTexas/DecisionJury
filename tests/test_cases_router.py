@@ -102,7 +102,7 @@ def test_get_case_found(client):
     })
     case_id = create_resp.json()["data"]["case_id"]
 
-    resp = client.get(f"/api/cases/{case_id}")
+    resp = client.get(f"/api/cases/{case_id}", params={"user_id": "u001"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is True
@@ -118,7 +118,7 @@ def test_get_case_found(client):
 
 def test_get_case_not_found(client):
     """查询不存在的 case_id 返回 CASE_NOT_FOUND。"""
-    resp = client.get("/api/cases/case_notexist")
+    resp = client.get("/api/cases/case_notexist", params={"user_id": "u001"})
     assert resp.status_code == 200
     body = resp.json()
     assert body["success"] is False
@@ -179,7 +179,7 @@ def test_list_cases_empty(client):
 
 def test_get_report_case_not_found(client):
     """不存在的 case 查报告返回 CASE_NOT_FOUND。"""
-    resp = client.get("/api/cases/case_notexist/report")
+    resp = client.get("/api/cases/case_notexist/report", params={"user_id": "u001"})
     body = resp.json()
     assert body["success"] is False
     assert body["message"] == "CASE_NOT_FOUND"
@@ -195,7 +195,7 @@ def test_get_report_not_found(client):
     })
     case_id = create_resp.json()["data"]["case_id"]
 
-    resp = client.get(f"/api/cases/{case_id}/report")
+    resp = client.get(f"/api/cases/{case_id}/report", params={"user_id": "u001"})
     body = resp.json()
     assert body["success"] is False
     assert body["message"] == "REPORT_NOT_FOUND"
@@ -237,7 +237,7 @@ def test_get_report_success(client):
     db.add(case)
     db.commit()
 
-    resp = client.get("/api/cases/case_report01/report")
+    resp = client.get("/api/cases/case_report01/report", params={"user_id": "u001"})
     body = resp.json()
     assert body["success"] is True
     data = body["data"]

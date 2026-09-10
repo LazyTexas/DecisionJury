@@ -403,7 +403,7 @@ export interface PaginatedResponse<T> {
 
 // ---- 用户 / 认证 ----
 
-/** 当前登录用户（后端 auth 接口扁平返回 user_id + name，无 token） */
+/** 当前登录用户身份（后端 auth 接口返回 user_id + name；JWT 单独存储） */
 export interface AuthUser {
   user_id: string;
   name: string;
@@ -413,4 +413,7 @@ export interface AuthUser {
 export interface AuthResponse {
   user_id: string;
   name: string;
+  /** JWT 访问令牌（登录接口返回；注册接口不含） */
+  access_token?: string;
+  token_type?: string;
 }

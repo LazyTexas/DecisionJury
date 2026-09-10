@@ -416,13 +416,15 @@ def test_get_messages_forbidden_for_other_user(client, db_session):
 
 
 def test_get_messages_missing_user_id(client, db_session):
-    """缺少 user_id 时返回验证错误"""
+    """缺少 user_id 且无 Token 时返回 MISSING_USER_ID（HTTP 200 + 业务错误码）"""
     _create_test_case(db_session)
 
     response = client.get("/api/cases/case_chat_test/messages")
 
-    assert response.status_code == 422
-    assert response.json()["success"] is False
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is False
+    assert body["message"] == "MISSING_USER_ID"
 
 
 def test_get_messages_invalid_page_params(client, db_session):

@@ -18,7 +18,7 @@ import {
   WatchlistItem,
 } from '../types';
 import { translateApiError } from '../utils/errors';
-import { getStoredUserId } from '../auth/storage';
+import { getStoredUserId, getStoredToken, clearStoredToken, clearStoredUser } from '../auth/storage';
 import {
   fetchCaseList as mockFetchCaseList,
   fetchCaseDetail as mockFetchCaseDetail,
@@ -70,19 +70,70 @@ export class ApiRequestError extends Error {
   }
 }
 
+/**
+ * 从响应体里解析错误码。
+ * 后端既可能返回字符串 message（如 "CASE_NOT_FOUND"），
+ * 也可能返回 JWT 认证错误的嵌套结构 {message: {code, message}}，
+ * 这里统一把两者都归一为 code 字符串。
+ */
+function extractErrorCode(message: unknown): string | undefined {
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object' && 'code' in message) {
+    const code = (message as { code?: unknown }).code;
+    if (typeof code === 'string') return code;
+  }
+  return undefined;
+}
+
+/** 从响应体里解析可直接展示的错误文案（嵌套结构取内层 message） */
+function extractErrorMessage(message: unknown): string | undefined {
+  if (typeof message === 'string') return message;
+  if (message && typeof message === 'object' && 'message' in message) {
+    const inner = (message as { message?: unknown }).message;
+    if (typeof inner === 'string') return inner;
+  }
+  return undefined;
+}
+
+/** token 失效时的统一处理：清本地登录态并回到登录页（防重复跳转） */
+function handleUnauthorized(): void {
+  clearStoredToken();
+  clearStoredUser();
+  if (typeof window !== 'undefined') {
+    const { pathname } = window.location;
+    if (pathname !== '/login' && pathname !== '/register') {
+      window.location.replace('/login');
+    }
+  }
+}
+
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
+  // 统一注入 JWT：所有业务请求都经由此处，登录后自动携带 Authorization 头。
+  // 注意：先解构出调用方的 headers，再合并，避免 ...options 覆盖掉 Authorization。
+  const token = USE_MOCK ? null : getStoredToken();
+  const { headers: optionHeaders, ...restOptions } = options ?? {};
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${url}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...options,
+      ...restOptions,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(optionHeaders as Record<string, string> | undefined),
+      },
     });
   } catch {
     // 网络层失败（后端未启动 / 代理断开）
     throw new ApiRequestError('网络连接失败，请确认后端服务已启动（localhost:8000）');
   }
 
-  let body: { success?: boolean; data?: unknown; message?: string } | null = null;
+  // token 缺失 / 无效 / 过期：清登录态并跳登录页
+  if (res.status === 401) {
+    handleUnauthorized();
+    throw new ApiRequestError('登录已失效，请重新登录', 'UNAUTHORIZED', 401);
+  }
+
+  let body: { success?: boolean; data?: unknown; message?: unknown } | null = null;
   try {
     body = await res.json();
   } catch {
@@ -90,17 +141,19 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const code = typeof body?.message === 'string' ? body.message : undefined;
+    const code = extractErrorCode(body?.message);
+    const readable = extractErrorMessage(body?.message);
     throw new ApiRequestError(
-      translateApiError(code, `请求失败（HTTP ${res.status}）`),
+      translateApiError(code ?? readable, `请求失败（HTTP ${res.status}）`),
       code,
       res.status,
     );
   }
 
   if (body && body.success === false) {
-    const code = typeof body.message === 'string' ? body.message : undefined;
-    throw new ApiRequestError(translateApiError(code), code);
+    const code = extractErrorCode(body.message);
+    const readable = extractErrorMessage(body.message);
+    throw new ApiRequestError(translateApiError(code ?? readable), code);
   }
 
   // 兼容两种响应形态：{success,data} 信封 或 裸数据
