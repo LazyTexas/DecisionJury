@@ -110,10 +110,16 @@ def send_message(
         safe_fields["_conflicts"] = conflicts
         case.collected_fields = safe_fields
 
-    # 10. 接入 next_question_key
+    # 10. 接入 next_question_key + next_question 文本
     next_question_key = result_dict.get("next_question_key")
+    next_question_text = result_dict.get("next_question")
+
     if next_question_key:
         safe_fields["_current_question_key"] = next_question_key
+        case.collected_fields = safe_fields
+
+    if next_question_text:
+        safe_fields["_next_question"] = next_question_text
         case.collected_fields = safe_fields
 
     # 11. 接入 parser_used
@@ -123,15 +129,34 @@ def send_message(
         case.collected_fields = safe_fields
 
     # 12. 根据状态生成回复
-    if case.status == CaseStatus.READY_FOR_DEBATE:
+    if case.status == CaseStatus.READY_FOR_DEBATE and not missing_fields:
+        # 场景 A：7 字段全齐，完全就绪
         reply = "信息已补充完整，可以进入正反方分析。"
-    else:
-        # 优先使用 C 的 next_question
+
+    elif case.status == CaseStatus.READY_FOR_DEBATE and missing_fields:
+        # 场景 B：最低门槛就绪，但还有字段可补充（新增分支）
         next_question = result_dict.get("next_question")
         if next_question:
             reply = next_question
         else:
-            # 如果有冲突，生成冲突确认追问
+            # C 没有返回 next_question 时，根据 missing_fields 生成可读追问
+            field_names = {
+                "price": "商品价格",
+                "purpose": "购买目的",
+                "monthly_budget_left": "本月剩余预算",
+                "owned_alternatives": "已有哪些替代品",
+                "expected_usage_frequency": "预计使用频率",
+                "trigger_reason": "想买的触发原因",
+            }
+            readable = [field_names.get(f, f) for f in missing_fields[:3]]
+            reply = f"核心信息已完整，可以进入分析；建议补充：{'、'.join(readable)}。"
+
+    else:
+        # 场景 C：仍在收集（原逻辑不变）
+        next_question = result_dict.get("next_question")
+        if next_question:
+            reply = next_question
+        else:
             if conflicts:
                 reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
             else:
