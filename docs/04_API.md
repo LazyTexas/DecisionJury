@@ -452,7 +452,7 @@ B的/debate已有保存分支：读取这些metrics，用案件user/case ID，�
   "data": {
     "tool_name": "decision_score",
     "status": "success",
-    "summary": "综合评分偏低，建议放弃或寻找替代方案。",
+    "summary": "综合评分 18（风险维度较集中）；该分数是参考维度，最终结论以法官判决为准。",
     "risk_level": "high",
     "metrics": {
       "score": 18,

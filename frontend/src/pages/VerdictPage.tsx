@@ -14,6 +14,15 @@ const nodeColor: Record<string, [string, string]> = {
 
 const C = 2 * Math.PI * 66;
 
+/**
+ * 工具是进程内规则计算，耗时低于 1ms 时后端存下的是整数 0（毫秒精度截断）。
+ * 直接渲染会显示成“0ms”，看起来像没执行，因此这里统一显示成 <1ms。
+ */
+function formatDuration(ms: number | null | undefined): string {
+  if (ms === null || ms === undefined) return '—';
+  return ms > 0 ? `${ms}ms` : '<1ms';
+}
+
 export default function VerdictPage() {
   const { caseId } = useParams<{ caseId: string }>();
   const navigate = useNavigate();
@@ -43,7 +52,7 @@ export default function VerdictPage() {
           <div className="verdict-head"><div className="kicker">DecisionJury · 冷静裁判庭</div><h1>判决书</h1><div className="muted">案号：{report.case_id} · {CASE_TYPE_META[report.case_type]?.label ?? report.case_type} · {report.case_summary}</div></div>
           <div className="flowzone"><div className="label"><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--pro)', display: 'inline-block' }}></span>分析执行过程 · {trace.length} 步 · 全部完成</div><div className="flow">
             {trace.map((t) => { const [color, glyph] = nodeColor[t.name] ?? ['#3B5BDB', '·']; return (
-              <div key={t.trace_id} className="node"><div className="n-ico" style={{ background: color }}>{glyph}</div><div className="n-name">{TRACE_NAME_LABEL[t.name] ?? t.name}</div><div className="n-meta">{TRACE_TYPE_LABEL[t.type] ?? t.type} · {t.duration_ms}ms</div><div className="n-ok">✓</div><div className="conn"></div></div>
+              <div key={t.trace_id} className="node"><div className="n-ico" style={{ background: color }}>{glyph}</div><div className="n-name">{TRACE_NAME_LABEL[t.name] ?? t.name}</div><div className="n-meta">{TRACE_TYPE_LABEL[t.type] ?? t.type} · {formatDuration(t.duration_ms)}</div><div className="n-ok">✓</div><div className="conn"></div></div>
             ); })}
           </div></div>
           <div className="letter">
@@ -52,7 +61,7 @@ export default function VerdictPage() {
             <h2>历史证据（RAG）</h2>
             {(report.rag_evidence || []).length === 0 ? <p className="muted">无引用证据。</p> : (report.rag_evidence || []).map((ev: RagEvidence, i) => (<div key={ev.id} className="cite"><div className="no">{i + 1}</div><div className="ct"><b>{ev.title}</b><span className="score">相关性 {ev.score}</span><p>{ev.content}</p></div></div>))}
             <h2>工具计算结果</h2>
-            <div className="toolrow">{(report.tool_results || []).map((tr: ToolResult, i) => (<div key={i} className="toolbox"><div className="t-name"><span className="tag tool" style={{ background: 'var(--brand-soft)', color: 'var(--tool)' }}>工具</span>{tr.tool_name}</div><p className="tiny" style={{ marginTop: 8 }}>{tr.summary}</p>{tr.risk_level && <p className="tiny">风险：{tr.risk_level}</p>}</div>))}</div>
+            <div className="toolrow">{(report.tool_results || []).map((tr: ToolResult, i) => (<div key={i} className="toolbox"><div className="t-name"><span className="tag tool" style={{ background: 'var(--brand-soft)', color: 'var(--tool)' }}>工具</span>{tr.tool_name}</div><p className="tiny" style={{ marginTop: 8 }}>{tr.summary}</p>{tr.risk_level && <p className="tiny">{tr.tool_name === 'decision_score' ? '评分档位' : '风险等级'}：{tr.risk_level}</p>}</div>))}</div>
             <h2>最终裁决</h2>
             <div className="verdict-badge"><div className="vlabel">{meta?.label ?? report.final_decision}</div><div className="gauge"><svg viewBox="0 0 160 160"><circle className="track" cx="80" cy="80" r="66" /><circle className="p" cx="80" cy="80" r="66" transform="rotate(-90 80 80)" style={{ strokeDasharray: C, strokeDashoffset: gaugeOffset }} /></svg><div className="val"><b>{report.confidence}</b><span>法官置信度</span></div></div><p className="muted" style={{ maxWidth: 520 }}>{report.summary}</p></div>
             <h2>后续动作</h2><ul className="actions">{(report.next_actions || []).map((a, i) => <li key={i}><span className="i">{i + 1}</span>{a}</li>)}</ul>
