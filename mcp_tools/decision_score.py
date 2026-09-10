@@ -69,13 +69,17 @@ def score_decision(
 
     if score >= 70:
         risk_level = "low"
-        suggestion = "综合评分较高，建议积极执行。"
+        detail = "各维度均未发现明显风险"
     elif score >= 45:
         risk_level = "medium"
-        suggestion = "综合评分中等，建议暂缓后再决定。"
+        detail = "部分维度需要确认"
     else:
         risk_level = "high"
-        suggestion = "综合评分偏低，建议放弃或寻找替代方案。"
+        detail = "风险维度较集中"
+
+    # 这里只描述评分维度，不下"买 / 不买"的行动指令：最终判决由 judge_agent._decide
+    # 唯一确定，两套结论在报告页并列展示时不能互相抢台词。
+    suggestion = f"综合评分 {score}（{detail}）；该分数是参考维度，最终结论以法官判决为准。"
 
     result = {
         "score": score,
