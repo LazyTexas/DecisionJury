@@ -79,17 +79,17 @@ def test_rag_case_type_isolation():
     print("\n✅ 用例三通过：case_type 跨场景数据隔离测试成功！")
 
 
-def test_rag_dataset_has_500_records():
+def test_rag_dataset_has_1000_records():
     """
-    新增验收：RAG 历史数据集应达到 500 条，购物/时间各 250，且字段齐全。
+    新增验收：RAG 历史数据集应达到 1000 条，购物/时间各 500，且字段齐全。
     """
     from data_loader import load_history_data
     records = load_history_data("u001")
-    assert len(records) >= 500, f"数据集应不少于 500 条，当前 {len(records)}"
+    assert len(records) >= 1000, f"数据集应不少于 1000 条，当前 {len(records)}"
     shopping = sum(1 for r in records if r["case_type"] == "shopping")
     time_n = sum(1 for r in records if r["case_type"] == "time")
-    assert shopping >= 250, f"购物记录应不少于 250 条，当前 {shopping}"
-    assert time_n >= 250, f"时间记录应不少于 250 条，当前 {time_n}"
+    assert shopping >= 500, f"购物记录应不少于 500 条，当前 {shopping}"
+    assert time_n >= 500, f"时间记录应不少于 500 条，当前 {time_n}"
 
     required = {"id", "title", "content", "source", "case_type", "tags", "created_at"}
     for record in records:

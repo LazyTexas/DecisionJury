@@ -44,7 +44,7 @@ def test_normalize_backend_item_skips_empty_summary():
 def test_load_history_data_merges_static_and_live(monkeypatch):
     """静态种子 + 后端实时记录合并，且以 id 去重、实时优先。"""
     static = data_loader._read_static_records()
-    assert len(static) >= 500, "静态种子应不少于 500 条"
+    assert len(static) >= 1000, "静态种子应不少于 1000 条"
 
     live = [
         data_loader._normalize_backend_item({
@@ -72,7 +72,7 @@ def test_load_history_data_returns_static_when_live_empty(monkeypatch):
     """后端无数据/不可用时，应回退到静态种子，且不编造历史。"""
     monkeypatch.setattr(data_loader, "fetch_backend_history", lambda user_id="local_user": [])
     merged = data_loader.load_history_data("local_user")
-    assert len(merged) >= 500
+    assert len(merged) >= 1000
 
 
 def test_fetch_backend_history_can_be_disabled(monkeypatch):
