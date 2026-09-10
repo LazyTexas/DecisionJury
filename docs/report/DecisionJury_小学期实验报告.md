@@ -227,7 +227,7 @@ DecisionJury 是一个面向日常购物决策的多 Agent 冷静决策助手。
 | 第 2 周 | 真实 RAG、规则工具、多轮状态合并 | 购物主链路、RAG 证据、工具结果、异常降级测试 | 已完成 |
 | 第 3 周 | 前端庭审与报告、持久化闭环、部署与答辩准备 | 两个购物演示案例、回归记录、启动脚本与演示材料 | 已完成（部分页面闭环待最终验收） |
 
-在具体实施过程中，团队按功能分支开发，通过 Pull Request 合并到 `dev` 分支，`main` 分支只保留稳定版本。每完成一个功能，同步更新接口文档和测试记录；范围调整时同步更新 MVP、SPEC 和里程碑文档。文档与测试基线为 `dev@5abbc86`。
+在具体实施过程中，团队按功能分支开发，通过 Pull Request 合并到 `dev` 分支，`main` 分支只保留稳定版本。每完成一个功能，同步更新接口文档和测试记录；范围调整时同步更新 MVP、SPEC 和里程碑文档。文档与测试基线为 `dev@c1ff634`。
 
 ## 1.4 团队分工
 
@@ -1091,7 +1091,17 @@ uv run --frozen pytest -p no:cacheprovider tests/test_cases_router.py \
 
 Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG 三个服务；停止使用 `stop_all.bat`。Linux 环境使用 `deploy/install.sh`、`deploy/start.sh` 和 `deploy/stop.sh` 通过 screen 启动和停止。容器环境使用 `docker-compose.yml` 编排前端 Nginx、后端和 RAG 服务，详细说明见 `deploy/DOCKER.md`。默认地址为前端 `http://localhost:5173/`、后端健康检查 `http://127.0.0.1:8000/api/health`、后端 Swagger `http://127.0.0.1:8000/docs`、RAG Swagger `http://127.0.0.1:8001/docs`。
 
-【截图：一键启动成功后的终端窗口和前端首页】
+![图 5-3 服务启动（screen -ls）](assets/screenshots/shot_01_startup.png)
+
+图 5-3 服务启动（screen -ls）
+
+![图 5-4 登录页面](assets/screenshots/shot_02_login.png)
+
+图 5-4 登录页面
+
+![图 5-5 注册页面](assets/screenshots/shot_03_register.png)
+
+图 5-5 注册页面
 
 ## 5.2 测试策略与测试用例
 
@@ -1137,11 +1147,11 @@ Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG
 
 ### 5.3.1 全量测试结果
 
-在最新 `dev@5abbc86`（含 JWT 身份契约测试对齐、迁移字段补全）上执行全量测试，实际结果如下：
+在最新 `dev@c1ff634`（含 JWT 身份契约测试对齐、迁移字段补全、前端输入锁定）上执行全量测试，实际结果如下：
 
 ```text
 命令：uv run --frozen pytest -p no:cacheprovider tests -q --tb=line --show-capture=no
-结果：292 passed, 5 failed, 7 warnings in 39.15s
+结果：292 passed, 5 failed, 7 warnings in 35.99s
 ```
 
 ### 5.3.2 定向测试结果
@@ -1150,10 +1160,10 @@ Windows 环境使用根目录 `start_all.bat` 一键启动前端、后端和 RAG
 
 | 测试分组 | 实际结果 | 耗时 |
 |---|---|---|
-| C Agent/LLM/RAG-MCP adapter | 139 passed | 28.78s |
-| D RAG 检索、数据加载、评测指标 | 18 passed | 0.93s |
-| E MCP 工具、评分、提醒、工具路由 | 59 passed | 0.28s |
-| B 后端路由、消息、辩论、历史、观察清单、轨迹、迁移 | 71 passed, 5 failed | 6.37s |
+| C Agent/LLM/RAG-MCP adapter | 139 passed | 28.94s |
+| D RAG 检索、数据加载、评测指标 | 18 passed | 0.99s |
+| E MCP 工具、评分、提醒、工具路由 | 59 passed | 0.23s |
+| B 后端路由、消息、辩论、历史、观察清单、轨迹、迁移 | 71 passed, 5 failed | 5.81s |
 
 > 说明：前四行按 A/B/C/D/E 模块负责人标注；“全量 tests/”是五个模块的汇总结果，因此不单独标注成员。为保持命名一致，下面统一使用“成员 + 模块/功能”的格式。
 
@@ -1265,7 +1275,27 @@ RAG 测试覆盖以下场景：
 5. 查看执行轨迹，确认 `input_parser → rag_search → cost_analyzer → decision_score → pro_agent → con_agent → cooling_reminder → judge_agent` 的调用顺序。
 6. 提交复盘，查看历史记录和观察清单变化。
 
-【截图：创建案件页、多轮对话页、庭审回放页、判决书页、执行轨迹页、观察清单页】
+![图 5-6 创建购物案件页面](assets/screenshots/shot_04_create_case.png)
+
+图 5-6 创建购物案件页面
+
+![图 5-7 判决书页面（一）：案件摘要、正反方观点与最终裁决](assets/screenshots/shot_05_verdict_1.png)
+
+图 5-7 判决书页面（一）：案件摘要、正反方观点与最终裁决
+
+![图 5-8 判决书页面（二）：RAG 证据、工具结果与后续动作](assets/screenshots/shot_06_verdict_2.png)
+
+图 5-8 判决书页面（二）：RAG 证据、工具结果与后续动作
+
+![图 5-9 执行轨迹页面](assets/screenshots/shot_07_trace.png)
+
+图 5-9 执行轨迹页面
+
+![图 5-10 观察清单页面](assets/screenshots/shot_08_watchlist.png)
+
+图 5-10 观察清单页面
+
+> 待补截图：多轮对话页（包含“本月预算还剩 3000 元，已有普通耳机”的补充过程）。拍摄方法见 `docs/report/替换实际运行截图指南.md` 第 5 节。
 
 ### 5.6.2 多轮价格纠正流程
 
@@ -1276,7 +1306,8 @@ RAG 测试覆盖以下场景：
 3. 纠正：“刚才价格说错了，不是 2500，是 2200。”
 4. 检查系统价格更新为 2200，预算保持 3000，并达到最低字段要求进入分析。
 
-【截图：多轮价格纠正后的字段展示】
+> 待补截图：多轮价格纠正后的字段展示。
+> 操作路径：登录后在案件创建页输入“想买一部手机，预算 3000 元”，进入多轮对话页依次发送“价格大概是 2500 元”和“刚才价格说错了，不是 2500，是 2200”，截取价格更新为 2200、预算保持 3000 的页面。
 
 ### 5.6.3 工具调用与 RAG 输出
 
@@ -1287,7 +1318,9 @@ RAG 测试覆盖以下场景：
 - `cooling_reminder` 返回提醒 ID、到期时间和观察项。
 - RAG 返回命中标题、内容、得分和标签。
 
-【截图：工具调用日志、RAG 检索结果、trace 面板】
+> 待补截图：工具调用日志和 RAG 检索结果。执行轨迹页面已见图 5-9。
+> - 工具调用日志：在项目根目录运行 `python -m mcp_tools.demo`，截取 `cost_analyzer`、`decision_score`、`cooling_reminder` 的调用输出；或打开后端 Swagger 调用 `/api/tools/cost-analyzer` 后截图。
+> - RAG 检索结果：运行 `python rag/evaluate_rag.py` 截取命中表格；或打开 RAG Swagger `http://127.0.0.1:8001/docs`，调用 `POST /api/rag/search`（`case_type=shopping`、`query=想买降噪耳机`、`top_k=5`）后截图返回结果。
 
 ## 5.7 测试结论
 

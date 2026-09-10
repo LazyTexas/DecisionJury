@@ -1,7 +1,7 @@
 # DecisionJury 小学期实验报告 · 协作框架
 
 > 本目录用于把「小学期实验报告」拆成可分工、可合并的 Markdown 章节。
-> 当前章节内容已按 `dev@5abbc86` 的实际代码和测试结果完成，已生成：
+> 当前章节内容已按 `dev@c1ff634` 的实际代码和测试结果完成，已生成：
 > - `docs/report/DecisionJury_小学期实验报告.md`
 > - `docs/report/DecisionJury_小学期实验报告.docx`
 >
