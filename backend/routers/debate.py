@@ -36,7 +36,6 @@ def start_debate(
 
     # 3. 检查状态
     if case.status == CaseStatus.REJECTED:
-        # 从 collected_fields 获取拒绝原因
         collected = case.collected_fields or {}
         reject_reason = collected.get("reject_reason", "该决策超出系统支持范围。")
         return ApiResponse(
@@ -50,9 +49,9 @@ def start_debate(
         )
 
     if case.status != CaseStatus.READY_FOR_DEBATE:
-        # 从 collected_fields 获取缓存的 next_question
+        # ===== 修复：从 `_next_question` 读取（而不是 `next_question`）=====
         collected = case.collected_fields or {}
-        next_question = collected.get("next_question")
+        next_question = collected.get("_next_question")   # ← 修复
         if not next_question:
             next_question = "请继续补充以下信息" if case.missing_fields else None
         return ApiResponse(
@@ -130,7 +129,6 @@ def start_debate(
         for tool in tool_results:
             if tool.get("tool_name") == "cooling_reminder" and tool.get("status") == "success":
                 metrics = tool.get("metrics", {})
-                # 从 metrics 中提取字段
                 reminder = Reminder(
                     id=metrics.get("reminder_id", f"reminder_{uuid.uuid4().hex[:8]}"),
                     user_id=case.user_id,
@@ -141,10 +139,9 @@ def start_debate(
                     status="waiting"
                 )
                 db.add(reminder)
-                break  # 只有一个 cooling_reminder
+                break
 
         db.commit()
-        # ===== 保存 trace 结束 =====
 
         return ApiResponse(
             success=True,
