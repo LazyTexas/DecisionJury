@@ -14,7 +14,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from mcp_tools.cost_analyzer import analyze_shopping, analyze_time
+from mcp_tools.cost_analyzer import BUDGET_SOURCES, analyze_shopping, analyze_time
 from mcp_tools.cooling_reminder import create_reminder
 from mcp_tools.decision_score import score_decision
 from mcp_tools.logger import logger
@@ -32,6 +32,11 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                 "case_type": {"type": "string", "enum": ["shopping", "time"]},
                 "price": {"type": "number"},
                 "monthly_budget_left": {"type": "number"},
+                "budget_source": {
+                    "type": "string",
+                    "enum": ["monthly_budget", "savings"],
+                    "description": "该金额的来源：monthly_budget 为本月剩余可支配预算，savings 为为此攒下的一次性资金。",
+                },
                 "hours_required": {"type": "number"},
                 "free_hours_this_week": {"type": "number"},
                 "urgent_tasks": {"type": "integer"},
@@ -120,7 +125,15 @@ def _call_cost_analyzer(args: dict[str, Any]) -> dict[str, Any]:
                 "shopping 场景需要 price 和 monthly_budget_left",
                 "MISSING_ARGS",
             )
-        raw = analyze_shopping(price=float(price), monthly_budget_left=float(budget))
+        try:
+            budget_source = _parse_budget_source(args.get("budget_source"))
+        except ValueError as exc:
+            return _failed_tool("cost_analyzer", str(exc), "INVALID_ARGS")
+        raw = analyze_shopping(
+            price=float(price),
+            monthly_budget_left=float(budget),
+            budget_source=budget_source,
+        )
         return _success_tool(
             "cost_analyzer",
             summary=raw.get("explanation", "成本分析完成。"),
@@ -217,6 +230,17 @@ def _parse_bool(value: Any, default: bool = False) -> bool:
         if value in (0, 1):
             return bool(value)
     raise ValueError(f"impulse_trigger 必须是布尔值或可解析字符串，收到: {value!r}")
+
+
+def _parse_budget_source(value: Any) -> str:
+    """把参数解析成预算来源，缺省或未传时保持既有的 monthly_budget 行为。"""
+    if value is None:
+        return "monthly_budget"
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in BUDGET_SOURCES:
+            return text
+    raise ValueError(f"budget_source 只能是 monthly_budget 或 savings，收到: {value!r}")
 
 
 def _call_decision_score(args: dict[str, Any]) -> dict[str, Any]:

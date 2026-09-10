@@ -123,12 +123,12 @@ collecting / ready_for_debate → rejected（B风险判断）
   "status": "success",
   "summary": "该商品占剩余预算约 65%，风险等级为 high。",
   "risk_level": "high",
-  "metrics": {"budget_ratio": 0.65, "budget_left_after_purchase": 701},
+  "metrics": {"budget_ratio": 0.65, "budget_left_after_purchase": 701, "budget_source": "monthly_budget"},
   "error": null
 }
 ```
 
-所有字段均为稳定结构；status为success/failed，risk_level及error可为null，metrics为对象。成功工具数据不等于数据库写入成功。
+所有字段均为稳定结构；status为success/failed，risk_level及error可为null，metrics为对象。成功工具数据不等于数据库写入成功。cost_analyzer 的 metrics 另含 `budget_source`（`monthly_budget` / `savings`），用于说明该占比是拿哪一笔钱算出来的。
 
 ### 5.6 DecisionReport
 
@@ -193,6 +193,7 @@ B另行生成数据库trace ID，并在GET trace中增加created_at。不要用C
 - 最低必需项仅为 `product_name / price / monthly_budget_left`。`is_complete` 与 `case_status` 由 C 计算，不直接采用模型返回的同名值。
 - 当前实现保留本轮未提及的历史字段，同名非空本轮字段覆盖历史值，`correction_fields` 最后覆盖。不要将其误写成“普通提取永远不会覆盖历史值”。
 - 价格与预算按各自语义提取；邻近分句中的预算关键词不应使明确价格消失。
+- 金额来源标记 `budget_source` 取 `monthly_budget` 或 `savings`，不是七项字段之一，不计入 `missing_fields`，也不参与最低字段放行。它只在本次真的写入或覆盖 `monthly_budget_left` 时同步更新：本轮没有金额表达就保留历史标签，避免出现“数字是存款、标签是月预算”的错配。该键随 `merged_fields` 持久化并传给 cost_analyzer；缺失时按 `monthly_budget` 处理。
 - 当三个最低字段齐全而用途等信息缺失时，`case_status=ready_for_debate` 与非空 `missing_fields` 可以同时成立。当前本地分支仍可能返回选填项追问候选，调用方不应因此重新阻塞分析。
 - `termination_reason` 是本轮收集条件的说明，不表示已实现最大轮数或无进展熔断。
 
@@ -405,10 +406,10 @@ HTTP工具异常可能返回success=true且data.status=failed；调用方必须�
 `POST /api/tools/cost-analyzer`：
 
 ```json
-{"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000}
+{"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000, "budget_source": "monthly_budget"}
 ```
 
-case_type必填；case_id可选。购物必需price/monthly_budget_left且非负；预算0是合法边界，实现以占比1.0处理。结果data为§5.5，1299/2000约0.65、high、余额701。阈值按未舍入占比计算：≤0.2 low、≤0.6 medium、其余high。
+case_type必填；case_id可选；budget_source可选，取 `monthly_budget`（默认）或 `savings`，其他取值失败而不是静默按默认口径计算。购物必需price/monthly_budget_left且非负；预算0是合法边界，实现以占比1.0处理。结果data为§5.5，1299/2000约0.65、high、余额701。阈值按未舍入占比计算：`monthly_budget` 为≤0.2 low、≤0.6 medium、其余high；`savings` 为≤0.5 low、≤1.0 medium、其余high。
 
 历史兼容的time分支要求hours_required/free_hours_this_week/urgent_tasks，仍可组件调用，但不代表本轮时间主流程可用。
 

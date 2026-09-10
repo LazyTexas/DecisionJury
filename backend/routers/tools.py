@@ -28,6 +28,8 @@ class CostAnalyzerRequest(BaseModel):
     case_id: str | None = None
     price: float | None = None
     monthly_budget_left: float | None = None
+    # 金额来源：monthly_budget（默认，本月剩余可支配预算）或 savings（攒下的一次性资金）
+    budget_source: str | None = None
     hours_required: float | None = None
     free_hours_this_week: float | None = None
     urgent_tasks: int | None = None
@@ -57,7 +59,7 @@ def cost_analyzer_endpoint(req: CostAnalyzerRequest):
     """
     成本分析工具。
 
-    - shopping 场景：传入 price, monthly_budget_left
+    - shopping 场景：传入 price, monthly_budget_left，可选 budget_source
     - time 场景：传入 hours_required, free_hours_this_week, urgent_tasks
     """
     start = time.perf_counter()
@@ -68,7 +70,11 @@ def cost_analyzer_endpoint(req: CostAnalyzerRequest):
                     success=False, data=None,
                     message="shopping 场景需要 price 和 monthly_budget_left"
                 )
-            raw = analyze_shopping(price=req.price, monthly_budget_left=req.monthly_budget_left)
+            raw = analyze_shopping(
+                price=req.price,
+                monthly_budget_left=req.monthly_budget_left,
+                budget_source=req.budget_source or "monthly_budget",
+            )
         elif req.case_type == "time":
             if req.hours_required is None or req.free_hours_this_week is None or req.urgent_tasks is None:
                 return ApiResponse(

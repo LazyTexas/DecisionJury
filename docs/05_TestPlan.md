@@ -36,6 +36,8 @@ Linux/macOS 可在单条命令范围设置同样的变量：
 DATABASE_URL=sqlite:///:memory: ENV=development DEEPSEEK_API_KEY= PYTHON_DOTENV_DISABLED=1 RAG_LIVE_RECORDS=0 PYTHONIOENCODING=utf-8 uv run --frozen pytest -p no:cacheprovider tests
 ```
 
+Windows 上可以用仓库根目录的 `run_tests.bat` 代替手工设置变量：它封装了上面同一组隔离变量，默认跑 `tests`，也支持传目标，例如 `run_tests.bat tests\test_input_parser.py`、`run_tests.bat tests -k savings`。双击运行时窗口会保留结果，从 cmd 窗口调用则直接返回退出码。脚本不替代上面的手工命令，环境变量或依赖变化时两者行为应保持一致。
+
 首次安装依赖见 [README](../README.md)。`httpx2` 已列在开发依赖中，不再以手动安装未记录包的方式维持测试环境。
 
 当前先显式指定 `tests/`：根目录自动收集会导入 `backend/test/test_feedback_quick.py`，该辅助脚本在导入时直接查询/写入默认数据库，并非隔离 fixture 用例。在内存空库会报错，在日常数据库上则可能写入测试案件；不要通过切回真实数据库规避此问题。迁移测试另有引擎隔离缺陷，见§9，指定目录并不代表全部通过。
@@ -197,3 +199,27 @@ uv run --frozen python rag/evaluate_rag_standard.py --out "$env:TEMP/decisionjur
 - 根目录辅助脚本未变；本次复跑显式限定tests目录，没有重新运行根目录收集。
 - 观察清单删除新增user_id校验、parser元数据接入与报告损坏分支按代码同步文档；不以本次现有用例通过宣称这些新增边界全部有专项测试。
 - 未运行真实模型、浏览器或部署验收；本次不修改测试或业务代码以绕过遗留失败。
+
+### 9.3 预算金额来源修复（budget_source）
+
+2026-09-10，工作分支 `dev` 工作区改动（未提交、未推送），基线 `dev@d79a0a2`。环境为 Windows / Python 3.12.4 / pytest 9.1.1，沿用§2的内存数据库、禁用 dotenv、无真实模型 Key、关闭实时历史拉取。
+
+改动内容：`mcp_tools/cost_analyzer.py` 增加可选参数 `budget_source`（`monthly_budget` 默认 / `savings`）与存量分级表；`mcp_tools/mcp.py` 暴露同名 schema 字段并校验非法值；`backend/app/agents/input_parser.py` 按显式存量词识别金额来源，且只在本次真的写入金额时更新标签；`backend/app/services/mcp_adapter.py`、`backend/routers/tools.py` 透传；`mcp_tools/demo.py` 增加存量示例。
+
+| 实际命令/检查 | 结果 |
+|---|---|
+| 基线：`git worktree add` 到 `dev@d79a0a2` 后跑同一命令 | 292 passed、5 failed、7 warnings，37.59秒 |
+| `uv run --frozen pytest -p no:cacheprovider -q --tb=line --show-capture=no tests` | 317 passed、5 failed、7 warnings，7.52秒 |
+| `uv run --frozen python -m compileall -q backend tests rag mcp_tools` | 通过 |
+| `git diff --check` | 通过，无空白错误 |
+| `python -m mcp_tools.demo` | 通过；同一金额在 `monthly_budget` 下为 high、在 `savings` 下为 medium |
+
+新增25条用例全部通过：`test_cost_analyzer.py` +5（存量三档、超出资金池、默认口径不变、未知来源报错）、`test_mcp_tools.py` +4（schema 枚举、透传、默认值、非法值 INVALID_ARGS）、`test_input_parser.py` +10（存量词识别、月预算识别、存量金额不被当成价格、预算纠正翻转标签、无金额表达时保留标签、标签不参与最低字段、LLM 路径写入与不写入金额两种情况、存量口语变体、存量词不吞价格）、`test_debate_router.py` +2（端到端回归对）、`test_tools_router.py` +2（HTTP 接受 savings、非法来源失败）、`test_chat_router.py` +2（消息路径打 savings / monthly_budget 标签）。
+
+真实 Key 测试追加修复：用户在浏览器中用"我自己攒有1000块钱，不影响日常支出"复现时，金额仍被按月预算判为 high。核对 `data/decisionjury.db` 的案件记录后确认是存量词表只列了"攒了/攒下"等固定搭配、漏掉"攒有"。词表改为按词根收录（攒 / 存款 / 储蓄 / 积蓄 / 闲钱 / 私房钱 / 存了 / 存下 / 存起来），并新增"存量词与金额之间不得出现买/购"的约束以防吞掉商品价格。用该案件的原始字段重跑：`budget_source=savings`、`risk_level=medium`、`final_decision=delay`（修复前为 high / reject）。该轮同样未执行真实 DeepSeek 调用，模型的字段抽取仍属未验收部分。
+
+端到端回归对（本次修复的核心证据，`tests/test_debate_router.py`）：同一组数字 799/1000，带 `budget_source=savings` 时 cost_analyzer 为 medium、`final_decision=delay`；不带时仍为 high、`final_decision=reject`。该对用例锁住"修复误判"与"不放真·超预算"两侧。
+
+5个失败仍为§9.1所列 `tests/test_migrate.py` 迁移测试，与基线完全一致，未因本次改动增加或减少。7条warning仍为既有 Pydantic Config 与 Starlette 422 常量弃用提示。
+
+本轮未做：真实 DeepSeek Key 下的 parser/庭审验收、浏览器闭环、部署验收。因此本次只声明"隔离单元与契约测试通过、端到端规则链路通过"，不声明真实模型路径或线上部署已验收。本轮未修改任何测试或业务代码来绕过遗留失败。

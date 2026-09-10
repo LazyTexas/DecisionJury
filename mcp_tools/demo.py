@@ -26,6 +26,18 @@ def main() -> None:
         },
     )
 
+    # 同一笔金额标成"攒下的钱"时走另一套分级：占可用资金 79.9% 只到 medium，
+    # 不会像月度预算那样直接判 high（对应"购买不影响日常生活"这类表达）。
+    savings_cost = call_tool(
+        "cost_analyzer",
+        {
+            "case_type": "shopping",
+            "price": 799,
+            "monthly_budget_left": 1000,
+            "budget_source": "savings",
+        },
+    )
+
     time_cost = call_tool(
         "cost_analyzer",
         {
@@ -60,7 +72,7 @@ def main() -> None:
     )
 
     output = {
-        "tool_results": [shopping_cost, time_cost, reminder, decision_score],
+        "tool_results": [shopping_cost, savings_cost, time_cost, reminder, decision_score],
         "call_log": logger.get_all(),
     }
     print(json.dumps(output, ensure_ascii=False, indent=2))

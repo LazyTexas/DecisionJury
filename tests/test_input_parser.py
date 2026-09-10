@@ -518,3 +518,152 @@ def test_adjacent_price_and_budget_survive_deepseek_failure(monkeypatch):
     assert result.extracted_fields["price"] == 1299.0
     assert result.extracted_fields["monthly_budget_left"] == 2000.0
     assert result.case_status == "ready_for_debate"
+
+
+# ========== 预算金额来源标记（budget_source） ==========
+# 背景：用户说"攒了1000，购入不影响日常生活"时，1000 是攒下的存量资金，
+# 而不是本月可支配预算。标签必须和金额同一次写入，否则庭审用 description
+# 再解析一次时可能出现"数字是存款、标签是月预算"的错配。
+
+def test_savings_statement_marks_source(monkeypatch):
+    """'攒了1000' → 金额 + savings 标签。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input("我攒了1000，购入不影响日常生活")
+
+    assert result.merged_fields["monthly_budget_left"] == 1000.0
+    assert result.merged_fields["budget_source"] == "savings"
+
+
+def test_monthly_budget_statement_marks_source(monkeypatch):
+    """'本月预算还剩3000' → monthly_budget 标签。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input("本月预算还剩3000，想买个1299元的耳机")
+
+    assert result.merged_fields["monthly_budget_left"] == 3000.0
+    assert result.merged_fields["budget_source"] == "monthly_budget"
+
+
+def test_savings_wording_variants_mark_source(monkeypatch):
+    """存量表达的口语变体都要覆盖：真实测试里"攒有"曾被漏识别。
+
+    词表按词根收录而不是逐个罗列固定搭配，就是为了防止这类漏识别。
+    """
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+
+    variants = [
+        "我自己攒有1000块钱，不影响日常支出",
+        "我攒了1000，购入不影响日常生活",
+        "手头有1000块存款",
+        "1000块是我自己攒的",
+        "这1000是我存下来的",
+    ]
+    for message in variants:
+        result = parse_input(message)
+        assert result.merged_fields.get("monthly_budget_left") == 1000, message
+        assert result.merged_fields.get("budget_source") == "savings", message
+
+
+def test_savings_keywords_do_not_swallow_price(monkeypatch):
+    """'攒钱买个1000元的耳机'里 1000 是商品价格，不能被当成可用资金。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+
+    result = parse_input("攒钱买个1000元的耳机")
+
+    assert result.merged_fields.get("price") == 1000.0
+    assert "monthly_budget_left" not in result.merged_fields
+
+
+def test_savings_amount_is_not_taken_as_price(monkeypatch):
+    """存量金额不能被当成商品价格：799 是价格，1000 是攒下的钱。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input("想买个799元的降噪耳机，为了学习，我攒了1000块")
+
+    assert result.merged_fields["price"] == 799.0
+    assert result.merged_fields["monthly_budget_left"] == 1000.0
+    assert result.merged_fields["budget_source"] == "savings"
+
+
+def test_budget_correction_flips_source_back(monkeypatch):
+    """明确把预算改为某个数时，标签同步回到 monthly_budget。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input("预算改为3000", {"monthly_budget_left": 1000, "budget_source": "savings"})
+
+    assert result.merged_fields["monthly_budget_left"] == 3000.0
+    assert result.merged_fields["budget_source"] == "monthly_budget"
+
+
+def test_absent_budget_statement_keeps_existing_source(monkeypatch):
+    """本轮没提金额时保留原标签（庭审用 description 再解析时不能被冲掉）。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    result = parse_input("想买个降噪耳机", {"monthly_budget_left": 1000, "budget_source": "savings"})
+
+    assert result.merged_fields["monthly_budget_left"] == 1000
+    assert result.merged_fields["budget_source"] == "savings"
+
+
+def test_budget_source_does_not_gate_minimum_fields(monkeypatch):
+    """标签只是元数据：不进必填表，也不影响最低字段放行。"""
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: None)
+    assert "budget_source" not in input_parser.REQUIRED_SHOPPING_FIELDS
+    assert "budget_source" not in input_parser.MINIMUM_DECISION_FIELDS
+
+    result = parse_input("想买个799元的耳机，我攒了1000")
+    assert result.merged_fields["budget_source"] == "savings"
+    assert result.is_complete is True
+
+
+def test_llm_path_tags_source_when_amount_written(monkeypatch):
+    """LLM 路径：模型本轮写入预算金额时，标签同步更新。"""
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(
+        client,
+        "complete_parser_json",
+        lambda payload: {
+            "case_type": "shopping",
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {
+                "product_name": "降噪耳机",
+                "price": 799,
+                "monthly_budget_left": 1000,
+            },
+            "correction_fields": {},
+            "next_question": None,
+            "confidence": 0.9,
+        },
+    )
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input("我攒了1000，购入不影响日常生活")
+
+    assert result.parser_used == "deepseek"
+    assert result.merged_fields["monthly_budget_left"] == 1000
+    assert result.merged_fields["budget_source"] == "savings"
+
+
+def test_llm_path_keeps_source_when_amount_not_written(monkeypatch):
+    """LLM 路径：模型本轮没写金额时，不覆盖已有标签。"""
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(
+        client,
+        "complete_parser_json",
+        lambda payload: {
+            "case_type": "shopping",
+            "is_high_risk": False,
+            "reject_reason": None,
+            "extracted_fields": {"product_name": "降噪耳机"},
+            "correction_fields": {},
+            "next_question": "这个商品大约多少钱？",
+            "confidence": 0.8,
+        },
+    )
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+
+    result = parse_input(
+        "想买个降噪耳机",
+        {"monthly_budget_left": 1000, "budget_source": "savings"},
+    )
+
+    assert result.parser_used == "deepseek"
+    assert result.merged_fields["monthly_budget_left"] == 1000
+    assert result.merged_fields["budget_source"] == "savings"

@@ -23,6 +23,8 @@ def analyze_shopping_cost(case_id: str, case_type: str, fields: dict[str, Any]) 
                 "case_type": "shopping",
                 "price": float(fields["price"]),
                 "monthly_budget_left": float(fields["monthly_budget_left"]),
+                # 金额来源由 parser 标记；老案件没有该字段时回落到月度预算（原行为）。
+                "budget_source": fields.get("budget_source") or "monthly_budget",
             },
         )
         return _to_tool_result(raw_result, "cost_analyzer")

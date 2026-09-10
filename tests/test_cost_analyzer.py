@@ -142,3 +142,48 @@ def test_time_negative_urgent_tasks_raises():
         assert False, "expected ValueError"
     except ValueError:
         pass
+
+
+# ========== 预算金额来源（budget_source）分级 ==========
+# 背景：用户说"攒了1000，购入不影响日常生活"时，1000 是攒下的存量资金，
+# 而不是本月可支配预算。用月度阈值衡量存量，会把合理消费直接判成 high。
+
+
+def test_savings_medium_not_high():
+    """存款场景：799/1000 = 79.9% 只到 medium，不再是 high。"""
+    result = analyze_shopping(price=799, monthly_budget_left=1000, budget_source="savings")
+    assert result["risk_level"] == "medium", f"expected medium, got {result['risk_level']}"
+    assert result["metrics"]["budget_source"] == "savings"
+    assert result["metrics"]["budget_ratio"] == 0.8
+    assert "攒下的可用资金" in result["explanation"]
+
+
+def test_savings_boundaries():
+    """存款场景边界：<=50% low，<=100% medium。"""
+    assert analyze_shopping(price=500, monthly_budget_left=1000, budget_source="savings")["risk_level"] == "low"
+    assert analyze_shopping(price=1000, monthly_budget_left=1000, budget_source="savings")["risk_level"] == "medium"
+
+
+def test_savings_exceeding_funds_is_high():
+    """存款本身也不够时仍判 high：1200/1000 = 120%。"""
+    result = analyze_shopping(price=1200, monthly_budget_left=1000, budget_source="savings")
+    assert result["risk_level"] == "high"
+
+
+def test_monthly_budget_default_unchanged():
+    """不传 budget_source 时行为与改动前一致：799/1000 仍为 high，1299/2000 仍为 high。"""
+    default_result = analyze_shopping(price=799, monthly_budget_left=1000)
+    explicit_result = analyze_shopping(price=799, monthly_budget_left=1000, budget_source="monthly_budget")
+    assert default_result["risk_level"] == "high"
+    assert explicit_result["risk_level"] == "high"
+    assert default_result["metrics"]["budget_source"] == "monthly_budget"
+    assert analyze_shopping(price=1299, monthly_budget_left=2000)["risk_level"] == "high"
+
+
+def test_unknown_budget_source_raises():
+    """未知来源直接报错，避免拼错时静默走默认分支。"""
+    try:
+        analyze_shopping(price=100, monthly_budget_left=1000, budget_source="deposit")
+        assert False, "expected ValueError"
+    except ValueError:
+        pass
