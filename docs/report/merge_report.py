@@ -39,6 +39,36 @@ def load_section(path: Path) -> str:
     return text
 
 
+def extract_headings(sections_dir: Path) -> list[tuple[int, str]]:
+    """从章节文件中提取分级标题，用于生成目录。"""
+    headings: list[tuple[int, str]] = []
+    in_code = False
+    for name in SECTIONS:
+        text = load_section(sections_dir / name)
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("```"):
+                in_code = not in_code
+                continue
+            if in_code or not stripped.startswith("#"):
+                continue
+            level = len(stripped) - len(stripped.lstrip("#"))
+            title = stripped.lstrip("#").strip()
+            if title and "封面信息" not in title:
+                headings.append((level, title))
+    return headings
+
+
+def build_toc(headings: list[tuple[int, str]]) -> str:
+    """生成 Markdown 分级目录；Word 版会用 TOC 域生成带页码目录。"""
+    lines = ["# 目录", "", "> 以下为分级目录；Word 版会通过目录域自动生成带页码的目录。", ""]
+    for level, title in headings:
+        indent = "  " * max(0, level - 1)
+        lines.append(f"{indent}- {title}")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def build_report(sections_dir: Path) -> str:
     parts: list[str] = [
         "<!-- 本文件由 docs/report/merge_report.py 自动生成，请勿直接编辑；修改请编辑 sections/ 下的对应文件。 -->",
@@ -49,6 +79,9 @@ def build_report(sections_dir: Path) -> str:
         "> 课程名称：综合能力实训",
         "> 本文档为章节合并版，最终排版请使用学校 Word 模板 `小学期实验报告模板(1).docx`。",
         "",
+        "---",
+        "",
+        build_toc(extract_headings(sections_dir)),
         "---",
         "",
     ]

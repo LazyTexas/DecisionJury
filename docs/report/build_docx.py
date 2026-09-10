@@ -16,6 +16,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from pathlib import Path
 
@@ -104,12 +105,53 @@ def add_paragraph(doc: Document, text: str, size=BODY_SIZE, bold=False, indent=T
 def add_heading(doc: Document, text: str, level: int):
     # 学校模板要求标题为五号宋体加粗；这里统一用 10.5pt，避免改变模板字号约定。
     p = doc.add_paragraph()
+    try:
+        p.style = doc.styles[f"Heading {min(max(level, 1), 4)}"]
+    except KeyError:
+        pass
     run = p.add_run(clean_inline(text))
-    set_run_font(run, size=BODY_SIZE, bold=True)
+    set_run_font(run, size=BODY_SIZE, bold=True, color=RGBColor(0x00, 0x00, 0x00))
     pf = p.paragraph_format
     pf.space_before = Pt(10 if level == 1 else 6)
     pf.space_after = Pt(4)
     pf.line_spacing = 1.15
+    # 设置大纲级别，保证 Word 目录域可以抓取到分级标题。
+    ppr = p._p.get_or_add_pPr()
+    outline = OxmlElement("w:outlineLvl")
+    outline.set(qn("w:val"), str(max(0, min(level, 4) - 1)))
+    ppr.append(outline)
+    return p
+
+
+def add_toc_field(doc: Document):
+    """插入 Word 目录域（TOC），打开文档或更新域时自动生成带页码的分级目录。"""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_after = Pt(6)
+
+    run_begin = p.add_run()
+    fld_begin = OxmlElement("w:fldChar")
+    fld_begin.set(qn("w:fldCharType"), "begin")
+    fld_begin.set(qn("w:dirty"), "true")
+    run_begin._r.append(fld_begin)
+
+    run_instr = p.add_run()
+    instr = OxmlElement("w:instrText")
+    instr.set(qn("xml:space"), "preserve")
+    instr.text = ' TOC \\o "1-3" \\h \\z \\u '
+    run_instr._r.append(instr)
+
+    run_sep = p.add_run()
+    fld_sep = OxmlElement("w:fldChar")
+    fld_sep.set(qn("w:fldCharType"), "separate")
+    run_sep._r.append(fld_sep)
+
+    run_text = p.add_run("目录将在 Word 打开时自动更新；如未显示，请右键选择“更新域”。")
+    set_run_font(run_text, size=BODY_SIZE)
+
+    run_end = p.add_run()
+    fld_end = OxmlElement("w:fldChar")
+    fld_end.set(qn("w:fldCharType"), "end")
+    run_end._r.append(fld_end)
     return p
 
 
@@ -313,8 +355,10 @@ def build_docx(md_path: Path, out_path: Path, template_path: Path) -> None:
         raise SystemExit("输出文件不能写入 templates/ 目录，以免覆盖模板副本。")
 
     text = md_path.read_text(encoding="utf-8")
-    # 从 "# 00" 章节开始，跳过合并文件头部说明
-    start = text.find("# 00 ")
+    # 优先从 "# 目录" 开始，其次从 "# 00" 开始，跳过合并文件头部说明。
+    start = text.find("# 目录")
+    if start == -1:
+        start = text.find("# 00 ")
     if start == -1:
         start = 0
     lines = text[start:].splitlines()
@@ -326,10 +370,22 @@ def build_docx(md_path: Path, out_path: Path, template_path: Path) -> None:
     doc.add_page_break()
 
     skip_until_heading = False
+    in_toc_section = False
     first_h1 = True
     for kind, payload in iter_blocks(lines):
         if kind == "heading":
             level, title = payload
+            if level == 1 and title.strip() == "目录":
+                add_heading(doc, "目录", 1)
+                add_toc_field(doc)
+                in_toc_section = True
+                first_h1 = False
+                continue
+            if in_toc_section:
+                if level == 1:
+                    in_toc_section = False
+                else:
+                    continue
             if "封面信息" in title:
                 skip_until_heading = True
                 continue
@@ -343,6 +399,8 @@ def build_docx(md_path: Path, out_path: Path, template_path: Path) -> None:
                     doc.add_page_break()
                 first_h1 = False
             add_heading(doc, title, level)
+        elif in_toc_section:
+            continue
         elif skip_until_heading:
             continue
         elif kind == "quote":
@@ -371,8 +429,17 @@ def build_docx(md_path: Path, out_path: Path, template_path: Path) -> None:
             add_image(doc, alt, rel_path)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(str(out_path))
-    print(f"已生成 Word 报告：{out_path}")
+    tmp_path = out_path.with_name(out_path.name + ".tmp")
+    doc.save(str(tmp_path))
+    try:
+        os.replace(str(tmp_path), str(out_path))
+        print(f"已生成 Word 报告：{out_path}")
+    except PermissionError:
+        # 目标文件可能正在 Word 中打开；保留临时文件为“_含目录”版本，避免覆盖失败。
+        fallback = out_path.with_name(f"{out_path.stem}_含目录{out_path.suffix}")
+        os.replace(str(tmp_path), str(fallback))
+        print(f"原文件被占用，未覆盖：{out_path}")
+        print(f"已生成新文件：{fallback}")
 
 
 def main() -> None:

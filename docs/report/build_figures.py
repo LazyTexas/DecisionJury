@@ -255,8 +255,8 @@ def build_test_results() -> None:
         ("C Agent/LLM/adapter", 139, 0),
         ("D RAG 检索/评测", 18, 0),
         ("E MCP 工具/评分/提醒", 59, 0),
-        ("B 后端路由/迁移", 58, 18),
-        ("全量 tests/（汇总）", 279, 18),
+        ("B 后端路由/迁移", 71, 5),
+        ("全量 tests/（汇总）", 292, 5),
     ]
     max_val = max(p + f for _, p, f in groups)
     left, right, top, bottom = 260, w - 80, 150, h - 150
