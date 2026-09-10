@@ -65,9 +65,7 @@ def send_message(
     # 5. 检查高风险
     if result_dict.get("is_high_risk"):
         reject_reason = result_dict.get("reject_reason", "该决策超出系统支持范围。")
-        # 更新案件状态为 REJECTED
         case.status = CaseStatus.REJECTED
-        # 保存拒绝原因到 collected_fields
         collected = case.collected_fields or {}
         collected["is_high_risk"] = True
         collected["reject_reason"] = reject_reason
@@ -92,7 +90,7 @@ def send_message(
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
 
-    # 7. 获取缺失字段（只赋值一次）
+    # 7. 获取缺失字段
     missing_fields = result_dict.get("missing_fields", [])
     case.missing_fields = missing_fields
 
@@ -110,10 +108,16 @@ def send_message(
         safe_fields["_conflicts"] = conflicts
         case.collected_fields = safe_fields
 
-    # 10. 接入 next_question_key
+    # 10. 接入 next_question_key + next_question 文本（修复：同时存储 key 和文本）
     next_question_key = result_dict.get("next_question_key")
+    next_question_text = result_dict.get("next_question")
+
     if next_question_key:
         safe_fields["_current_question_key"] = next_question_key
+        case.collected_fields = safe_fields
+
+    if next_question_text:
+        safe_fields["_next_question"] = next_question_text  # ← 新增：存储文本
         case.collected_fields = safe_fields
 
     # 11. 接入 parser_used
@@ -122,20 +126,26 @@ def send_message(
         safe_fields["_parser_used"] = parser_used
         case.collected_fields = safe_fields
 
-    # 12. 根据状态生成回复
-    if case.status == CaseStatus.READY_FOR_DEBATE:
+    # 12. 根据状态生成回复（修复：区分"完全就绪"和"最低门槛就绪"）
+    if case.status == CaseStatus.READY_FOR_DEBATE and not missing_fields:
+        # 场景 A：7 字段全齐，完全就绪
         reply = "信息已补充完整，可以进入正反方分析。"
+    elif case.status == CaseStatus.READY_FOR_DEBATE and missing_fields:
+        # 场景 B：达到最低门槛（3 字段），但还有增强字段可补充
+        next_question = result_dict.get("next_question")
+        if next_question:
+            reply = f"核心信息已完整，可以进入分析；建议补充：{next_question}"
+        else:
+            reply = "核心信息已完整，可以进入分析；继续补充可以让分析更充分。"
     else:
-        # 优先使用 C 的 next_question
+        # 场景 C：仍在收集
         next_question = result_dict.get("next_question")
         if next_question:
             reply = next_question
+        elif conflicts:
+            reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
         else:
-            # 如果有冲突，生成冲突确认追问
-            if conflicts:
-                reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
-            else:
-                reply = "信息仍在收集中，请继续补充相关细节。"
+            reply = "信息仍在收集中，请继续补充相关细节。"
 
     # 13. 保存助手消息
     assistant_msg = Message(
@@ -147,7 +157,7 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 14. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
+    # 14. 强制标记字段已修改
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')
