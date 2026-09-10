@@ -14,7 +14,7 @@ import { isMockMode, MOCK_USER_ID } from '../api';
 import { registerUser, loginUser } from '../api/auth';
 import {
   loadStoredUser, saveStoredUser, clearStoredUser,
-  saveStoredToken, clearStoredToken,
+  saveStoredToken, clearStoredToken, getStoredToken,
 } from './storage';
 
 const DEMO_USER: AuthUser = { user_id: MOCK_USER_ID, name: '演示用户' };
@@ -29,10 +29,22 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-/** 初始化登录态：mock 自动登录；真实模式从 localStorage 恢复 */
+/**
+ * 初始化登录态：mock 自动登录；真实模式从 localStorage 恢复。
+ *
+ * 关键：登录态必须「用户身份 + JWT」齐备。
+ * 引入 JWT 之前登录的老会话只有 dj:auth、没有 token，此时若视为已登录，
+ * 会出现「页面能打开、但所有接口都返回 MISSING_USER_ID」的假死状态；
+ * 因此这里把这种不完整会话判为未登录并清理，避免后续误判与重定向死循环。
+ */
 function initialUser(): AuthUser | null {
   if (isMockMode) return DEMO_USER;
-  return loadStoredUser();
+  const stored = loadStoredUser();
+  if (stored && !getStoredToken()) {
+    clearStoredUser();
+    return null;
+  }
+  return stored;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {

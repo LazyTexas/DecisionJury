@@ -222,26 +222,26 @@ export async function getCaseList(
 
 export async function getCaseDetail(caseId: string): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
-  try {
-    const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
-    if (!raw) return null;
-    return {
-      case_id: raw.case_id as string,
-      user_id: raw.user_id as string,
-      case_type: raw.case_type as CaseType,
-      title: raw.title as string,
-      description: raw.description as string,
-      status: (raw.case_status ?? raw.status) as Case['status'],
-      collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
-      missing_fields: (raw.missing_fields ?? []) as string[],
-      final_decision: (raw.final_decision ?? null) as string | null,
-      report_id: (raw.report_id ?? null) as string | null,
-      created_at: raw.created_at as string,
-      updated_at: raw.updated_at as string,
-    };
-  } catch {
-    return null;
-  }
+  // 与 getCaseList / getHistory / getWatchlist 保持一致：显式携带 user_id。
+  // 后端在「无 Token 且无 user_id」时返回 HTTP 200 + {success:false, message:"MISSING_USER_ID"}，
+  // 若不带 user_id，老会话会在这里拿不到案件而静默失败。
+  // 注意：这里不再吞掉异常——加载失败必须让调用方（页面）能感知并提示，否则页面会假死。
+  const raw = await request<Record<string, unknown>>(`/cases/${caseId}?user_id=${getCurrentUserId()}`);
+  if (!raw) return null;
+  return {
+    case_id: raw.case_id as string,
+    user_id: raw.user_id as string,
+    case_type: raw.case_type as CaseType,
+    title: raw.title as string,
+    description: raw.description as string,
+    status: (raw.case_status ?? raw.status) as Case['status'],
+    collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
+    missing_fields: (raw.missing_fields ?? []) as string[],
+    final_decision: (raw.final_decision ?? null) as string | null,
+    report_id: (raw.report_id ?? null) as string | null,
+    created_at: raw.created_at as string,
+    updated_at: raw.updated_at as string,
+  };
 }
 
 /** 创建案件；真实后端会返回首个追问 next_question（作为新案件对话首条引导） */
@@ -348,12 +348,18 @@ export async function startDebate(caseId: string): Promise<{
   rag_evidence: unknown[]; tool_results: unknown[]; report: DecisionReport;
 }> {
   if (USE_MOCK) return mockStartDebate(caseId);
-  return request(`/cases/${caseId}/debate`, { method: 'POST' });
+  // 后端 start_debate 的入参是必填的 DebateRequest{user_id}，
+  // 不发送请求体会被 FastAPI 判为 422（message=VALIDATION_ERROR，页面显示“提交内容有误，请检查后重试”）。
+  return request(`/cases/${caseId}/debate`, {
+    method: 'POST',
+    body: JSON.stringify({ user_id: getCurrentUserId() }),
+  });
 }
 
 export async function getTrace(caseId: string): Promise<{ case_id: string; trace: TraceItem[] }> {
   if (USE_MOCK) return mockFetchTrace(caseId);
-  return request(`/cases/${caseId}/trace`);
+  // 同上：显式携带 user_id，避免无 Token 会话下拿到 MISSING_USER_ID。
+  return request(`/cases/${caseId}/trace?user_id=${getCurrentUserId()}`);
 }
 
 // ---- 判决书 API ----
@@ -361,11 +367,14 @@ export async function getTrace(caseId: string): Promise<{ case_id: string; trace
 export async function getReport(caseId: string): Promise<DecisionReport | null> {
   if (USE_MOCK) return mockFetchReport(caseId);
   try {
-    const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report?user_id=${getCurrentUserId()}`);
     if (!raw) return null;
     return { ...raw, case_id: (raw.case_id as string) ?? caseId } as DecisionReport;
-  } catch {
-    return null;
+  } catch (e) {
+    // 「尚未生成判决书」（REPORT_NOT_FOUND）是正常状态，返回 null 交给页面提示；
+    // 其余错误（未登录 / 无权限 / 网络）继续抛出，避免被静默吞掉。
+    if ((e as ApiRequestError)?.code === 'REPORT_NOT_FOUND') return null;
+    throw e;
   }
 }
 
