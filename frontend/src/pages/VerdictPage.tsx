@@ -20,6 +20,7 @@ export default function VerdictPage() {
   const [report, setReport] = useState<DecisionReport | null>(null);
   const [trace, setTrace] = useState<TraceItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [traceOpen, setTraceOpen] = useState(false);
 
@@ -27,7 +28,8 @@ export default function VerdictPage() {
     if (!caseId) return;
     Promise.all([getReport(caseId), getTrace(caseId).catch(() => ({ case_id: caseId, trace: [] }))])
       .then(([r, t]) => { setReport(r); setTrace(t.trace); })
-      .catch(() => setReport(null))
+      // 不再静默吞错：加载失败（未登录 / 无权限 / 网络）要给出可见提示
+      .catch((e) => { setReport(null); setError((e as Error).message || '判决书加载失败'); })
       .finally(() => setLoading(false));
   }, [caseId]);
 
@@ -36,7 +38,7 @@ export default function VerdictPage() {
 
   return (
     <div>
-      {loading ? (<div className="card"><p className="muted">加载判决书中…</p></div>) : !report ? (<div className="card"><p className="muted">尚未生成判决书，请先完成辩论分析。</p><button className="btn ghost" style={{ marginTop: 16 }} onClick={() => navigate('/chat/' + caseId)}>回到对话</button></div>) : (
+      {loading ? (<div className="card"><p className="muted">加载判决书中…</p></div>) : error ? (<div className="card" style={{ borderColor: 'var(--con)' }}><p style={{ color: 'var(--con)' }}>{error}</p><button className="btn ghost" style={{ marginTop: 16 }} onClick={() => navigate('/chat/' + caseId)}>回到对话</button></div>) : !report ? (<div className="card"><p className="muted">尚未生成判决书，请先完成辩论分析。</p><button className="btn ghost" style={{ marginTop: 16 }} onClick={() => navigate('/chat/' + caseId)}>回到对话</button></div>) : (
         <>
           <div className="verdict-head"><div className="kicker">DecisionJury · 冷静裁判庭</div><h1>判决书</h1><div className="muted">案号：{report.case_id} · {CASE_TYPE_META[report.case_type]?.label ?? report.case_type} · {report.case_summary}</div></div>
           <div className="flowzone"><div className="label"><span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--pro)', display: 'inline-block' }}></span>分析执行过程 · {trace.length} 步 · 全部完成</div><div className="flow">

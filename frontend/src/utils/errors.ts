@@ -24,6 +24,7 @@ export const API_ERROR_MESSAGES: Record<string, string> = {
   INVALID_CREDENTIALS: '用户 ID 或密码不正确',
   FORBIDDEN: '没有权限执行该操作',
   REMINDER_NOT_FOUND: '该观察项不存在或已被删除',
+  MISSING_USER_ID: '缺少用户身份信息，请重新登录',
   // ---- JWT 认证 ----
   INVALID_TOKEN: 'Token 无效或已过期，请重新登录',
   AUTHENTICATION_REQUIRED: '请先登录后再访问此接口',
