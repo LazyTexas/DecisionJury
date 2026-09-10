@@ -31,9 +31,25 @@ export default function ChatPage() {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, sending, debating]);
 
   const isTime = caseData?.case_type === CaseType.TIME;
-  const canDebate = caseData?.status === CaseStatus.READY_FOR_DEBATE && !isTime && !debating;
   const isCompleted = caseData?.status === CaseStatus.COMPLETED;
   const isRejected = caseData?.status === CaseStatus.REJECTED;
+
+  // 尚未补齐的必填项（time 场景不适用）
+  const missing = (caseData?.missing_fields ?? []).filter((f) => !isTime);
+
+  // 后端只按 is_complete（最小 3 字段）判定，为真时状态即为 ready_for_debate，
+  // 此时 missing_fields 仍可能残留若干「推荐补充」项。
+  // 因此判断是否锁输入框不能只看 case_status，必须结合 missing_fields：
+  const isReadyForDebate = caseData?.status === CaseStatus.READY_FOR_DEBATE && !isTime;
+
+  // 可以启动辩论：状态就绪即可（不要求 missing_fields 为空）
+  const canDebate = isReadyForDebate && !debating;
+
+  // 完全就绪（必填项一个不剩）：此时才锁定输入框
+  const isFullyReady = isReadyForDebate && missing.length === 0;
+
+  // 输入框锁定条件：已完成 / 已拒绝 / 辩论中 / 完全就绪
+  const inputLocked = isCompleted || isRejected || debating || isFullyReady;
 
   const commit = (updater: (prev: Message[]) => Message[]) => setMessages((prev) => { const next = updater(prev); if (caseId) saveLocalMessages(caseId, next); return next; });
 
@@ -56,8 +72,6 @@ export default function ChatPage() {
     try { await startDebate(caseId); navigate('/verdict/' + caseId); } catch (e) { setError((e as Error).message || '启动辩论失败'); } finally { setDebating(false); }
   };
 
-  const missing = (caseData?.missing_fields ?? []).filter((f) => !isTime);
-
   return (
     <div>
       <div className="hero" style={{ paddingTop: 26, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -75,19 +89,23 @@ export default function ChatPage() {
             <div ref={endRef} />
           </div>
           <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
-            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="补充你的信息…" style={{ flex: 1, border: '1px solid var(--line)', background: 'var(--panel)', color: 'var(--ink)', borderRadius: 12, padding: '12px 14px', fontSize: 14 }} disabled={isCompleted || isRejected || debating || canDebate} />
+            <input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="补充你的信息…" style={{ flex: 1, border: '1px solid var(--line)', background: 'var(--panel)', color: 'var(--ink)', borderRadius: 12, padding: '12px 14px', fontSize: 14 }} disabled={inputLocked} />
             <button className="btn" onClick={send} disabled={sending || debating}>{debating ? '分析中…' : sending ? '发送中…' : '发送'}</button>
           </div>
           {canDebate && (<div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end' }}><button className="btn" onClick={debate}>启动辩论分析</button></div>)}
         </div>
         <div className="card" style={{ alignSelf: 'start' }}>
           <h3 style={{ fontSize: 16 }}>信息收集进度</h3>
-          <div className="tiny" style={{ margin: '6px 0 14px', color: 'var(--ink3)' }}>{missing.length === 0 ? '已收集完整' : '还需补充 ' + missing.length + ' 项'}</div>
+          <div className="tiny" style={{ margin: '6px 0 14px', color: 'var(--ink3)' }}>
+            {missing.length === 0 ? '已收集完整' : (isReadyForDebate ? '可先辩论，另有 ' + missing.length + ' 项建议补充' : '还需补充 ' + missing.length + ' 项')}
+          </div>
           <ul className="fieldlist">
-            {(missing.length === 0 ? [] : missing).map((f) => (<li key={f}>{fieldLabel(caseData?.case_type as string, f)}<span className="tiny">待补充</span></li>))}
+            {(missing.length === 0 ? [] : missing).map((f) => (<li key={f}>{fieldLabel(caseData?.case_type as string, f)}<span className="tiny">{isReadyForDebate ? '建议补充' : '待补充'}</span></li>))}
             {missing.length === 0 && <li className="ok">信息已补齐</li>}
           </ul>
-          <div className="tiny" style={{ marginTop: 12, color: 'var(--ink3)' }}>全部补齐后即可进入多 Agent 分析</div>
+          <div className="tiny" style={{ marginTop: 12, color: 'var(--ink3)' }}>
+            {isFullyReady ? '信息已齐全，可以开始多 Agent 分析' : (isReadyForDebate ? '可继续补充，也可直接启动辩论分析' : '全部补齐后即可进入多 Agent 分析')}
+          </div>
         </div>
       </div>
     </div>
