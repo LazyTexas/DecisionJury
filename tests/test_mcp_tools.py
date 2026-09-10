@@ -156,3 +156,44 @@ def test_call_logs_failure_only_once() -> None:
         if r["tool_name"] == "decision_score" and r["output"].get("status") == "failed"
     ]
     assert len(failed_logs) == 1
+
+
+# ========== cost_analyzer 的 budget_source 契约 ==========
+
+def test_tool_definition_exposes_budget_source() -> None:
+    """cost_analyzer 的 schema 暴露 budget_source 枚举。"""
+    definitions = {item["name"]: item for item in get_tool_definitions()}
+    schema = definitions["cost_analyzer"]["inputSchema"]["properties"]["budget_source"]
+    assert schema["enum"] == ["monthly_budget", "savings"]
+
+
+def test_cost_analyzer_budget_source_passthrough() -> None:
+    """budget_source 透传到工具函数并进入 metrics。"""
+    result = call_tool(
+        "cost_analyzer",
+        {"case_type": "shopping", "price": 799, "monthly_budget_left": 1000, "budget_source": "savings"},
+    )
+    assert result["status"] == "success"
+    assert result["risk_level"] == "medium"
+    assert result["metrics"]["budget_source"] == "savings"
+
+
+def test_cost_analyzer_default_budget_source() -> None:
+    """不传 budget_source 时保持 monthly_budget，风险等级与改动前一致。"""
+    result = call_tool(
+        "cost_analyzer",
+        {"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000},
+    )
+    assert result["status"] == "success"
+    assert result["risk_level"] == "high"
+    assert result["metrics"]["budget_source"] == "monthly_budget"
+
+
+def test_cost_analyzer_invalid_budget_source() -> None:
+    """非法来源返回 failed / INVALID_ARGS，不静默降级成默认分支。"""
+    result = call_tool(
+        "cost_analyzer",
+        {"case_type": "shopping", "price": 799, "monthly_budget_left": 1000, "budget_source": "deposit"},
+    )
+    assert result["status"] == "failed"
+    assert result["error"] == "INVALID_ARGS"

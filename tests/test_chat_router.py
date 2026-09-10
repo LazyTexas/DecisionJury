@@ -74,6 +74,46 @@ def test_messages_extracts_budget(client, db_session):
     assert "monthly_budget_left" not in body["data"]["missing_fields"]
 
 
+def test_messages_marks_savings_budget_source(client, db_session):
+    """回归：用户原话"我自己攒有1000块钱，不影响日常支出"要标成 savings。
+
+    这是真实测试里出现过的一句话：当时关键词表只列了"攒了/攒下"等固定搭配，
+    没有覆盖"攒有"，金额被当成月预算，899/1000 被判 high → reject。
+    """
+    _create_test_case(db_session)
+
+    response = client.post(
+        "/api/cases/case_chat_test/messages",
+        json={
+            "user_id": "u001",
+            "message": "我自己攒有1000块钱，不影响日常支出",
+        }
+    )
+    body = response.json()
+    assert body["success"] is True
+    collected = body["data"]["collected_fields"]
+    assert collected["monthly_budget_left"] == 1000
+    assert collected["budget_source"] == "savings"
+
+
+def test_messages_marks_monthly_budget_source(client, db_session):
+    """对照：明确的月预算表达仍标成 monthly_budget。"""
+    _create_test_case(db_session)
+
+    response = client.post(
+        "/api/cases/case_chat_test/messages",
+        json={
+            "user_id": "u001",
+            "message": "本月预算还剩1000元",
+        }
+    )
+    body = response.json()
+    assert body["success"] is True
+    collected = body["data"]["collected_fields"]
+    assert collected["monthly_budget_left"] == 1000
+    assert collected["budget_source"] == "monthly_budget"
+
+
 def test_messages_extracts_alternatives(client, db_session):
     """消息包含'已有'时，正确提取 owned_alternatives"""
     _create_test_case(db_session)

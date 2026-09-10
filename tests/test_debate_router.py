@@ -190,3 +190,66 @@ def test_debate_response_contains_steps(client, db_session):
     tool_names = [tool["tool_name"] for tool in payload["tool_results"]]
     assert "cost_analyzer" in tool_names
     assert "cooling_reminder" in tool_names
+
+
+# ========== 预算金额来源的端到端回归对 ==========
+# 场景来源：用户补充"我攒了1000，购入不影响日常生活"，系统却把它当成本月预算，
+# 799/1000 被判 high，最终 reject 且置信度 0.85。下面两条用例锁住修复后的行为。
+
+def _seed_budget_case(case_id, price, budget, budget_source=None):
+    """播种一个可进入庭审的购物案件；description 不含预算/存量词，避免庭审重解析改标签。"""
+    fields = {
+        "product_name": "降噪耳机",
+        "price": price,
+        "purpose": "学习",
+        "monthly_budget_left": budget,
+        "owned_alternatives": "普通耳机",
+        "expected_usage_frequency": "每天",
+        "trigger_reason": "刚需",
+    }
+    if budget_source:
+        fields["budget_source"] = budget_source
+    return Case(
+        id=case_id,
+        user_id="u001",
+        case_type="shopping",
+        title="买耳机",
+        description="想买降噪耳机，已有普通耳机",
+        status=CaseStatus.READY_FOR_DEBATE,
+        collected_fields=fields,
+        missing_fields=[],
+    )
+
+
+def _cost_result(payload):
+    return next(item for item in payload["tool_results"] if item["tool_name"] == "cost_analyzer")
+
+
+def test_debate_savings_budget_avoids_reject(client, db_session):
+    """攒下的钱买 799 元耳机：成本风险降为 medium，判决不再是 reject。"""
+    db_session.add(_seed_budget_case("case_savings_budget", price=799, budget=1000, budget_source="savings"))
+    db_session.commit()
+
+    response = client.post("/api/cases/case_savings_budget/debate", json={"user_id": "u001"})
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    cost = _cost_result(payload)
+    assert cost["risk_level"] == "medium"
+    assert cost["metrics"]["budget_source"] == "savings"
+    assert payload["report"]["final_decision"] == "delay"
+
+
+def test_debate_monthly_budget_still_rejects(client, db_session):
+    """同样数字若来自本月预算，仍然判 reject，避免把真·超预算一起放过。"""
+    db_session.add(_seed_budget_case("case_monthly_budget", price=799, budget=1000))
+    db_session.commit()
+
+    response = client.post("/api/cases/case_monthly_budget/debate", json={"user_id": "u001"})
+
+    assert response.status_code == 200
+    payload = response.json()["data"]
+    cost = _cost_result(payload)
+    assert cost["risk_level"] == "high"
+    assert cost["metrics"]["budget_source"] == "monthly_budget"
+    assert payload["report"]["final_decision"] == "reject"

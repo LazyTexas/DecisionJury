@@ -75,6 +75,41 @@ def test_cost_analyzer_unsupported_case_type(client):
     assert body["message"] == "UNSUPPORTED_CASE_TYPE"
 
 
+def test_cost_analyzer_accepts_savings_source(client):
+    """HTTP 接口同样支持 budget_source=savings：799/1000 只到 medium。"""
+    resp = client.post(
+        "/api/tools/cost-analyzer",
+        json={
+            "case_type": "shopping",
+            "price": 799,
+            "monthly_budget_left": 1000,
+            "budget_source": "savings",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "success"
+    assert data["risk_level"] == "medium"
+    assert data["metrics"]["budget_source"] == "savings"
+
+
+def test_cost_analyzer_rejects_unknown_budget_source(client):
+    """非法 budget_source 失败而不是静默按默认口径计算。"""
+    resp = client.post(
+        "/api/tools/cost-analyzer",
+        json={
+            "case_type": "shopping",
+            "price": 799,
+            "monthly_budget_left": 1000,
+            "budget_source": "deposit",
+        },
+    )
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["status"] == "failed"
+    assert "budget_source" in data["error"]
+
+
 def test_cooling_reminder_success_persists_to_db(client, db_session):
     """创建冷静期提醒成功，并写入 reminders 表（观察清单可查到）。"""
     # cases.user_id 外键指向 users.id；测试用户 u001 由 conftest 统一预置。
