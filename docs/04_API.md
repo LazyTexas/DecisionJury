@@ -8,7 +8,8 @@ B 维护 HTTP/存储，C 维护 Agent 和 adapter，D 维护检索，E 维护工
 
 - B 已在 PR #89 补齐 `/debate` 提醒保存所需的 `Reminder` 导入，路由回归通过；页面闭环与重复保存等仍需验收。
 - `PATCH /cases/{case_id}` 仍按七项字段计算状态，与创建/消息使用的 C 最低三项条件不一致。以下分别说明，不声称本轮已统一代码。
-- 注册登录存在，但无 JWT/统一会话鉴权。部分接口比较 `user_id`，另一些没有所属用户校验，不构成生产级权限保护。
+- 鉴权现状：`POST /auth/login` 返回 JWT `access_token`（HS256，用 `SECRET_KEY` 签发），业务接口以 `Authorization: Bearer <token>` 携带身份。是否强制由 `ENFORCE_JWT` 控制：`false`（默认）= 兼容模式，无 Token 时降级用请求里的 `user_id`；`true` = 严格模式，无 Token / Token 无效一律 401。Windows 一键脚本 `start_all.bat` 启动的是严格模式。
+- 即使开启严格模式，仍有路由只做 `user_id` 比较（见§8.2），不构成完整权限体系，也不宣称生产级公网鉴权。
 - 不因接口/工具返回 HTTP 200 就认定业务、模型或数据库保存成功。
 
 ## 2. 通用约定
@@ -41,7 +42,7 @@ GET查询，POST创建或触发，PATCH局部修改，DELETE删除/软删除。�
 
 ### 2.6 身份前提
 
-创建案件、历史和提醒前，`user_id` 必须存在于users表，否则可触发外键错误。登录返回用户信息而非token；客户端不能凭此宣称服务端已验证后续请求身份。
+创建案件、历史和提醒前，`user_id` 必须存在于users表，否则可触发外键错误（实测为 HTTP 400 `INTEGRITY_ERROR`）。登录返回用户信息并附带 `access_token`；身份解析顺序是"Token 优先，其次请求参数 `user_id`"。`ENFORCE_JWT=false`（默认）时无 Token 的请求仍以参数 `user_id` 为准，等于调用方自称身份，不能宣称服务端验证过身份；只有 `ENFORCE_JWT=true` 才拒绝无 Token 请求。
 
 ## 3. 枚举
 
@@ -422,7 +423,7 @@ data包含reply、case_status、collected_fields、missing_fields、is_high_risk
 
 ### 8.6 用户登录
 
-`POST /auth/login`：user_id/password必填；成功data为user_id/name，message“登录成功”。失败为“用户不存在”或“密码错误”。没有返回Bearer token/JWT，也没有统一cookie会话。
+`POST /auth/login`：user_id/password必填；成功data为 `user_id`/`name`/`access_token`/`token_type="bearer"`，message“登录成功”。失败为“用户不存在”或“密码错误”。Token为HS256 JWT，`sub`为user_id，有效期由 `ACCESS_TOKEN_EXPIRE_MINUTES` 控制（默认7天），不返回cookie会话。密码按bcrypt校验：库里若残留早期 sha256_crypt 旧哈希，校验会抛 `UnknownHashError` 并被全局异常处理器变成HTTP 500，此时登录失败不等于“密码错误”。
 
 ### 8.7 分页消息
 
@@ -505,6 +506,8 @@ D服务的 `POST /api/rag/search`：
 ```
 
 user_id/case_id/case_type/query必填，top_k默认3。成功data为results数组，每项为§5.4；无命中results=[]。BM25不负责最终建议。C通过RAG_SEARCH_URL访问；RAG通过BACKEND_HISTORY_URL尝试加载当前用户历史。
+
+严格模式（`ENFORCE_JWT=true`）下 D 读后端 `GET /api/history` 需要凭据：C 调用本接口时透传 `Authorization: Bearer <该用户token>`（由 `backend/app/services/rag_adapter.py` 现签），D 不解析也不验签，只把它转发给 B，鉴权仍在 B 完成。未带该头时 D 退回静态种子数据——检索仍可用，但没有实时历史联动（日志打印"回退使用静态 JSON 数据"）。
 
 time检索仍是组件兼容能力，不作为本轮完整时间案件服务。不要将种子、实时用户历史和外部知识库来源混称为真实用户证据。
 
@@ -600,6 +603,8 @@ B读取case.debate_result.report与顶层debate_events，无案件/无报告分�
 
 user_id必填；page≥1，page_size实际允许1～1000（默认10）；可选case_type/result筛选。只返回is_deleted=0，按created_at倒序。data为items/total/page/page_size；item字段为history_id/user_id/case_type/title/summary/result/tags/case_id/report_id/created_at。
 
+严格模式（`ENFORCE_JWT=true`）下本接口要求 `Authorization: Bearer <token>`：无 Token 返回 HTTP 401（`message.code=UNAUTHORIZED`），Token 无效/过期返回 `INVALID_TOKEN`，Token 对应用户不存在返回 `USER_NOT_FOUND`；返回数据以 Token 的 `sub` 为准，query 里的 `user_id` 被忽略。RAG 实时联动必须透传 Token 的原因见§10.1。
+
 ### 13.2 添加历史
 
 `POST /api/history`：
@@ -648,6 +653,7 @@ user_id/actual_action/satisfaction必填，review可选。actual_action为字符
 |---|---|
 | CASE_NOT_FOUND / REPORT_NOT_FOUND / REPORT_DATA_CORRUPTED / CASE_NOT_COMPLETED | B业务失败，通常HTTP200、success=false |
 | FORBIDDEN | 部分B路由user_id比较失败，通常HTTP200，不是统一鉴权中间件 |
+| UNAUTHORIZED / INVALID_TOKEN / USER_NOT_FOUND | 严格JWT（`ENFORCE_JWT=true`）下的HTTP 401：真实HTTP状态码，错误码放在 `message` 对象里（`{"success":false,"data":null,"message":{"code":...}}`），不是业务层200 |
 | MISSING_FIELDS / HIGH_RISK_DECISION | 业务失败，可携带data说明 |
 | UNSUPPORTED_CASE_TYPE | C adapter/部分工具不支持类型；不表示创建接口已严格枚举校验 |
 | HISTORY_NOT_FOUND / HISTORY_ALREADY_DELETED / HISTORY_NOT_DELETED | 历史业务失败 |

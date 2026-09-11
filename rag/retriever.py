@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from fastapi import FastAPI
+from fastapi import FastAPI, Header
 from pydantic import BaseModel
 from typing import Optional
 import jieba
@@ -46,9 +46,19 @@ def _to_rag_evidence_item(record: dict, score: float) -> dict:
 
 
 @app.post("/api/rag/search")
-async def rag_search(request: RagRequest):
+async def rag_search(request: RagRequest, authorization: Optional[str] = Header(None)):
+    # 严格 JWT（ENFORCE_JWT=true）下由 C 模块透传该用户的 token：
+    # RAG 不解析也不验签，只把它转发给后端 GET /api/history，鉴权在后端完成。
+    # 未带 token 时保持原行为——拿不到实时记录，但静态种子检索照常可用。
+    # 该 endpoint 在单测里会被直接调用（见 tests/test_rag.py::call_rag_search），
+    # 此时 authorization 仍是 Header 默认对象而不是字符串，这里统一收窄一次。
+    raw_authorization = authorization if isinstance(authorization, str) else None
+    auth_token = None
+    if raw_authorization and raw_authorization.lower().startswith("bearer "):
+        auth_token = raw_authorization[7:].strip() or None
+
     # 每次检索实时取数：静态种子 + 当前用户在后端新写入的历史记录（联动）
-    all_records = load_history_data(request.user_id)
+    all_records = load_history_data(request.user_id, auth_token=auth_token)
 
     # 步骤 A：数据隔离 (根据 shopping 还是 time 进行初步过滤)
     filtered_records = [

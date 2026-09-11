@@ -97,6 +97,39 @@ def test_rag_dataset_has_1000_records():
         assert isinstance(record.get("tags"), list), "tags 必须为列表"
         assert record.get("content"), "content 不能为空"
 
+def test_rag_search_forwards_authorization_to_loader(monkeypatch):
+    """
+    严格 JWT（ENFORCE_JWT=true）模式：路由层要把 Authorization 头里的 token
+    原样透传给数据加载层，否则 RAG 读后端 /api/history 会 401、实时联动失效。
+    RAG 本身不解析也不验签，鉴权在后端完成。
+    """
+    import retriever
+
+    seen = {}
+
+    def fake_loader(user_id, auth_token=None):
+        seen["user_id"] = user_id
+        seen["auth_token"] = auth_token
+        return []
+
+    monkeypatch.setattr(retriever, "load_history_data", fake_loader)
+
+    payload = {
+        "user_id": "u001",
+        "case_id": "case_001",
+        "case_type": "shopping",
+        "query": "降噪耳机 学习",
+        "top_k": 3,
+    }
+
+    asyncio.run(retriever.rag_search(retriever.RagRequest(**payload), authorization="Bearer tok-1"))
+    assert seen == {"user_id": "u001", "auth_token": "tok-1"}
+
+    # 不带 Authorization 头（兼容模式 / 直连脚本）：保持旧行为，不传 token
+    asyncio.run(retriever.rag_search(retriever.RagRequest(**payload)))
+    assert seen["auth_token"] is None
+
+
 
 def test_rag_time_scenario_hit():
     """

@@ -637,5 +637,41 @@ npm --prefix frontend run build                                  => tsc + vite �
 属于产品口径，尚未决定。
 
 
+### 9.15 严格 JWT 一键启动 + RAG 实时联动凭据透传（2026-09-11）
+
+**基线**：`merge-test/latest-dev-20260911@b4cdc51` ＋ 本次**未提交**工作区改动。
+
+**背景**：一键脚本 `start_all.bat` 的写法 `cmd /c "… && set ENFORCE_JWT=true && …"` 有两个坑：
+外层引号与内层 `set "X=Y"` 冲突；不带引号时 cmd 会把值存成 `"true "`（尾随空格），
+而 `Config.ENFORCE_JWT` 用的是 `== "true"`，于是"看起来开了严格鉴权，实际仍是兼容模式"。
+同时严格模式会切断 RAG 的实时历史联动：RAG 请求 `GET /api/history` 不带 `Authorization` → 401 → 静默回退静态数据。
+
+**改动**：`start_all.bat`（父脚本 `set "ENFORCE_JWT=true"`，由 `start` 启动的子进程继承）；
+`backend/app/services/rag_adapter.py`（为该 `user_id` 现签 JWT 放进 `Authorization` 头）；
+`rag/retriever.py`（读 `Authorization` 头并透传，不改 POST body 契约）；
+`rag/data_loader.py`（`auth_token` 参数 → 请求头）。RAG 只转发、不验签，鉴权仍在 B 完成。
+
+**验证环境**：Windows 11 + Git Bash + 项目 `.venv`（Python 3.12.4）；E2E 全程真实 HTTP，
+数据库为临时文件（不触碰 `data/decisionjury.db`），端口 8010/8011。
+
+```text
+run_tests.bat（隔离：内存库 / 无 API Key / RAG_LIVE_RECORDS=0）        => 503 passed, 0 failed（10.2s）
+
+旧写法  cmd /c "… && set ENFORCE_JWT=true && …" 后端子进程                => Config.ENFORCE_JWT = False（raw env = 'true '）
+新写法  父脚本 set "ENFORCE_JWT=true" + start 继承                        => Config.ENFORCE_JWT = True （raw env = 'true'）
+
+严格模式 GET /api/history 无 token                                       => HTTP 401 {"code": "UNAUTHORIZED"}
+严格模式 POST /auth/login                                                => 200，返回 access_token（token_type=bearer）
+严格模式 带 token GET /api/history                                       => 200
+带 token 写入 history_27ace35c / history_dee2e330
+经 search_rag_evidence() 走 C→D→B（透传 token）                          => 结果第 1 条即刚写入的记录，本次调用 RAG 日志无回退提示
+直连 RAG（不带 Authorization）同 query                                   => 不含该记录，RAG 日志出现"回退使用静态 JSON 数据"
+```
+
+**未做/边界**：Docker Compose 仍是兼容模式（未设 `ENFORCE_JWT`）；RAG 侧不验签、无 scope/短 TTL 限制；
+没有刷新 token 流程；一键脚本的真实浏览器端到端（注册 → 建案 → 判决）仍待人工点一遍。
+
+
+
 
 

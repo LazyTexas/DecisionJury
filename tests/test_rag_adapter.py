@@ -148,6 +148,32 @@ def test_default_url_request_method_and_body(monkeypatch: Any) -> None:
     }
 
 
+def test_request_carries_bearer_token_for_history_lookup(monkeypatch: Any) -> None:
+    """
+    严格 JWT（ENFORCE_JWT=true）下 RAG 需要凭据才能读后端 GET /api/history，
+    adapter 必须为该用户透传一个 Authorization 头，且 sub 与请求体 user_id 一致。
+    """
+    from jose import jwt
+
+    from backend.config import Config
+
+    captured: dict[str, Any] = {}
+
+    def fake_urlopen(request: Any, timeout: int) -> FakeHTTPResponse:
+        captured["authorization"] = request.get_header("Authorization")
+        return FakeHTTPResponse({"success": True, "data": {"results": []}, "message": ""})
+
+    monkeypatch.setattr(rag_adapter, "urlopen", fake_urlopen)
+
+    assert call_adapter() == []
+
+    authorization = captured["authorization"]
+    assert isinstance(authorization, str), "RAG 请求必须带 Authorization 头"
+    assert authorization.startswith("Bearer ")
+    payload = jwt.decode(authorization[7:], Config.SECRET_KEY, algorithms=[Config.ALGORITHM])
+    assert payload["sub"] == "u001"
+
+
 def test_rag_search_url_env_override(monkeypatch: Any) -> None:
     captured: dict[str, str] = {}
 

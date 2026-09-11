@@ -59,7 +59,11 @@ def test_load_history_data_merges_static_and_live(monkeypatch):
         }),
     ]
 
-    monkeypatch.setattr(data_loader, "fetch_backend_history", lambda user_id="local_user": live)
+    monkeypatch.setattr(
+        data_loader,
+        "fetch_backend_history",
+        lambda user_id="local_user", auth_token=None: live,
+    )
 
     merged = data_loader.load_history_data("local_user")
 
@@ -70,7 +74,11 @@ def test_load_history_data_merges_static_and_live(monkeypatch):
 
 def test_load_history_data_returns_static_when_live_empty(monkeypatch):
     """后端无数据/不可用时，应回退到静态种子，且不编造历史。"""
-    monkeypatch.setattr(data_loader, "fetch_backend_history", lambda user_id="local_user": [])
+    monkeypatch.setattr(
+        data_loader,
+        "fetch_backend_history",
+        lambda user_id="local_user", auth_token=None: [],
+    )
     merged = data_loader.load_history_data("local_user")
     assert len(merged) >= 1000
 
@@ -128,3 +136,68 @@ def test_fetch_backend_history_maps_response_items(monkeypatch):
     assert records[0]["id"] == "history_a1"
     assert records[0]["content"] == "参加技术分享收获大，值得。"
     assert records[0]["source"] == "decision_history"
+
+def _fake_response(payload):
+    class FakeResponse:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return None
+
+        def read(self):
+            import json
+            return json.dumps(payload, ensure_ascii=False).encode("utf-8")
+
+    return FakeResponse()
+
+
+def test_fetch_backend_history_sends_bearer_token_when_provided(monkeypatch):
+    """严格 JWT 模式：C 模块透传的 token 必须出现在 Authorization 头里，否则后端 401。"""
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["url"] = request.full_url
+        captured["authorization"] = request.get_header("Authorization")
+        return _fake_response({"success": True, "data": {"items": []}})
+
+    monkeypatch.setenv("RAG_LIVE_RECORDS", "1")
+    monkeypatch.setattr(data_loader.urllib.request, "urlopen", fake_urlopen)
+
+    data_loader.fetch_backend_history("u001", auth_token="tok-abc")
+
+    assert captured["authorization"] == "Bearer tok-abc"
+    assert "user_id=u001" in captured["url"]
+
+
+def test_fetch_backend_history_has_no_auth_header_by_default(monkeypatch):
+    """不带 token 时保持旧行为（兼容模式、离线脚本直连），不发送 Authorization 头。"""
+    captured = {}
+
+    def fake_urlopen(request, timeout):
+        captured["authorization"] = request.get_header("Authorization")
+        return _fake_response({"success": True, "data": {"items": []}})
+
+    monkeypatch.setenv("RAG_LIVE_RECORDS", "1")
+    monkeypatch.setattr(data_loader.urllib.request, "urlopen", fake_urlopen)
+
+    data_loader.fetch_backend_history("u001")
+
+    assert captured["authorization"] is None
+
+
+def test_load_history_data_forwards_token_to_fetch(monkeypatch):
+    """load_history_data 必须把透传的 token 继续传给 fetch_backend_history。"""
+    seen = {}
+
+    def fake_fetch(user_id="local_user", auth_token=None):
+        seen["user_id"] = user_id
+        seen["auth_token"] = auth_token
+        return []
+
+    monkeypatch.setattr(data_loader, "fetch_backend_history", fake_fetch)
+
+    data_loader.load_history_data("u001", auth_token="tok-xyz")
+
+    assert seen == {"user_id": "u001", "auth_token": "tok-xyz"}
+
