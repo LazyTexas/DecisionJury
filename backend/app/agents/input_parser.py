@@ -84,6 +84,23 @@ BUDGET_CONTEXT_KEYWORDS = [
     "余额",
 ]
 
+# 存量资金（savings）词根表（来自 dev 的 budget_source 特性，本次融合移植）：
+# 用户口中的"攒的钱"是存量，和本月可支配预算（流量）语义不同——同一笔钱不会每月重复消耗，
+# 用月度阈值衡量会把合理消费判成高风险（真实案例：799/1000 因"攒有1000"被判 reject）。
+# 只认显式存量表达；"不影响日常生活"这类不可核实的声明不作为降级依据。
+# 按词根收录而不是罗列固定搭配：口语里有"攒了/攒有/攒着/攒下/攒的钱"等形态。
+SAVINGS_KEYWORDS = [
+    "攒",
+    "存款",
+    "储蓄",
+    "积蓄",
+    "闲钱",
+    "私房钱",
+    "存了",
+    "存下",
+    "存起来",
+]
+
 
 def parse_input(
     raw_input: str,
@@ -514,6 +531,19 @@ def _build_llm_result(
     # 明确纠正优先于本轮普通表达，再覆盖历史值；普通补充不会覆盖已确认历史值。
     # 重放历史文本（authoritative）时反过来：已有值优先，本轮只补缺口。
     merged = _merge_layers(existing, extracted, corrections, authoritative=authoritative)
+    # 金额来源标签必须与金额同一次写入（融合自 dev 的 budget_source）：
+    # 只有本轮真的写了 monthly_budget_left 才更新标签；本轮没有金额表达时保留历史标签，
+    # 避免出现"数字是存款、标签却是月度预算"的错配。存量表达也要能把金额写进来
+    # （真实案例："我自己攒有1000块钱"以前既没提取到金额、也没有来源标签）。
+    if _is_missing(merged.get("monthly_budget_left")):
+        savings_hit = _extract_savings_match(normalized_input)
+        if savings_hit is not None:
+            _assign(merged, "monthly_budget_left", savings_hit[0], authoritative)
+            merged["budget_source"] = "savings"
+    written_this_turn = "monthly_budget_left" in {**extracted, **corrections}
+    budget_source = _detect_budget_source(normalized_input)
+    if budget_source is not None and written_this_turn:
+        merged["budget_source"] = budget_source
     # 模型的替代品等效判断（存在 field_meta 里）并入字段，供判决 R2 分支使用。
     covers = (llm_result.get("field_meta") or {}).get("owned_alternatives", {})
     if isinstance(covers, dict) and covers.get("covers_core_need") is not None:
@@ -677,13 +707,28 @@ def _extract_shopping_details(
     # 否则“本月预算还剩3000元”这类补充消息会被错误写进 price。
     budget_match = _extract_budget_match(text)
     correction_budget = _extract_budget_correction(text)
-    budget = correction_budget if correction_budget is not None else (budget_match[0] if budget_match else None)
+    # 存量资金（攒的钱）也是"可用于本次购物的钱"，只是语义与月度预算不同：
+    # 在没有明确预算表达时，把存量表达当作 monthly_budget_left 的金额来源（融合自 dev）。
+    savings_match = (
+        _extract_savings_match(text)
+        if budget_match is None and correction_budget is None
+        else None
+    )
+    budget = correction_budget if correction_budget is not None else (
+        budget_match[0] if budget_match else (savings_match[0] if savings_match else None)
+    )
+    budget_raw = budget_match[2] if budget_match else (savings_match[2] if savings_match else None)
     if budget is not None:
         fields["monthly_budget_left"] = budget
-        field_meta["monthly_budget_left"] = _amount_meta(text, budget, budget_match[2] if budget_match else None)
+        # 标签描述"当前这个金额是什么钱"，必须和金额同一次写入——案件进入庭审时会用
+        # description 再解析一次，分开写会出现"数字是存款、标签是月度预算"的错配。
+        fields["budget_source"] = "savings" if savings_match is not None else "monthly_budget"
+        field_meta["monthly_budget_left"] = _amount_meta(text, budget, budget_raw)
 
     correction_price = _extract_price_correction(text)
-    price = correction_price if correction_price is not None else _extract_price(text, budget_match[1] if budget_match else None)
+    price = correction_price if correction_price is not None else _extract_price(
+        text, budget_match[1] if budget_match else (savings_match[1] if savings_match else None)
+    )
     if price is not None:
         fields["price"] = price
         field_meta["price"] = _amount_meta(text, price, None)
@@ -751,6 +796,41 @@ def _extract_budget_match(text: str) -> tuple[float, tuple[int, int], str] | Non
         match = re.search(pattern, text)
         if match:
             return _parse_amount(match.group(1)), match.span(1), match.group(1)
+    return None
+
+
+def _extract_savings_match(text: str) -> tuple[float, tuple[int, int], str] | None:
+    """识别"攒了1000""存款有1000""1000块的存款"这类**存量资金**表达（融合自 dev）。
+
+    返回 (金额, 金额位置, 原文片段)；没有显式存量表达时返回 None。
+    结果只用于标记金额来源（budget_source），不改变"最低字段"要求，也不会让案件提前放行。
+    """
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
+    word_pattern = "|".join(SAVINGS_KEYWORDS)
+    # 间隔里排除"买/购"与句读：否则"攒钱买个1000元的耳机"会把商品价格吞成可用资金
+    gap = r"[^\d零〇一二两三四五六七八九十百千万亿，。；;买购]"
+    patterns = [
+        # 存量词在前："攒了1000""我自己攒有1000块钱""手头有1000块存款"
+        rf"(?:{word_pattern}){gap}{{0,4}}({amount})\s*(?:元|块)?",
+        # 金额在前："1000块是我自己攒的"
+        rf"({amount})\s*(?:元|块)?[^，。；;\n买购]{{0,6}}(?:{word_pattern})",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return _parse_amount(match.group(1)), match.span(1), match.group(1)
+    return None
+
+
+def _detect_budget_source(text: str) -> str | None:
+    """判断本轮文本里的金额属于哪种钱（存量 savings / 流量 monthly_budget）。
+
+    没有明确表达时返回 None，表示保留已有标签（默认仍是 monthly_budget）。
+    """
+    if _extract_budget_correction(text) is not None or _extract_budget_match(text) is not None:
+        return "monthly_budget"
+    if _extract_savings_match(text) is not None:
+        return "savings"
     return None
 
 
