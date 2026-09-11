@@ -1,8 +1,23 @@
 from __future__ import annotations
 
+import os
 import re
 from typing import Any
 
+from backend.app.agents.field_normalizer import resolve_frequency, resolve_trigger
+from backend.app.agents.reply_composer import (
+    CLARIFY_FIELDS,
+    ENHANCED_FIELDS,
+    FIELD_LABELS,
+    SKIPPED_VALUE,
+    build_reply_plan,
+    is_skip_signal,
+    natural_question,
+    optional_question,
+)
+
+# 澄清上限：每个字段最多确认一次，全局最多两轮（避免把收集变成审问）。
+MAX_CLARIFY_ROUNDS = 2
 from backend.app.schemas.decision import AgentStep, ParserResult
 from backend.app.services.llm_client import DeepSeekLLMClient, get_llm_client
 
@@ -73,13 +88,25 @@ BUDGET_CONTEXT_KEYWORDS = [
 def parse_input(
     raw_input: str,
     existing_collected_fields: dict[str, Any] | None = None,
+    recent_turns: list[str] | None = None,
+    existing_is_authoritative: bool = False,
+    is_first_turn: bool = False,
 ) -> ParserResult:
-    existing = existing_collected_fields or {}
+    """解析一轮输入。
+
+    `existing_is_authoritative=True` 用于**判决阶段重放案件首条描述**的场景：
+    此时 `raw_input` 是历史文本，而已收集字段是累计（含用户后续纠正）后的权威状态，
+    因此本轮解析只允许补齐缺口，不允许用旧文本覆盖已有值。
+    普通对话轮保持 False：最新一轮发言可以更新/纠正历史值。
+
+    `is_first_turn=True`（建案那一轮）会额外产出欢迎语，用于"先欢迎、再收集"。
+    """
+    existing = dict(existing_collected_fields or {})
     normalized_input = _normalize_text(raw_input)
 
     high_risk = _is_high_risk(normalized_input)
 
-    local_result = _build_rule_result(normalized_input, existing)
+    local_result = _build_rule_result(normalized_input, existing, existing_is_authoritative)
     if high_risk:
         local_result.is_high_risk = True
         local_result.reject_reason = "high_risk_domain"
@@ -87,24 +114,303 @@ def parse_input(
     client = get_llm_client()
     # 正常购物字段统一交给 DeepSeek，只有请求失败或结果校验失败时才使用本地规则。
     if isinstance(client, DeepSeekLLMClient):
-        try:
-            llm_result = client.complete_parser_json(
-                {
-                    "current_message": normalized_input,
-                    "existing_collected_fields": existing,
-                    "existing_missing_fields": local_result.missing_fields,
-                }
-            )
-            return _build_llm_result(llm_result, existing)
-        except Exception as exc:
-            # 真实解析失败时保留已有本地规则结果，保证多轮收集不中断。
+        payload = {
+            "current_message": normalized_input,
+            "existing_collected_fields": existing,
+            "existing_missing_fields": local_result.missing_fields,
+            # 允许模型发问的目标字段（修复 1）：模型只能就这些字段提问，并在 dialogue.ask_field 里声明。
+            "askable_fields": [f for f in local_result.missing_fields if f in FIELD_LABELS],
+            # 对话上下文：让模型能承接上一句、不复读、能处理"就刚才那个"这类指代。
+            "recent_turns": list(recent_turns or [])[-12:],
+            "last_question": existing.get("_last_question"),
+            "already_asked_fields": existing.get("_asked_fields", []),
+        }
+        result = None
+        last_error: Exception | None = None
+        attempts = 2 if os.getenv("PARSER_SELF_CONSISTENCY", "").strip() in {"1", "true", "yes"} else 1
+        seen_canonical: dict[str, set] = {}
+        for attempt in range(attempts):     # 失败重试一次：网络抖动/JSON 偶发不合法不至于整轮降级
+            try:
+                payload_result = client.complete_parser_json(payload)
+                for key in ("frequency_canonical", "trigger_canonical"):
+                    if payload_result.get(key):
+                        seen_canonical.setdefault(key, set()).add(payload_result[key])
+                result = _build_llm_result(payload_result, existing, normalized_input,
+                                           existing_is_authoritative)
+                break
+            except Exception as exc:
+                last_error = exc
+        if result is not None and attempts > 1:
+            # 自一致检查（可选）：两次采样给出不同受控值 → 按"不确定"处理，交给澄清。
+            for key, values in seen_canonical.items():
+                if len(values) > 1:
+                    result.merged_fields.pop(key, None)
+                    result.merged_fields.setdefault("_field_conflicts", {})[key] = {
+                        "canonical": "/".join(sorted(values)),
+                        "text": result.merged_fields.get(
+                            "expected_usage_frequency" if key == "frequency_canonical" else "trigger_reason"
+                        ),
+                        "resolved": "unknown",
+                    }
+        if result is None:
+            # 真实解析失败时保留已有本地规则结果，保证多轮收集不中断（并标记降级）。
             local_result.parser_used = "local_fallback"
-            local_result.agent_step.error = f"deepseek_parser_failed: {type(exc).__name__}"
-            return local_result
-    return local_result
+            local_result.agent_step.error = f"deepseek_parser_failed: {type(last_error).__name__}"
+            result = local_result
+    else:
+        result = local_result
+    return _finalize(result, existing, normalized_input, existing_is_authoritative, is_first_turn)
 
 
-def _build_rule_result(normalized_input: str, existing: dict[str, Any]) -> ParserResult:
+# 单价 / 数量语义：用于避免把“5元/斤”的单价当成总价去算预算占比。
+_PRICE_UNIT_PATTERN = re.compile(
+    r"(\d+(?:\.\d+)?)\s*(?:元|块)\s*(?:[/／]|每)?\s*(?:一|1)?\s*"
+    r"(斤|公斤|千克|克|两|个|件|盒|袋|瓶|包|只|张|套|台|支|份|颗|粒|片|条|寸|G|GB|T|TB|M|MB|ml|L|米|平方米|平米|升|毫升|公里|人|次|小时|天|月)"
+)
+_QUANTITY_PATTERN = re.compile(
+    r"(?:买|要|来|需要|打算买|准备买|购)\s*(\d+)\s*(斤|公斤|千克|克|个|件|盒|袋|瓶|包|只|张|套|台|支|份|颗|粒|片|条|G|GB|T|TB|M|MB|ml|L)"
+)
+# 数量+单位的所有候选；纠正语序下取最后一个（"不是60颗，是30颗" → 30）
+_QTY_UNIT_ALL = re.compile(
+    r"(\d+)\s*(斤|公斤|千克|克|个|件|盒|袋|瓶|包|只|张|套|台|支|份|颗|粒|片|条|G|GB|T|TB|M|MB|ml|L)"
+)
+# 纠正语序：「不是60颗，是30颗」——取最后一个数量为准
+_QUANTITY_CORRECTION_PATTERN = re.compile(
+    r"(?:不是|改成|改为|其实|准确说)[^。；;，,]{0,12}?[，,]?\s*(?:是|要|买|有)?\s*(\d+)\s*"
+    r"(斤|公斤|千克|克|个|件|盒|袋|瓶|包|只|张|套|台|支|份|颗|粒|片|条|G|GB|T|TB|M|MB|ml|L)"
+)
+
+
+def _assign(merged: dict[str, Any], key: str, value: Any, authoritative: bool) -> None:
+    """权威模式（判决阶段重放历史文本）下，已有值优先：只补缺口，不覆盖累计状态。"""
+    if authoritative and merged.get(key) not in (None, ""):
+        return
+    merged[key] = value
+
+
+def _merge_layers(existing: dict[str, Any], *layers: dict[str, Any],
+                  authoritative: bool = False) -> dict[str, Any]:
+    """按层合并字段；后层优先。
+
+    `authoritative=True`（判决阶段重放案件首条描述）时，已有非空值不被任何一层覆盖——
+    否则"首条描述里的旧数字"会盖掉用户后来纠正的值（真实事故：
+    `想买4袋` + 后续 `不是4袋，是2袋` → 判决按 4 袋算成 11%，实际应为 2 袋 5.6%）。
+    """
+    merged = {**existing}
+    for layer in layers:
+        for key, value in (layer or {}).items():
+            if value in (None, ""):
+                continue
+            _assign(merged, key, value, authoritative)
+    return merged
+
+
+def _merge_price_semantics(merged: dict[str, Any], text: str, field_meta: dict[str, Any],
+                           authoritative: bool = False) -> None:
+    """补充 price_unit / quantity / price_is_unit，供成本工具与判决区分单价与总价。
+
+    旧实现把“5元/斤”的数值 5 当作商品价格直接算预算占比，可能把单价当总价、
+    也可能漏掉数量；这里把语义显式记下来（不改动 price 数值本身）。
+    """
+    meta = field_meta if isinstance(field_meta, dict) else {}
+    quantity = meta.get("quantity")
+    correction = re.search(r"(?:不是|改成|改为|其实|准确说)", text)
+    if correction:
+        found = _QTY_UNIT_ALL.findall(text[correction.start():])
+        if found:
+            quantity = int(found[-1][0])   # 纠正语序：以最后一个说法为准
+    match = _QUANTITY_PATTERN.search(text)
+    if quantity in (None, "") and match:
+        quantity = match.group(1)
+    if quantity in (None, ""):
+        pass
+        if match:
+            quantity = int(match.group(1))
+    if quantity not in (None, ""):
+        try:
+            _assign(merged, "quantity", int(quantity), authoritative)
+        except (TypeError, ValueError):
+            pass
+
+    unit = meta.get("price_unit")
+    match = _PRICE_UNIT_PATTERN.search(text)
+    if not unit and match:
+        unit = match.group(2)
+    # 只有当入库价格就是那个单价值时才标记为单价；如果模型已经把它换算成总价
+    # （例如“2元一寸×27寸=54元”），标记为单价会导致成本工具再乘一次数量。
+    if unit and match is not None:
+        # 原话给出的是单价（"1元一G"）。模型有时会自行换算成总价（128），
+        # 此时以本地识别到的单价为准，并用该单位回抓数量，避免"纠正数量后金额不变"。
+        try:
+            unit_price = float(match.group(1))
+            if merged.get("price") is None:
+                merged["price"] = unit_price          # 缺口补齐：两种情况都允许
+            elif not authoritative and abs(float(merged["price"]) - unit_price) > 1e-6:
+                merged["price"] = unit_price          # 本轮文本改写金额：仅普通对话轮
+                merged["_price_corrected_from"] = merged.get("price_before_correction")
+        except (TypeError, ValueError):
+            pass
+        if merged.get("quantity") in (None, "", 0):
+            hit = re.search(r"(\d+)\s*" + re.escape(str(unit)), text)
+            if hit:
+                try:
+                    merged["quantity"] = int(hit.group(1))
+                except (TypeError, ValueError):
+                    pass
+    if unit:
+        _assign(merged, "price_unit", str(unit), authoritative)
+        _assign(merged, "price_is_unit", True, authoritative)
+        # 按单价单位回抓数量：'5元一颗…想买60颗'、'2元一寸…27寸' 这类商品名夹在中间的说法
+        if merged.get("quantity") in (None, "", 0):
+            hit = re.search(r"(\d+)\s*" + re.escape(str(unit)), text)
+            if hit:
+                try:
+                    merged["quantity"] = int(hit.group(1))
+                except (TypeError, ValueError):
+                    pass
+        # 供类型化事实层做一致性校验（声明单价但价格已是总价时按总价处理）
+        try:
+            merged["_price_unit_value"] = float(match.group(1))
+        except (AttributeError, TypeError, ValueError):
+            pass
+    elif meta.get("price_is_unit") is None:
+        merged.setdefault("price_is_unit", False)
+
+
+def _finalize(result: ParserResult, existing: dict[str, Any], normalized_input: str,
+              authoritative: bool = False, is_first_turn: bool = False) -> ParserResult:
+    """收集阶段的收尾：跳过处理 + 可选追问熔断计数 + 生成结构化回复计划。
+
+    这里集中“怎么说话”的规则（承接、一次只问一个、跳过后不再重复问、
+    可选追问最多两轮），保证本地规则路径与模型路径表现一致。
+    `authoritative=True`：判决阶段重放历史文本，已有字段优先。
+    `is_first_turn=True`：建案那一轮，额外产出欢迎语（先欢迎、再收集）。
+    """
+    this_turn_fields: dict[str, Any] = {**result.extracted_fields, **result.correction_fields}
+    merged = dict(result.merged_fields)
+    skipped_field: str | None = None
+    skip_rejected_field: str | None = None
+    _merge_price_semantics(merged, normalized_input, {}, authoritative)
+
+    if is_skip_signal(normalized_input):
+        current_field = existing.get("_current_question_key")
+        if current_field in ENHANCED_FIELDS:
+            # 增强字段允许跳过：记为“未说明”，之后不再重复追问
+            merged[current_field] = SKIPPED_VALUE
+            merged["_skipped_fields"] = sorted(set(merged.get("_skipped_fields") or []) | {current_field})
+            this_turn_fields[current_field] = SKIPPED_VALUE
+            result.extracted_fields = {**result.extracted_fields, current_field: SKIPPED_VALUE}
+            result.merged_fields = merged
+            result.missing_fields = [f for f in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(f))]
+            unresolved = [f for f in MINIMUM_DECISION_FIELDS if _is_missing(merged.get(f))]
+            result.is_complete = not unresolved and not result.conflicts
+            result.case_status = "ready_for_debate" if result.is_complete else "collecting"
+            if result.is_complete:
+                result.next_question_key, result.next_question = _enhanced_question(result.missing_fields)
+            else:
+                result.next_question_key, result.next_question = _next_question(
+                    result.missing_fields, result.conflicts, normalized_input
+                )
+            skipped_field = current_field
+        elif current_field:
+            # 核心字段（商品/价格/预算）跳过会导致无法分析，换成给范围的追问
+            skip_rejected_field = current_field
+
+    # 修 1：把"受控值 vs 文本"的冲突真正消费掉——写入字段，供判决依据与下一轮追问使用。
+    freq_value, freq_conflict = resolve_frequency(merged)
+    trig_value, trig_conflict = resolve_trigger(merged)
+    field_conflicts: dict[str, Any] = {}
+    if freq_conflict:
+        field_conflicts["expected_usage_frequency"] = {
+            "canonical": merged.get("frequency_canonical"),
+            "text": merged.get("expected_usage_frequency"),
+            "resolved": freq_value,
+        }
+    if trig_conflict:
+        field_conflicts["trigger_reason"] = {
+            "canonical": merged.get("trigger_canonical"),
+            "text": merged.get("trigger_reason"),
+            "resolved": trig_value,
+        }
+    if merged.pop("_evidence_mismatch", None):
+        field_conflicts.setdefault("_evidence_mismatch", {})["dropped"] = "canonical_value_without_quote"
+    if field_conflicts:
+        merged["_field_conflicts"] = field_conflicts
+        result.merged_fields = merged
+
+    # S2 澄清循环：冲突/弃权的字段 → 二选一确认；每字段最多 1 次、全局最多 2 轮。
+    clarify_field: str | None = None
+    asked = dict(merged.get("_clarify_asked") or {})
+    rounds = int(merged.get("_clarify_rounds") or 0)
+    if rounds < MAX_CLARIFY_ROUNDS:
+        candidates = list((merged.get("_field_conflicts") or {}).keys()) + list((merged.get("_abstained") or {}).keys())
+        for field_name in candidates:
+            if field_name in CLARIFY_FIELDS and asked.get(field_name, 0) == 0:
+                clarify_field = field_name
+                break
+    if clarify_field:
+        asked[clarify_field] = asked.get(clarify_field, 0) + 1
+        merged["_clarify_asked"] = asked
+        merged["_clarify_rounds"] = rounds + 1
+        result.merged_fields = merged
+
+    optional_asked = int(merged.get("_optional_asked") or 0)
+    plan = build_reply_plan(
+        this_turn_fields=this_turn_fields,
+        merged_fields=merged,
+        missing_fields=result.missing_fields,
+        is_complete=result.is_complete,
+        next_question_key=result.next_question_key,
+        next_question=result.next_question,
+        conflicts=result.conflicts,
+        skipped_field=skipped_field,
+        skip_rejected_field=skip_rejected_field,
+        optional_asked=optional_asked,
+        dialogue=result.dialogue,
+        last_question=existing.get("_last_question"),
+        corrections=result.correction_fields,
+        previous_fields=existing,
+        user_text=normalized_input,
+        clarify_field=clarify_field,
+        asked_fields=list(merged.get("_asked_fields") or []),
+        include_welcome=is_first_turn,
+        closing_sent=bool(merged.get("_closing_sent")),
+    )
+    # 结束语只发一次：这一轮发了就记住；下一轮又开始追问时重新武装（下次收尾还要给）。
+    if plan.get("closing"):
+        merged["_closing_sent"] = True
+    elif plan.get("question"):
+        merged.pop("_closing_sent", None)
+    # 熔断计数口径（修复 2）：只要"信息已齐之后仍在发问"就计数，不区分问题来自本地模板还是模型。
+    if plan.get("counts_toward_optional") and plan.get("question"):
+        merged["_optional_asked"] = optional_asked + 1
+        result.merged_fields = merged
+    # 记录本轮问了什么，供下一轮做"不复读"判定与上下文
+    if plan.get("question"):
+        merged["_last_question"] = plan["question"]
+    # 记账用"实际问的那个字段"（模型声明并通过校验的 ask_field 优先），
+    # 而不是本地模板原本想用的字段——否则模型自问的维度永远不进 already_asked_fields。
+    asked_target = plan.get("ask_field") if plan.get("question") else None
+    if not asked_target and plan.get("question"):
+        asked_target = result.next_question_key
+    if asked_target:
+        asked = list(merged.get("_asked_fields") or [])
+        if asked_target not in asked:
+            asked.append(asked_target)
+        merged["_asked_fields"] = asked
+    # 降级可见（I1）：模型不可用时明确标记，前端据此提示“这轮用的是本地规则”。
+    degraded = result.parser_used in {"local_fallback", "local"}
+    plan["degraded"] = degraded
+    if degraded:
+        plan["degraded_reason"] = result.agent_step.error or "模型不可用，本轮使用本地规则解析"
+    plan["parser_used"] = result.parser_used
+    result.merged_fields = merged
+    result.reply_plan = plan
+    return result
+
+
+def _build_rule_result(normalized_input: str, existing: dict[str, Any],
+                       authoritative: bool = False) -> ParserResult:
     extracted, corrections, field_meta, conflicts = _extract_shopping_details(normalized_input, existing)
     prior_product = existing.get("product_name")
     new_product = extracted.get("product_name")
@@ -115,8 +421,7 @@ def _build_rule_result(normalized_input: str, existing: dict[str, Any]) -> Parse
             "status": "confirmed", "confidence": 0.98, "provenance": "user_explicit",
             "action": "replace", "old_value": prior_product, "new_value": new_product,
         }
-    merged = {**base_existing, **{key: value for key, value in extracted.items() if value not in (None, "")}}
-    merged.update({key: value for key, value in corrections.items() if value not in (None, "")})
+    merged = _merge_layers(base_existing, extracted, corrections, authoritative=authoritative)
     missing_fields = [field for field in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(field))]
     for field in REQUIRED_SHOPPING_FIELDS:
         field_meta.setdefault(
@@ -133,6 +438,9 @@ def _build_rule_result(normalized_input: str, existing: dict[str, Any]) -> Parse
         "uncertain_required_fields" if conflicts else "missing_required_fields"
     )
     next_question_key, next_question = _next_question(missing_fields, conflicts, normalized_input)
+    if is_complete and missing_fields:
+        # 与 LLM 路径保持一致：核心信息已齐时给“可选补充”的追问，而不是阻塞式追问。
+        next_question_key, next_question = _enhanced_question(missing_fields)
 
     step = AgentStep(
         agent="input_parser",
@@ -168,6 +476,8 @@ def _build_rule_result(normalized_input: str, existing: dict[str, Any]) -> Parse
 def _build_llm_result(
     llm_result: dict[str, Any],
     existing: dict[str, Any],
+    normalized_input: str = "",
+    authoritative: bool = False,
 ) -> ParserResult:
     if not llm_result.get("is_supported", True):
         step = AgentStep(
@@ -202,15 +512,113 @@ def _build_llm_result(
         if value not in (None, "")
     }
     # 明确纠正优先于本轮普通表达，再覆盖历史值；普通补充不会覆盖已确认历史值。
-    merged = {**existing, **extracted, **corrections}
+    # 重放历史文本（authoritative）时反过来：已有值优先，本轮只补缺口。
+    merged = _merge_layers(existing, extracted, corrections, authoritative=authoritative)
+    # 模型的替代品等效判断（存在 field_meta 里）并入字段，供判决 R2 分支使用。
+    covers = (llm_result.get("field_meta") or {}).get("owned_alternatives", {})
+    if isinstance(covers, dict) and covers.get("covers_core_need") is not None:
+        _assign(merged, "alternative_covers_need", covers["covers_core_need"], authoritative)
+    if llm_result.get("alternative_covers_need") is not None:
+        _assign(merged, "alternative_covers_need", llm_result["alternative_covers_need"], authoritative)
+    # 模型直接给的受控值（契约优先）：存下来，判决与评分优先读它，其次才从中文文本归一。
+    for canonical_key in ("frequency_canonical", "trigger_canonical"):
+        value = llm_result.get(canonical_key)
+        if value:
+            _assign(merged, canonical_key, value, authoritative)
+    if llm_result.get("price_basis") == "unit":
+        _assign(merged, "price_is_unit", True, authoritative)
+        if llm_result.get("price_unit"):
+            _assign(merged, "price_unit", llm_result["price_unit"], authoritative)
+    if llm_result.get("quantity") is not None:
+        _assign(merged, "quantity", llm_result["quantity"], authoritative)
+
+    # 证据契约（span grounding）：模型填的每个字段都要引用用户原话片段；
+    # 片段不在原话里 → 该字段直接作废（宁可留空，也不要无依据的值）。
+    # 字符偏移由服务端从片段定位得到（确定性），不让模型自己数位置。
+    evidence = llm_result.get("evidence") or {}
+    abstained: dict[str, str] = {}
+    spans: dict[str, dict[str, Any]] = {}
+    for field_name, quote in evidence.items():
+        quote = str(quote)
+        start = normalized_input.find(quote)
+        if start >= 0:
+            spans[field_name] = {
+                "text": quote,
+                "start": start,
+                "end": start + len(quote),
+            }
+        if field_name not in merged or merged.get(field_name) in (None, ""):
+            continue
+        if start >= 0:
+            continue
+        merged.pop(field_name, None)
+        extracted.pop(field_name, None)
+        corrections.pop(field_name, None)
+        abstained[field_name] = quote
+    if spans:
+        merged["_evidence_spans"] = spans
+    if abstained:
+        merged["_abstained"] = abstained
+
+    # 漂移兜底（零延迟）：受控值必须能被它自己的证据片段佐证——
+    # evidence 归一出另一个值，说明模型这次"给错了值"，丢弃受控值并回落文本归一。
+    from backend.app.agents.field_normalizer import normalize_frequency, normalize_trigger
+
+    for canonical_key, evidence_key, normalizer in (
+        ("frequency_canonical", "frequency_evidence", normalize_frequency),
+        ("trigger_canonical", "trigger_evidence", normalize_trigger),
+    ):
+        value = merged.get(canonical_key)
+        quote = llm_result.get(evidence_key)
+        if not value or not quote:
+            continue
+        implied = normalizer(str(quote))
+        if implied != "unknown" and implied != value:
+            merged.pop(canonical_key, None)
+            merged.setdefault("_field_conflicts", {})[canonical_key] = {
+                "canonical": value,
+                "text": str(quote),
+                "resolved": implied,
+            }
+    # 修 3：受控值必须能被原话佐证——evidence 与原话不匹配就丢弃受控值，回落文本归一。
+    for canonical_key, evidence_key in (("frequency_canonical", "frequency_evidence"),
+                                        ("trigger_canonical", "trigger_evidence")):
+        value = merged.get(canonical_key)
+        evidence = llm_result.get(evidence_key)
+        if value and evidence:
+            if str(evidence).strip() and str(evidence).strip() in normalized_input:
+                continue
+            merged.pop(canonical_key, None)
+            merged.setdefault("_evidence_mismatch", []).append(canonical_key)
+    _merge_price_semantics(merged, normalized_input, llm_result.get("field_meta") or {}, authoritative)
     missing = [field for field in REQUIRED_SHOPPING_FIELDS if _is_missing(merged.get(field))]
     conflicts = list(llm_result.get("conflicts") or [])
     unresolved_required = [field for field in MINIMUM_DECISION_FIELDS if _is_missing(merged.get(field))]
     is_complete = not unresolved_required and not conflicts
     status = "ready_for_debate" if is_complete else "collecting"
+    # 追问只有**一个**来源：本地算出的目标字段（key）+ 本地模板文案（base question）。
+    # 模型想用自己的措辞，必须走 dialogue.question + dialogue.ask_field，由 reply_composer 的
+    # 闸门校验目标是否合法——见下面的"旧字段折叠"。
     next_question_key, generated_question = _next_question(missing, conflicts, "")
-    # 模型追问只作为文案候选，字段选择和“一次一个”由 C 本地规则决定。
-    next_question = None if is_complete else (llm_result.get("next_question") or generated_question)
+    if is_complete:
+        # 核心信息已齐、但增强字段仍缺失时，给一句“可选补充”的追问，
+        # 而不是返回 None 让 B 端只能拼兜底文案（旧的空 next_question 问题）。
+        next_question_key, next_question = _enhanced_question(missing)
+    else:
+        # 本地模板作为兜底文案；模型措辞经由 dialogue 走闸门（不在这里直接采用）
+        next_question = generated_question
+
+    # 旧字段折叠（真实事故的根因）：模型常把问句写进 next_question、把目标写成另一个字段，
+    # 于是"屏幕显示的文本"和"系统记账的追问目标"长期不一致——显示上在问价格，记账里却一直是
+    # missing[0]（本案七轮全是 product_name），判重/闸门全部落空。
+    # 现在把它折叠成同一条受闸门管的路径：只有在 dialogue.question 为空时，才把旧措辞当
+    # "候选问句 + 候选目标"塞进 dialogue，由闸门校验（目标不在允许集合内就丢弃、回落本地模板）。
+    dialogue = dict(llm_result.get("dialogue") or {})
+    legacy_question = str(llm_result.get("next_question") or "").strip()
+    if not str(dialogue.get("question") or "").strip() and legacy_question:
+        dialogue["question"] = legacy_question
+        if not str(dialogue.get("ask_field") or "").strip():
+            dialogue["ask_field"] = str(llm_result.get("next_question_key") or "").strip()
     step = AgentStep(
         agent="input_parser",
         status="completed",
@@ -237,10 +645,12 @@ def _build_llm_result(
         correction_fields=corrections,
         field_meta=dict(llm_result.get("field_meta") or {}),
         conflicts=conflicts,
-        next_question_key=llm_result.get("next_question_key") or next_question_key,
+        # 记账目标只认本地算出的字段（模型想换目标只能通过 dialogue.ask_field 走闸门）
+        next_question_key=next_question_key,
         is_complete=is_complete,
         termination_reason=("complete_minimum_fields" if is_complete else ("uncertain_required_fields" if conflicts else "missing_required_fields")),
         parser_used="deepseek",
+        dialogue=dialogue,
     )
 
 
@@ -347,10 +757,17 @@ def _extract_budget_match(text: str) -> tuple[float, tuple[int, int], str] | Non
 def _extract_price(text: str, budget_span: tuple[int, int] | None) -> float | None:
     amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
     patterns = [
+        # 动词在金额之后：“花4元买”“4块钱入手”——旧正则要求动词在前，这类句式全部漏识别。
+        rf"(?:花|花了|用了|掏了|掏)\s*({amount})\s*(?:元|块|rmb|RMB)?\s*(?:钱)?\s*(?:买|购|入手|下单|办)",
         rf"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)(?:(?:一|1|两|二|三|四|五|六|七|八|九)\s*)?(?:个|件|副|台|盏|份|部|张|只|套)?\s*[^\d零〇一二两三四五六七八九十百千万亿]{{0,6}}({amount})\s*(?:元|块|rmb|RMB)",
         rf"({amount})\s*(?:元|块|rmb|RMB)\s*的",
         rf"(?:价格|商品价|售价|金额)\s*(?:是|为|大约是|约为|大概是)?\s*({amount})\s*(?:元|块|rmb|RMB)?",
     ]
+    if budget_span is not None:
+        # 只有当同句已经识别出预算时，另一个带“元/块”的金额才兜底当作商品价格
+        # （如“预算 3000 元，芒果 4 元”）。没有预算时必须保留金额歧义判定，
+        # 不能把“2000，冰可乐，3块”这类输入直接猜成价格。
+        patterns.append(rf"({amount})\s*(?:元|块|rmb|RMB)")
     for pattern in patterns:
         for match in re.finditer(pattern, text):
             number_span = match.span(1)
@@ -460,6 +877,10 @@ def _is_budget_context(text: str, span: tuple[int, int]) -> bool:
 def _extract_product(text: str) -> str | None:
     patterns = [
         r"(?:想买|买|购买|入手|下单|换|办|考虑买|准备买)(?:[一1]?(?:个|件|副|台|盏|份|部|张|只|套))?\s*(?:(?:\d+(?:\.\d+)?)\s*(?:元|块|rmb|RMB)\s*的?)?\s*([^\s，。；;]+)",
+        # “<商品>价格是N元”这类句式：商品名在“价格”之前（水果价格是5元一斤）。
+        r"([^\s，。；;、]{2,12}?)的?价格\s*(?:是|为|大约|大概)?\s*(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)",
+        # 动词在金额之后：“花4元买芒果” / “4块钱入手键盘”。
+        r"(?:花|花了|用了|掏了|掏)\s*(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)\s*(?:元|块|rmb|RMB)?\s*(?:钱)?\s*(?:买|购|入手|下单|办)\s*([^\s，。；;]+)",
         r"\d+(?:\.\d+)?\s*(?:元|块|rmb|RMB)\s*的([^\s，。；;]+)",
     ]
     for pattern in patterns:
@@ -468,6 +889,36 @@ def _extract_product(text: str) -> str | None:
             product = _clean_product_name(match.group(match.lastindex or 1))
             if product:
                 return product[:20]
+    # 兜底：没有购买动词时，从“<商品> N 元”结构里取商品名（如“预算 3000 元，芒果 4 元”）。
+    return _extract_product_before_amount(text, _extract_budget_match(text))
+
+
+# 这些词单独出现在金额前面时不是商品名（“花4元买”里的“花”）。
+_PRODUCT_STOPWORDS = {
+    "花", "花了", "用", "用了", "掏", "掏了", "买", "想买", "购买", "大概", "大约", "约",
+    "价格", "钱", "预算", "本月", "这个月", "还剩", "剩余", "余额", "生活费", "可支配",
+}
+
+
+def _extract_product_before_amount(text: str, budget_match: tuple[float, tuple[int, int], str] | None) -> str | None:
+    """从“<商品> N 元”里取商品名；跳过预算金额本身与预算上下文。"""
+    amount = r"(?:\d+(?:\.\d+)?|[零〇一二两三四五六七八九十百千万亿]+)"
+    budget_span = budget_match[1] if budget_match else None
+    for match in re.finditer(rf"({amount})\s*(?:元|块|rmb|RMB)", text):
+        span = match.span(1)
+        if budget_span and span == budget_span:
+            continue
+        if _is_budget_context(text, span):
+            continue
+        clause = re.split(r"[，,。；;\n]", text[:match.start()])[-1]
+        candidate = _clean_product_name(clause)
+        if not candidate or candidate in _PRODUCT_STOPWORDS:
+            continue
+        if re.fullmatch(r"[\d\s.]+", candidate):
+            continue
+        if any(word in candidate for word in ("预算", "本月", "剩余", "生活费", "可支配", "价格", "售价")):
+            continue
+        return candidate[:20]
     return None
 
 
@@ -610,20 +1061,27 @@ def _next_question(
     missing_fields: list[str], conflicts: list[dict[str, Any]] | None = None, text: str = ""
 ) -> tuple[str | None, str | None]:
     if conflicts:
-        return "price_or_budget", "请确认金额含义：这笔金额是商品价格，还是本月剩余预算？"
+        return "price_or_budget", "这两个金额我有点分不清：哪个是商品价格，哪个是本月预算？"
     if not missing_fields:
         return None, None
-    questions = {
-        "product_name": "你具体想买的商品或服务是什么？",
-        "price": "这个商品大约多少钱？",
-        "purpose": "你买它主要是为了解决什么问题，或用于什么场景？",
-        "monthly_budget_left": "你本月剩余可支配预算大约还有多少？",
-        "owned_alternatives": "你现在是否已经有类似物品或可以替代它的东西？",
-        "expected_usage_frequency": "如果买了，你预计多久会使用一次？",
-        "trigger_reason": "这次想买它的直接原因是什么，比如刚需、促销、种草、朋友推荐、情绪驱动或旧物损坏？",
-    }
     key = missing_fields[0]
-    return key, "为了进入购物法庭分析，还需要补充：" + questions[key]
+    return key, natural_question(key)
+
+
+# 核心三字段之外的增强字段：核心信息已齐时仍可“可选补充”，用于提高分析质量。
+# 核心三字段之外的增强字段：定义已下沉到 reply_composer（两处共用，避免漂移）
+
+
+def _enhanced_question(missing_fields: list[str]) -> tuple[str | None, str | None]:
+    """核心信息已齐、但增强字段仍缺失时的“可选补充”追问。
+
+    文案取自 reply_composer，保证与 B 端展示、快捷选项一致；
+    仍按“一次问一个”，且不改变 case_status（不阻塞进入分析）。
+    """
+    for field in ENHANCED_FIELDS:
+        if field in missing_fields:
+            return field, optional_question(field)
+    return None, None
 
 
 def _build_next_question(missing_fields: list[str]) -> str | None:

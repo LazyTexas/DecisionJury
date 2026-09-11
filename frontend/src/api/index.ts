@@ -257,6 +257,13 @@ export async function sendMessage(
       case_status: res.case_status,
       collected_fields: res.collected_fields,
       missing_fields: res.missing_fields,
+      reply_plan: {
+        chips: ['每天', '每周几次', '偶尔'],
+        can_stop: true,
+        optional: true,
+        tone: 'ready',
+        question: null,
+      },
     };
   }
   return request(`/cases/${caseId}/messages`, {
@@ -272,6 +279,25 @@ export async function sendMessage(
  */
 export async function getCaseMessages(caseId: string): Promise<Message[]> {
   if (USE_MOCK) return mockFetchCaseMessages(caseId);
+  // 服务端是唯一真相源：换设备/清缓存后仍能恢复对话；本地缓存只作渲染加速与离线兜底。
+  try {
+    const res = await request<{ items?: Record<string, unknown>[] }>(
+      `/cases/${caseId}/messages?user_id=${encodeURIComponent(getCurrentUserId())}&page=1&page_size=100`,
+    );
+    const items = (res?.items ?? []).map((raw) => ({
+      message_id: String(raw.id ?? raw.message_id ?? ''),
+      case_id: String(raw.session_id ?? raw.case_id ?? caseId),
+      role: (raw.role as MessageRole) ?? MessageRole.ASSISTANT,
+      content: String(raw.content ?? ''),
+      created_at: String(raw.created_at ?? new Date().toISOString()),
+    }));
+    if (items.length > 0) {
+      saveLocalMessages(caseId, items);
+      return items;
+    }
+  } catch {
+    // 后端不可用时回落到本地缓存，避免页面空白
+  }
   return loadLocalMessages(caseId);
 }
 
@@ -295,12 +321,113 @@ export async function startDebate(caseId: string): Promise<{
   rag_evidence: unknown[]; tool_results: unknown[]; report: DecisionReport;
 }> {
   if (USE_MOCK) return mockStartDebate(caseId);
-  return request(`/cases/${caseId}/debate`, { method: 'POST' });
+  // 后端 DebateRequest 要求 user_id（backend/schemas.py:180，routers/debate.py:25 校验归属）；
+  // 缺失 body 会直接 422，故与其他写接口一致带上当前登录用户。
+  return request(`/cases/${caseId}/debate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_id: getCurrentUserId() }),
+  });
 }
 
 export async function getTrace(caseId: string): Promise<{ case_id: string; trace: TraceItem[] }> {
   if (USE_MOCK) return mockFetchTrace(caseId);
   return request(`/cases/${caseId}/trace`);
+}
+
+/** 辩论进度事件（SSE） */
+export interface DebateProgressEvent {
+  stage: string;
+  status?: string;
+  summary?: string;
+  arguments?: string[];
+  final_decision?: string;
+  confidence?: number;
+  response?: unknown;
+  message?: string;
+}
+
+/**
+ * SSE 的 `__done__` 事件送的是后端 ApiResponse 信封（`{success,data,message}`，
+ * 见 backend/routers/debate.py 的 `response.model_dump()`），而调用方要的是里面的 `data`。
+ * 非流式接口走 `request()` 时会自动解包，流式这里必须做同样的事——
+ * 真实事故：没解包 → `result.report` 恒为 undefined → 页面永远提示"辩论未生成判决书"，
+ * 而报告其实已经落库；且 `success:false`（如 MISSING_FIELDS）也被信封吞掉，报错信息全是错的。
+ */
+function unwrapDebateEnvelope(raw: unknown): Awaited<ReturnType<typeof startDebate>> {
+  if (raw && typeof raw === 'object' && 'success' in (raw as Record<string, unknown>)) {
+    const envelope = raw as { success?: boolean; data?: unknown; message?: string };
+    if (envelope.success === false) {
+      const code = typeof envelope.message === 'string' ? envelope.message : undefined;
+      throw new ApiRequestError(translateApiError(code), code);
+    }
+    return envelope.data as Awaited<ReturnType<typeof startDebate>>;
+  }
+  // 兼容裸数据形态（后端若改为直接下发 data，这里不会误伤）
+  return raw as Awaited<ReturnType<typeof startDebate>>;
+}
+
+/**
+ * 流式启动辩论：后端逐阶段推送进度，页面可以在等待期间显示
+ * “正方发言中 → 反方发言中 → 法官评议中”，而不是干等 30 秒。
+ * 返回最终响应（与 startDebate 相同结构）。
+ */
+export async function startDebateStream(
+  caseId: string,
+  onEvent: (event: DebateProgressEvent) => void,
+): Promise<Awaited<ReturnType<typeof startDebate>>> {
+  if (USE_MOCK) {
+    onEvent({ stage: 'pro_agent', status: 'running' });
+    const result = await mockStartDebate(caseId);
+    onEvent({ stage: 'judge_agent', status: 'done' });
+    return result;
+  }
+
+  const token = localStorage.getItem('token');
+  const resp = await fetch(`${BASE_URL}/cases/${caseId}/debate/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ user_id: getCurrentUserId() }),
+  });
+  if (!resp.ok || !resp.body) {
+    throw new ApiRequestError('启动辩论失败', 'DEBATE_FAILED', resp.status);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let final: Awaited<ReturnType<typeof startDebate>> | null = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() ?? '';
+    for (const chunk of chunks) {
+      const line = chunk.split('\n').find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      let event: DebateProgressEvent;
+      try {
+        event = JSON.parse(line.slice(5).trim());
+      } catch {
+        continue;
+      }
+      if (event.stage === '__done__') {
+        final = unwrapDebateEnvelope(event.response);
+      } else if (event.stage === '__error__') {
+        throw new ApiRequestError(event.message || '辩论失败', 'DEBATE_FAILED');
+      } else {
+        onEvent(event);
+      }
+    }
+  }
+
+  if (!final) throw new ApiRequestError('辩论未返回结果', 'DEBATE_FAILED');
+  return final;
 }
 
 // ---- 判决书 API ----

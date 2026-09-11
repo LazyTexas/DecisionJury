@@ -2,9 +2,11 @@
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 import uuid
+from datetime import datetime, timedelta, timezone
 from backend.database import get_db
 from backend.models import Case, Message, Reminder, History, Trace
 from backend.schemas import CreateCaseRequest, CreateCaseResponse, ApiResponse, CaseStatus, CaseSummary, DecisionReportResponse, CreateFeedbackRequest, UpdateCaseRequest, SHOPPING_REQUIRED_FIELDS
+from backend.app.agents.user_facing import _deep_sanitize, public_fields, public_report, public_steps
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 
@@ -46,11 +48,21 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
                 data={
                     "case_id": case_id,
                     "case_status": case.status,
-                    "collected_fields": initial_collected,
+                    "collected_fields": public_fields(initial_collected),
                     "missing_fields": initial_missing,
-                    "next_question": "为了进入购物法庭分析，还需要补充：这个商品大约多少钱？ 你买它主要是为了解决什么问题，或用于什么场景？",
+                    "next_question": "这个大概多少钱？",
                     "is_high_risk": False,
                     "reject_reason": None,
+                    "reply_plan": {
+                        "ack": "",
+                        "question": "这个大概多少钱？",
+                        "chips": [],
+                        "can_stop": False,
+                        "optional": False,
+                        "tone": "collecting",
+                        "reply": "这个大概多少钱？",
+                        "progress": {"known": ["商品"], "missing": ["价格", "剩余预算", "用途", "已有替代品", "使用频率", "购买原因"]},
+                    },
                 },
                 message="case created"
             )
@@ -59,6 +71,7 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         parser_result = parse_input(
             raw_input=req.description,
             existing_collected_fields={},
+            is_first_turn=True,      # 建案这一轮额外产出欢迎语（先欢迎、再收集）
         )
         parser_dict = to_dict(parser_result)
         is_high_risk = parser_dict.get("is_high_risk", False)
@@ -138,16 +151,48 @@ def create_case(req: CreateCaseRequest, db: Session = Depends(get_db)):
         # 直接使用 C 模块返回的 next_question
         next_question = parser_dict.get("next_question")
 
+    # ===== 建案这一轮的三条消息落库：用户描述 → 欢迎语 → 第一个问题 =====
+    # 之前只有前端把首个问题塞进 localStorage，而 GET /messages 以服务端为唯一真相源，
+    # 一旦有了服务端消息就会覆盖本地缓存——首个问题和欢迎语会凭空消失。
+    # 时间戳用**负偏移**：消息按 created_at 升序返回（后续轮次由 server_default 取当前时间），
+    # 正偏移会在用户秒回时把建案消息排到后面去（真实踩到：首问出现在第 1 轮回复之后）。
+    reply_plan = parser_dict.get("reply_plan") or {}
+    welcome_text = str(reply_plan.get("welcome") or "").strip()
+    first_reply = str(reply_plan.get("reply") or next_question or "").strip()
+    base_time = datetime.now(timezone.utc).replace(tzinfo=None)
+    creation_messages = []
+    if (req.description or "").strip():
+        creation_messages.append(("user", req.description.strip(), "text"))
+    if welcome_text:
+        creation_messages.append(("assistant", welcome_text, "text"))
+    if first_reply:
+        creation_messages.append(("assistant", first_reply, "question"))
+    for offset, (role, content, msg_type) in enumerate(creation_messages):
+        db.add(
+            Message(
+                id=f"msg_{uuid.uuid4().hex[:8]}",
+                case_id=case_id,
+                role=role,
+                content=content,
+                message_type=msg_type,
+                created_at=base_time - timedelta(seconds=len(creation_messages) - offset),
+            )
+        )
+    if creation_messages:
+        db.commit()
+
     return ApiResponse(
         success=True,
         data={
             "case_id": case_id,
             "case_status": case.status,
-            "collected_fields": initial_collected,
+            "collected_fields": public_fields(initial_collected),
             "missing_fields": initial_missing,
             "next_question": next_question,
+            "welcome": welcome_text,
             "is_high_risk": is_high_risk,
             "reject_reason": reject_reason if is_high_risk else None,
+            "reply_plan": reply_plan,
         },
         message="case created"
     )
@@ -168,7 +213,7 @@ def get_case(case_id: str, db: Session = Depends(get_db)):
             "title": case.title,
             "description": case.description,
             "case_status": case.status,
-            "collected_fields": case.collected_fields or {},
+            "collected_fields": public_fields(case.collected_fields) or {},
             "missing_fields": case.missing_fields or [],
             "final_decision": case.final_decision,
             "report_id": case.report_id,
@@ -254,12 +299,12 @@ def get_report(case_id: str, db: Session = Depends(get_db)):
     
     # 3. 从 debate_result 中提取 report 和 debate_events
     # 安全提取 report，确保是 dict
-    report_data = case.debate_result.get("report")
+    report_data = _deep_sanitize(public_report(case.debate_result.get("report") or {}))
     if not isinstance(report_data, dict):
         report_data = {}
 
     # 安全提取 debate_events，确保是 list
-    debate_events = case.debate_result.get("debate_events")
+    debate_events = _deep_sanitize(case.debate_result.get("debate_events") or [])
     if not isinstance(debate_events, list):
         debate_events = []
 
@@ -359,7 +404,7 @@ def update_case(
             "title": case.title,
             "description": case.description,
             "case_status": case.status,
-            "collected_fields": case.collected_fields or {},
+            "collected_fields": public_fields(case.collected_fields) or {},
             "missing_fields": case.missing_fields or [],
             "final_decision": case.final_decision,
             "report_id": case.report_id,

@@ -9,7 +9,19 @@ from backend.app.agents.judge_agent import run_judge_agent
 from backend.app.agents.pro_agent import run_pro_agent
 from backend.app.schemas.decision import AgentStep, DebateEvent, DebateResult, DecisionReport, ToolResult, TraceItem
 from backend.app.services.mcp_adapter import analyze_shopping_cost, create_cooling_reminder, score_decision
+from backend.app.agents.field_normalizer import split_evidence_by_relevance
+from backend.app.agents.user_facing import sanitize_user_text
 from backend.app.services.rag_adapter import search_rag_evidence
+
+
+def _emit(progress: Callable[[dict[str, Any]], None] | None, stage: str, status: str, **extra: Any) -> None:
+    """向调用方推送阶段进度（SSE 用）；回调异常绝不能影响主流程。"""
+    if progress is None:
+        return
+    try:
+        progress({"stage": stage, "status": status, **extra})
+    except Exception:
+        pass
 
 
 def run_decision_flow(
@@ -17,17 +29,22 @@ def run_decision_flow(
     user_id: str = "u001",
     case_id: str = "case_001",
     existing_collected_fields: dict[str, Any] | None = None,
+    progress: Callable[[dict[str, Any]], None] | None = None,
 ) -> DebateResult:
     trace: list[TraceItem] = []
     steps: list[AgentStep] = []
+    _emit(progress, "parse", "running")
 
     parser_result = _record_agent_trace(
         trace,
         "input_parser",
         raw_input,
-        lambda: parse_input(raw_input, existing_collected_fields),
+        # 判决阶段重放的是案件首条描述（历史文本），已收集字段是累计后的权威状态：
+        # 只允许补缺口，不允许旧文本盖掉用户后来的纠正（真实事故：4袋 → 纠正 2袋 → 判决仍按 4 袋算）。
+        lambda: parse_input(raw_input, existing_collected_fields, existing_is_authoritative=True),
     )
     steps.append(parser_result.agent_step)
+    _emit(progress, "parse", "done", summary="已确认可以进入分析")
 
     if parser_result.case_status != "ready_for_debate":
         return DebateResult(
@@ -46,6 +63,7 @@ def run_decision_flow(
     fields = parser_result.merged_fields
     debate_events: list[DebateEvent] = []
     query = _build_rag_query(fields)
+    _emit(progress, "rag", "running", summary="检索历史复盘证据")
     rag_evidence = _record_trace(
         trace,
         trace_type="rag_search",
@@ -82,23 +100,36 @@ def run_decision_flow(
             fallback=_failed_tool_result("decision_score", "决策评分工具调用失败，主流程继续。", "TOOL_ERROR"),
         )
     )
+    # 论证上下文只给相关证据：无关历史此前会被反方拿去讨论（"另2条与本案无关"），
+    # 既浪费篇幅又误导读者。判决仍能看到全部证据并自行做相关性门槛。
+    related_ids = {item.id for item in split_evidence_by_relevance(rag_evidence, fields)[0]}
+    related_evidence = [item for item in rag_evidence if item.id in related_ids]
     debate_events.append(_build_clerk_event(fields, rag_evidence, tool_results))
+    _emit(
+        progress, "tools", "done",
+        summary=(tool_results[0].summary if tool_results else ""),
+        evidence_count=len(rag_evidence),
+    )
 
+    _emit(progress, "pro_agent", "running", summary="正方 Agent 正在组织支持购买的理由")
     pro_step = _record_agent_trace(
         trace,
         "pro_agent",
         fields.get("product_name", "shopping case"),
-        lambda: run_pro_agent(case_id, fields, rag_evidence, tool_results),
+        lambda: run_pro_agent(case_id, fields, related_evidence, tool_results),
     )
     steps.append(pro_step)
+    _emit(progress, "pro_agent", "done", summary=pro_step.summary, arguments=list(pro_step.arguments)[:3])
 
+    _emit(progress, "con_agent", "running", summary="反方 Agent 正在评估风险与替代方案")
     con_step = _record_agent_trace(
         trace,
         "con_agent",
         fields.get("product_name", "shopping case"),
-        lambda: run_con_agent(case_id, fields, rag_evidence, tool_results),
+        lambda: run_con_agent(case_id, fields, related_evidence, tool_results),
     )
     steps.append(con_step)
+    _emit(progress, "con_agent", "done", summary=con_step.summary, arguments=list(con_step.arguments)[:3])
 
     if _should_create_reminder(tool_results, fields):
         reminder = _record_trace(
@@ -124,6 +155,7 @@ def run_decision_flow(
         )
         tool_results.append(reminder)
 
+    _emit(progress, "judge_agent", "running", summary="法官正在依据规则结论撰写判决说明")
     judge_step, report = _record_agent_trace(
         trace,
         "judge_agent",
@@ -132,12 +164,22 @@ def run_decision_flow(
         output_summary_builder=lambda result: f"final_decision={result[1].final_decision}, confidence={result[1].confidence}",
     )
     steps.append(judge_step)
+    _emit(
+        progress, "judge_agent", "done",
+        summary=report.summary,
+        final_decision=report.final_decision,
+        confidence=report.confidence,
+    )
     debate_events = [
         _build_clerk_event(fields, rag_evidence, tool_results),
         _build_agent_event(pro_step, order=2, phase="opening_statement", tool_results=tool_results),
         _build_agent_event(con_step, order=3, phase="closing_argument", tool_results=tool_results),
         _build_judge_event(report, order=4),
     ]
+    # 事件文本也是用户可见内容：这里统一去工程腔（工具名/英文枚举/字段名）
+    for _event in debate_events:
+        if getattr(_event, "content", None):
+            _event.content = sanitize_user_text(_event.content, force=True)
     report.debate_events = debate_events
 
     return DebateResult(
@@ -244,8 +286,13 @@ def _should_create_reminder(tool_results: list[Any], fields: dict[str, Any]) -> 
 def _cooling_reason(fields: dict[str, Any], tool_results: list[Any]) -> str:
     cost_result = next((item for item in tool_results if item.tool_name == "cost_analyzer"), None)
     if cost_result and cost_result.status == "success":
-        return cost_result.summary
-    return f"{fields.get('product_name', '该商品')}存在冲动购买或预算不确定性，建议冷静 3 天后复盘。"
+        ratio = (cost_result.metrics or {}).get("budget_ratio")
+        product = fields.get("product_name", "该商品")
+        if ratio is not None:
+            return f"{product}约占本月剩余预算的 {float(ratio):.0%}，建议 3 天后结合真实需求再决定是否购买。"
+        return f"{product}的预算压力还需观察，建议 3 天后复盘。"
+    product = fields.get("product_name", "该商品")
+    return f"{product}存在冲动购买或预算不确定性，建议 3 天后复盘。"
 
 
 def _failed_tool_result(tool_name: str, summary: str, error: str) -> ToolResult:

@@ -9,26 +9,31 @@ import os
 from datetime import datetime
 from sqlalchemy import text
 from backend.database import engine, SessionLocal
+
+
+def _resolve_engine(target=None):
+    """迁移作用于哪个库由调用方决定；默认仍是全局 engine，生产调用点行为不变。"""
+    return target if target is not None else engine
 from backend import models
 
 
-def get_existing_columns(table_name):
+def get_existing_columns(table_name, engine=None):
     """获取表中已有的列名"""
-    with engine.connect() as conn:
+    with _resolve_engine(engine).connect() as conn:
         result = conn.execute(text(f"PRAGMA table_info({table_name})"))
         return {row[1] for row in result}
 
 
-def migrate_cases():
+def migrate_cases(engine=None):
     """迁移 cases 表"""
-    columns = get_existing_columns("cases")
+    columns = get_existing_columns("cases", engine)
     additions = []
 
     if "debate_result" not in columns:
         additions.append("ADD COLUMN debate_result TEXT")
 
     if additions:
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             for stmt in additions:
                 conn.execute(text(f"ALTER TABLE cases {stmt}"))
             conn.commit()
@@ -36,10 +41,10 @@ def migrate_cases():
     else:
         print("[INFO] cases 表无需迁移")
 
-def migrate_users():
+def migrate_users(engine=None):
     """迁移 users 表"""
     try:
-        columns = get_existing_columns("users")
+        columns = get_existing_columns("users", engine)
     except Exception:
         print("[INFO] users 表不存在，跳过迁移")
         return
@@ -53,15 +58,15 @@ def migrate_users():
         additions.append("ADD COLUMN created_at DATETIME")
 
     if additions:
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             for stmt in additions:
                 conn.execute(text(f"ALTER TABLE users {stmt}"))
             conn.commit()
             print("[OK] users 表迁移完成")
 
-def migrate_histories():
+def migrate_histories(engine=None):
     """迁移 histories 表"""
-    columns = get_existing_columns("histories")
+    columns = get_existing_columns("histories", engine)
     additions = []
 
     if "title" not in columns:
@@ -84,7 +89,7 @@ def migrate_histories():
         additions.append("ADD COLUMN report_id TEXT")
 
     if additions:
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             for stmt in additions:
                 conn.execute(text(f"ALTER TABLE histories {stmt}"))
             conn.commit()
@@ -93,10 +98,10 @@ def migrate_histories():
         print("[INFO] histories 表无需迁移")
 
 
-def migrate_traces():
+def migrate_traces(engine=None):
     """迁移 traces 表"""
     try:
-        columns = get_existing_columns("traces")
+        columns = get_existing_columns("traces", engine)
     except Exception:
         print("[INFO] traces 表不存在，跳过迁移")
         return
@@ -112,17 +117,17 @@ def migrate_traces():
         additions.append("ADD COLUMN error TEXT")
 
     if additions:
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             for stmt in additions:
                 conn.execute(text(f"ALTER TABLE traces {stmt}"))
             conn.commit()
             print("[OK] traces 表迁移完成")
 
 
-def migrate_reminders():
+def migrate_reminders(engine=None):
     """迁移 reminders 表"""
     try:
-        columns = get_existing_columns("reminders")
+        columns = get_existing_columns("reminders", engine)
     except Exception:
         print("[INFO] reminders 表不存在，跳过迁移")
         return
@@ -132,16 +137,16 @@ def migrate_reminders():
         additions.append("ADD COLUMN reason TEXT")
 
     if additions:
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             for stmt in additions:
                 conn.execute(text(f"ALTER TABLE reminders {stmt}"))
             conn.commit()
             print("[OK] reminders 表迁移完成")
 
 
-def migrate_indexes():
+def migrate_indexes(engine=None):
     """创建缺失的索引"""
-    with engine.connect() as conn:
+    with _resolve_engine(engine).connect() as conn:
         indexes = {
             "ix_cases_user_id_updated_at": "CREATE INDEX IF NOT EXISTS ix_cases_user_id_updated_at ON cases(user_id, updated_at)",
             "ix_cases_user_id_status": "CREATE INDEX IF NOT EXISTS ix_cases_user_id_status ON cases(user_id, status)",
@@ -228,7 +233,7 @@ def restore_data(backup_path):
     insert_order = ["users", "cases", "messages", "histories", "traces", "reminders"]
 
     # 临时关闭外键检查，避免恢复时约束冲突
-    with engine.connect() as conn:
+    with _resolve_engine(engine).connect() as conn:
         conn.execute(text("PRAGMA foreign_keys=OFF"))
         conn.commit()
 
@@ -258,7 +263,7 @@ def restore_data(backup_path):
         return False
     finally:
         # 重新启用外键检查
-        with engine.connect() as conn:
+        with _resolve_engine(engine).connect() as conn:
             conn.execute(text("PRAGMA foreign_keys=ON"))
             conn.commit()
         db.close()

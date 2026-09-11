@@ -294,3 +294,42 @@ app.include_router(debate.router)
 app.include_router(tools.router)
 app.include_router(watchlist.router)
 app.include_router(history.router)
+
+# ==================== 用户视图边界（唯一清洗关卡） ====================
+# 说明：内部字段名/工具名/英文枚举一旦出现在**给用户看的** JSON 里就是缺陷。
+# 在响应出口统一清洗，避免"逐个路由打补丁"导致的反复残留（含键名）。
+# 边界规则（T07 教训）：只清洗面向用户的读接口白名单；/api/tools/* 这类调试面
+# 必须原样返回（tool_name/metrics/used_tool_names 是其调用契约），
+# 因此这里不能用"对所有 JSON 生效"的全局改写。
+from fastapi import Request  # noqa: E402
+from fastapi.responses import Response  # noqa: E402
+from backend.app.agents.user_facing import (  # noqa: E402
+    _deep_sanitize,
+    is_user_facing_path,
+    public_report,
+)
+
+
+@app.middleware("http")  # user_facing_boundary
+async def user_facing_boundary(request: Request, call_next):
+    response = await call_next(request)
+    if not is_user_facing_path(request.url.path):
+        return response  # 调试面/框架路由：原始结构放行
+    content_type = response.headers.get("content-type", "")
+    # 只处理普通 JSON 响应：SSE 流式响应与文件下载直接放行
+    if "application/json" not in content_type or response.headers.get("transfer-encoding") == "chunked":
+        return response
+    body = b""
+    async for chunk in response.body_iterator:  # type: ignore[attr-defined]
+        body += chunk
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except Exception:
+        return Response(content=body, status_code=response.status_code,
+                        headers=dict(response.headers), media_type=response.media_type)
+    data = payload.get("data") if isinstance(payload, dict) else None
+    if isinstance(data, dict) and isinstance(data.get("report"), dict):
+        data["report"] = public_report(data["report"])
+    payload = _deep_sanitize(payload)  # 只清洗文案；标识/受控取值与契约键名不动
+    return Response(content=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                    status_code=response.status_code, media_type="application/json")

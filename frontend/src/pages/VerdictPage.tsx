@@ -51,8 +51,26 @@ export default function VerdictPage() {
             {(report.rag_evidence || []).length === 0 ? <p className="muted">无引用证据。</p> : (report.rag_evidence || []).map((ev: RagEvidence, i) => (<div key={ev.id} className="cite"><div className="no">{i + 1}</div><div className="ct"><b>{ev.title}</b><span className="score">相关性 {ev.score}</span><p>{ev.content}</p></div></div>))}
             <h2>工具计算结果</h2>
             <div className="toolrow">{(report.tool_results || []).map((tr: ToolResult, i) => (<div key={i} className="toolbox"><div className="t-name"><span className="tag tool" style={{ background: 'var(--brand-soft)', color: 'var(--tool)' }}>工具</span>{tr.tool_name}</div><p className="tiny" style={{ marginTop: 8 }}>{tr.summary}</p>{tr.risk_level && <p className="tiny">风险：{tr.risk_level}</p>}</div>))}</div>
+            <h2>判决依据</h2>
+            {(report.decision_basis || []).length === 0 ? (
+              <p className="muted">该报告生成于规则升级之前，未包含判决依据。</p>
+            ) : (
+              <ul style={{ listStyle: 'none', padding: 0, margin: '8px 0 0' }}>
+                {(report.decision_basis || []).map((item, i) => (
+                  <li key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', padding: '8px 0', borderBottom: '1px dashed var(--line)' }}>
+                    <span className="tag tool" style={{ flex: '0 0 auto', background: 'var(--brand-soft)', color: 'var(--tool)' }}>{item.rule}</span>
+                    <span className="tiny" style={{ flex: 1, lineHeight: 1.7 }}>{item.detail}</span>
+                    {item.effect !== 'info' && (
+                      <span className="tiny" style={{ flex: '0 0 auto', color: 'var(--brand)' }}>→ {DECISION_META[item.effect]?.label ?? item.effect}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
             <h2>最终裁决</h2>
-            <div className="verdict-badge"><div className="vlabel">{meta?.label ?? report.final_decision}</div><div className="gauge"><svg viewBox="0 0 160 160"><circle className="track" cx="80" cy="80" r="66" /><circle className="p" cx="80" cy="80" r="66" transform="rotate(-90 80 80)" style={{ strokeDasharray: C, strokeDashoffset: gaugeOffset }} /></svg><div className="val"><b>{report.confidence}</b><span>法官置信度</span></div></div><p className="muted" style={{ maxWidth: 520 }}>{report.summary}</p></div>
+            <div className="verdict-badge"><div className="vlabel">{meta?.label ?? report.final_decision}</div><div className="gauge"><svg viewBox="0 0 160 160"><circle className="track" cx="80" cy="80" r="66" /><circle className="p" cx="80" cy="80" r="66" transform="rotate(-90 80 80)" style={{ strokeDasharray: C, strokeDashoffset: gaugeOffset }} /></svg><div className="val"><b>{report.confidence}</b><span>证据置信度</span></div></div><p className="muted" style={{ maxWidth: 520 }}>{report.summary}</p>
+              <p className="tiny" style={{ marginTop: 8 }}>结论强度 {report.decision_strength ?? '—'}（由命中的判决规则决定，与证据置信度分开）</p>
+            </div>
             <h2>后续动作</h2><ul className="actions">{(report.next_actions || []).map((a, i) => <li key={i}><span className="i">{i + 1}</span>{a}</li>)}</ul>
             <div className="sig"><p>DecisionJury · 冷静裁判庭</p><p className="tiny">生成于 {formatDateTime(report.created_at)} · 报告 {report.report_id}</p><div className="stamp"><b>冷静裁判庭</b><span>判决专用章</span></div></div>
             <div style={{ textAlign: 'center', marginTop: 20, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>

@@ -5,6 +5,7 @@ import uuid
 from backend.database import get_db
 from backend.models import Case, Message
 from backend.schemas import SendMessageRequest, ApiResponse, CaseStatus
+from backend.app.agents.user_facing import public_fields
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 from backend.schemas import SHOPPING_REQUIRED_FIELDS
@@ -33,11 +34,20 @@ def send_message(
     )
     db.add(user_msg)
 
-    # 3. 调用 input_parser
+    # 3. 调用 input_parser（带上最近几轮对话，让模型能承接上下文、不复读）
     try:
+        recent = (
+            db.query(Message)
+            .filter(Message.case_id == case_id)
+            .order_by(Message.created_at.desc())
+            .limit(6)
+            .all()
+        )
+        recent_turns = [f"{m.role}: {m.content}" for m in reversed(recent)]
         result = parse_input(
             raw_input=req.message,
             existing_collected_fields=case.collected_fields or {},
+            recent_turns=recent_turns,
         )
         result_dict = to_dict(result)
         print(f"[DEBUG] parse_input 返回: {result_dict.get('extracted_fields', {})}")
@@ -67,7 +77,7 @@ def send_message(
             data={
                 "reply": reject_reason,
                 "case_status": CaseStatus.REJECTED,
-                "collected_fields": collected,
+                "collected_fields": public_fields(collected),
                 "missing_fields": [],
                 "is_high_risk": True,
                 "reject_reason": reject_reason,
@@ -111,11 +121,19 @@ def send_message(
         case.collected_fields = safe_fields
 
     # 11. 根据状态生成回复
-    if case.status == CaseStatus.READY_FOR_DEBATE:
+    next_question = result_dict.get("next_question")
+    # C 的回复计划优先：承接句 + 一个问题 + 快捷选项，B 不再自己拼追问文案。
+    reply_plan = result_dict.get("reply_plan") or {}
+    planned_reply = reply_plan.get("reply")
+    if planned_reply:
+        reply = planned_reply
+    elif case.status == CaseStatus.READY_FOR_DEBATE:
+        # 核心信息已齐：把 C 的“可选补充”追问接上，避免只剩一句泛泛的“可以分析”。
         reply = "信息已补充完整，可以进入正反方分析。"
+        if next_question:
+            reply += f" {next_question}"
     else:
         # 优先使用 C 的 next_question
-        next_question = result_dict.get("next_question")
         if next_question:
             reply = next_question
         else:
@@ -151,10 +169,12 @@ def send_message(
         data={
             "reply": reply,
             "case_status": case.status,
-            "collected_fields": safe_fields,
+            "collected_fields": public_fields(safe_fields),
             "missing_fields": case.missing_fields,
             "is_high_risk": False,
             "reject_reason": None,
+            # 结构化回复计划：前端据此渲染快捷选项与“可以结束了”的提示。
+            "reply_plan": reply_plan,
         },
         message=""
     )
