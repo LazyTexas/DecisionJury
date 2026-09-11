@@ -11,6 +11,7 @@ def run_case_decision_flow(
     case_type: str,
     description: str,
     collected_fields: dict | None = None,
+    progress=None,
 ) -> dict:
     """
     B 后端调用的统一入口。
@@ -48,6 +49,7 @@ def run_case_decision_flow(
         user_id=user_id,
         case_id=case_id,
         existing_collected_fields=normalized_fields,
+        progress=progress,
     )
 
     # 转为 dict

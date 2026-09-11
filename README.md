@@ -22,7 +22,7 @@ DecisionJury 是一个面向日常购物决策的多 Agent 冷静决策助手，
 ### 已知问题
 
 - B 的 `/debate` 已补齐 `Reminder` 导入（PR #89），本轮辩论路由测试通过；观察清单与复盘的浏览器闭环仍需实际验收。
-- 注册登录接口已存在，但没有 JWT/统一会话鉴权。部分接口仅比较请求中的 `user_id`，不等于完善的访问控制，不应直接面向不受信任的公网用户开放。
+- 鉴权：`/auth/login` 返回 JWT `access_token`，业务接口用 `Authorization: Bearer` 携带身份；`ENFORCE_JWT=true` 为严格模式（无 token 一律 401），`false`（默认）为兼容模式（可凭请求里的 `user_id` 自称身份）。`start_all.bat` 启动的是严格模式。签名密钥取自 `SECRET_KEY`，代码内有默认弱值，正式使用请在未提交的 `.env` 或部署环境变量里覆盖。仍有路由只做 `user_id` 比较，不应直接面向不受信任的公网用户开放。
 - C 标记高风险主题，B 创建/消息/辩论路径仍有拒绝逻辑。本次仅面向低风险购物，不承诺专业医疗、法律或金融建议。
 - 信息收集仍可能遇到歧义；最低字段是 `product_name / price / monthly_budget_left`，并要求无未解决冲突，不是“七项全部填满”，也没有跨轮最大次数熔断。
 - PATCH 案件仍使用七字段完成条件，与创建/消息路径不同；迁移测试和根目录 pytest 收集还存在数据库隔离问题，详见测试记录。不要为让测试通过而改用日常数据库。
@@ -62,6 +62,8 @@ npm --prefix frontend install
 
 脚本使用根目录 `.venv`；已有虚拟环境时不会自动同步新增依赖。脚本打印“已启动”不等于健康检查成功，应检查服务窗口与实际页面。
 
+`start_all.bat` 现以严格 JWT 模式启动后端（脚本内 `set "ENFORCE_JWT=true"`，由 `start` 启动的子进程继承；不要改回 `cmd /c "… && set ENFORCE_JWT=true && …"`，那种写法会把值写成带尾随空格的 `"true "`，开关实际不生效）。因此浏览器首次访问需先注册/登录，否则业务接口返回 401；要回到兼容模式，把该行改成 `set "ENFORCE_JWT=false"` 或删掉（手工命令行启动默认就是兼容模式）。
+
 | 服务 | 默认地址 |
 |---|---|
 | 前端 | http://localhost:5173/ |
@@ -83,6 +85,7 @@ npm --prefix frontend run dev
 
 - LLM 默认地址 `https://api.deepseek.com`，模型 `deepseek-v4-flash`；`DEEPSEEK_TIMEOUT_SECONDS` 默认 30 秒。默认工厂未读取自定义模型/地址环境变量，不能仅增加 `.env` 字段就宣称切换第三方网关成功。
 - `RAG_SEARCH_URL` 可配置 C 到 RAG 的 HTTP 地址；`BACKEND_HISTORY_URL` 配置 RAG 到后端历史接口；`RAG_LIVE_RECORDS=0` 可关闭实时历史拉取。
+- 鉴权相关：`ENFORCE_JWT` 控制严格/兼容模式，`SECRET_KEY` 是 JWT 签名密钥（默认值仅可用于本地演示），`ACCESS_TOKEN_EXPIRE_MINUTES` 默认 7 天。严格模式下 C 会为该用户现签 token 并透传给 RAG，RAG 只转发不验签，凭据最终仍由 B 校验；因此 RAG 容器不需要共享密钥。
 - `ENV=development` 为默认值，结构不一致可能重建数据库。保留数据的演示/部署应使用 `ENV=production`，升级前仍必须备份，迁移逻辑不等于任意 schema 变更均安全。
 - Linux 快速演示见 [screen 部署](deploy/README.md)，容器构建、静态前端及数据卷见 [Docker 部署](deploy/DOCKER.md)。配置存在不等于已上线；本仓库不宣称任何未核验的公网地址。
 

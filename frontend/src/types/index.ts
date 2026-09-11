@@ -179,6 +179,17 @@ export interface DecisionReport {
   next_actions: string[];
   created_at: string;
   debate_events?: DebateEvent[];
+  /** 判决依据：命中的规则、说明与影响（新字段，旧报告可能没有） */
+  decision_basis?: DecisionBasisItem[];
+  /** 结论强度：确定性高的规则接近 1，兜底规则接近 0.5 */
+  decision_strength?: number | null;
+}
+
+/** 判决依据单项 */
+export interface DecisionBasisItem {
+  rule: string;
+  detail: string;
+  effect: string;
 }
 
 /** Agent 执行轨迹项 */
@@ -263,6 +274,29 @@ export interface SendMessageResponse {
   case_status: string;
   collected_fields: Record<string, unknown>;
   missing_fields: string[];
+  /** 结构化回复计划：承接句、一个问题、快捷选项、是否可结束 */
+  reply_plan?: ReplyPlan;
+}
+
+/** 收集阶段的回复计划（C 的 reply_composer 产出） */
+export interface ReplyPlan {
+  ack?: string;
+  insight?: string;
+  answer_to_user?: string;
+  question?: string | null;
+  chips?: string[];
+  can_stop?: boolean;
+  optional?: boolean;
+  tone?: string;
+  intent?: string;
+  /** 用户明确要求“直接分析”时为 true，前端可自动进入辩论 */
+  stop_requested?: boolean;
+  /** 本轮模型不可用、走了本地规则 */
+  degraded?: boolean;
+  degraded_reason?: string;
+  parser_used?: string;
+  reply?: string;
+  progress?: { known?: string[]; missing?: string[] };
 }
 
 /** 启动辩论请求 */

@@ -1,20 +1,21 @@
 # backend/routers/chat.py
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.orm import attributes
 import uuid
 from typing import Optional
 from backend.database import get_db
 from backend.models import Case, Message, User
 from backend.schemas import SendMessageRequest, ApiResponse, CaseStatus
+from backend.app.agents.user_facing import public_fields
 from backend.app.agents.input_parser import parse_input
 from backend.app.schemas.decision import to_dict
 from backend.schemas import SHOPPING_REQUIRED_FIELDS
+from sqlalchemy.orm import attributes
+# JWT 身份（保留 dev 的认证接线）：Token 优先，其次回退请求体/查询参数里的 user_id
 from backend.security import get_current_user_optional
 
 router = APIRouter(prefix="/api", tags=["chat"])
 
-# ========== 发送消息 ==========
 @router.post("/cases/{case_id}/messages", response_model=ApiResponse)
 def send_message(
     case_id: str,
@@ -22,21 +23,17 @@ def send_message(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    # ===== 获取有效用户 ID（Token 优先）=====
     effective_user_id = current_user.id if current_user else req.user_id
     if not effective_user_id:
         return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
-
     # 1. 查询案件
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:
         return ApiResponse(success=False, data=None, message="CASE_NOT_FOUND")
-
-    # 2. 权限校验
     if case.user_id != effective_user_id:
         return ApiResponse(success=False, data=None, message="FORBIDDEN")
 
-    # 3. 保存用户消息
+    # 2. 保存用户消息
     user_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -46,11 +43,20 @@ def send_message(
     )
     db.add(user_msg)
 
-    # 4. 调用 input_parser
+    # 3. 调用 input_parser（带上最近几轮对话，让模型能承接上下文、不复读）
     try:
+        recent = (
+            db.query(Message)
+            .filter(Message.case_id == case_id)
+            .order_by(Message.created_at.desc())
+            .limit(6)
+            .all()
+        )
+        recent_turns = [f"{m.role}: {m.content}" for m in reversed(recent)]
         result = parse_input(
             raw_input=req.message,
             existing_collected_fields=case.collected_fields or {},
+            recent_turns=recent_turns,
         )
         result_dict = to_dict(result)
         print(f"[DEBUG] parse_input 返回: {result_dict.get('extracted_fields', {})}")
@@ -62,10 +68,12 @@ def send_message(
             message="PARSE_ERROR"
         )
 
-    # 5. 检查高风险
+    # 4. 检查高风险
     if result_dict.get("is_high_risk"):
         reject_reason = result_dict.get("reject_reason", "该决策超出系统支持范围。")
+        # 更新案件状态为 REJECTED
         case.status = CaseStatus.REJECTED
+        # 保存拒绝原因到 collected_fields
         collected = case.collected_fields or {}
         collected["is_high_risk"] = True
         collected["reject_reason"] = reject_reason
@@ -78,23 +86,24 @@ def send_message(
             data={
                 "reply": reject_reason,
                 "case_status": CaseStatus.REJECTED,
-                "collected_fields": collected,
+                "collected_fields": public_fields(collected),
                 "missing_fields": [],
                 "is_high_risk": True,
                 "reject_reason": reject_reason,
             },
             message=""
         )
+    
 
-    # 6. 使用 C 模块的 merged_fields
+    # 5. 使用 C 模块的 merged_fields
     safe_fields = result_dict.get("merged_fields", {})
     case.collected_fields = safe_fields
 
-    # 7. 获取缺失字段
+    # 6. 获取缺失字段（只赋值一次）
     missing_fields = result_dict.get("missing_fields", [])
     case.missing_fields = missing_fields
 
-    # 8. 接入 is_complete 判断状态
+    # 7. 接入 is_complete 判断状态
     is_complete = result_dict.get("is_complete", False)
 
     if is_complete or not missing_fields:
@@ -102,67 +111,48 @@ def send_message(
     else:
         case.status = CaseStatus.COLLECTING
 
-    # 9. 接入 conflicts
+    # 8. 接入 conflicts
     conflicts = result_dict.get("conflicts", [])
     if conflicts:
         safe_fields["_conflicts"] = conflicts
         case.collected_fields = safe_fields
 
-    # 10. 接入 next_question_key + next_question 文本
+    # 9. 接入 next_question_key
     next_question_key = result_dict.get("next_question_key")
-    next_question_text = result_dict.get("next_question")
-
     if next_question_key:
         safe_fields["_current_question_key"] = next_question_key
         case.collected_fields = safe_fields
 
-    if next_question_text:
-        safe_fields["_next_question"] = next_question_text
-        case.collected_fields = safe_fields
-
-    # 11. 接入 parser_used
+    # 10. 接入 parser_used
     parser_used = result_dict.get("parser_used", "")
     if parser_used:
         safe_fields["_parser_used"] = parser_used
         case.collected_fields = safe_fields
 
-    # 12. 根据状态生成回复
-    if case.status == CaseStatus.READY_FOR_DEBATE and not missing_fields:
-        # 场景 A：7 字段全齐，完全就绪
+    # 11. 根据状态生成回复
+    next_question = result_dict.get("next_question")
+    # C 的回复计划优先：承接句 + 一个问题 + 快捷选项，B 不再自己拼追问文案。
+    reply_plan = result_dict.get("reply_plan") or {}
+    planned_reply = reply_plan.get("reply")
+    if planned_reply:
+        reply = planned_reply
+    elif case.status == CaseStatus.READY_FOR_DEBATE:
+        # 核心信息已齐：把 C 的“可选补充”追问接上，避免只剩一句泛泛的“可以分析”。
         reply = "信息已补充完整，可以进入正反方分析。"
-
-    elif case.status == CaseStatus.READY_FOR_DEBATE and missing_fields:
-        # 场景 B：最低门槛就绪，但还有字段可补充（新增分支）
-        next_question = result_dict.get("next_question")
         if next_question:
-            reply = next_question
-        else:
-            # C 没有返回 next_question 时，根据 missing_fields 生成可读追问
-            field_names = {
-                "price": "商品价格",
-                "purpose": "购买目的",
-                "monthly_budget_left": "本月剩余预算",
-                "owned_alternatives": "已有哪些替代品",
-                "expected_usage_frequency": "预计使用频率",
-                "trigger_reason": "想买的触发原因",
-            }
-            readable = [field_names.get(f, f) for f in missing_fields[:3]]
-            reply = f"核心信息已完整，可以进入分析；建议补充：{'、'.join(readable)}。"
-
+            reply += f" {next_question}"
     else:
-        # 场景 C：仍在收集（原逻辑不变）
-        next_question = result_dict.get("next_question")
+        # 优先使用 C 的 next_question
         if next_question:
             reply = next_question
-        elif conflicts:
-            reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
         else:
+            # 如果有冲突，生成冲突确认追问
             if conflicts:
                 reply = "检测到金额信息存在歧义，请确认：这笔金额是商品价格，还是本月剩余预算？"
             else:
                 reply = "信息仍在收集中，请继续补充相关细节。"
 
-    # 13. 保存助手消息
+    # 12. 保存助手消息
     assistant_msg = Message(
         id=f"msg_{uuid.uuid4().hex[:8]}",
         case_id=case_id,
@@ -172,14 +162,14 @@ def send_message(
     )
     db.add(assistant_msg)
 
-    # 14. 强制标记字段已修改
+    # 13. 强制标记字段已修改（解决 SQLAlchemy JSON 字段追踪问题）
     try:
         attributes.flag_modified(case, 'collected_fields')
         attributes.flag_modified(case, 'missing_fields')
     except Exception as e:
         print(f"[WARN] flag_modified 失败: {e}")
 
-    # 15. 提交事务
+    # 14. 提交事务
     db.commit()
     print(f"[DEBUG] COMMIT 成功，case_id={case_id}")
 
@@ -188,16 +178,16 @@ def send_message(
         data={
             "reply": reply,
             "case_status": case.status,
-            "collected_fields": safe_fields,
+            "collected_fields": public_fields(safe_fields),
             "missing_fields": case.missing_fields,
             "is_high_risk": False,
             "reject_reason": None,
+            # 结构化回复计划：前端据此渲染快捷选项与“可以结束了”的提示。
+            "reply_plan": reply_plan,
         },
         message=""
     )
 
-
-# ========== 获取消息列表 ==========
 @router.get("/cases/{case_id}/messages", response_model=ApiResponse)
 def get_messages(
     case_id: str,
@@ -207,11 +197,9 @@ def get_messages(
     current_user: Optional[User] = Depends(get_current_user_optional),
     db: Session = Depends(get_db)
 ):
-    # ===== 获取有效用户 ID（Token 优先）=====
     effective_user_id = current_user.id if current_user else user_id
     if not effective_user_id:
         return ApiResponse(success=False, data=None, message="MISSING_USER_ID")
-
     # 1. 查询案件是否存在
     case = db.query(Case).filter(Case.id == case_id).first()
     if not case:

@@ -6,6 +6,7 @@ echo   DecisionJury one-click launcher
 echo   Frontend: http://127.0.0.1:5173
 echo   Backend:  http://127.0.0.1:8000
 echo   RAG:      http://127.0.0.1:8001
+echo   Auth:     strict JWT (ENFORCE_JWT=true)
 echo   API docs: http://127.0.0.1:8000/docs
 echo ============================================
 echo.
@@ -39,8 +40,14 @@ if not exist "%PYTHON_EXE%" (
 
 rem ========== 1. Start Backend (B + C modules) ==========
 rem Use cmd /c (not /k) so the window closes automatically once the process is stopped.
-echo [1/3] Starting backend...
-start "DecisionJury Backend" cmd /c "cd /d %~dp0 && set ENFORCE_JWT=true && .venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
+rem 严格 JWT：在父脚本设置，由 start 启动的子进程继承（start 默认不重置环境）。
+rem 不要写成 cmd /c "… && set ENFORCE_JWT=true && …"，这里有两个坑：
+rem   1) 外层已有引号，内层 set "X=Y" 的引号会与外层冲突；
+rem   2) 不写引号的 set X=true && 会把值写成 "true "（尾随空格），
+rem      Config.ENFORCE_JWT 的 == "true" 判定会得到 False，严格模式实际未生效。
+echo [1/3] Starting backend (strict JWT)...
+set "ENFORCE_JWT=true"
+start "DecisionJury Backend" cmd /c "cd /d %~dp0 && .venv\Scripts\python.exe -m uvicorn backend.main:app --host 127.0.0.1 --port 8000"
 
 timeout /t 3 /nobreak >nul
 
@@ -76,6 +83,7 @@ echo   RAG:      http://127.0.0.1:8001
 echo   API:      http://127.0.0.1:8000/docs
 echo ============================================
 echo.
+echo [HINT] 严格 JWT 已开启：浏览器首次使用请先注册/登录，否则业务接口会返回 401。
 echo [HINT] Run stop_all.bat to stop all services and close the windows.
 echo.
 pause

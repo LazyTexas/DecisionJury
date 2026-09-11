@@ -1,9 +1,14 @@
 # tests/test_history_router.py
 """
 测试 history 路由（GET /api/history, POST /api/history）
+
+含严格 JWT（ENFORCE_JWT=true）用例：history 是 RAG 实时联动要读的接口，
+必须验证"无 token 一律 401、带合法 token 才放行、身份以 token 为准"。
 """
 
+from backend.config import Config
 from backend.models import History
+from backend.security import create_access_token
 
 
 def test_post_history_success(client, db_session):
@@ -262,3 +267,46 @@ def test_get_history_sorted_by_created_at(client, db_session):
     assert data["success"] is True
     # 最新记录应该在第一个
     assert data["data"]["items"][0]["history_id"] == "hist_new"
+
+def test_get_history_strict_mode_requires_token(client, monkeypatch):
+    """严格模式下没有 token 就 401，不能用 ?user_id= 自称身份。"""
+    monkeypatch.setattr(Config, "ENFORCE_JWT", True)
+
+    response = client.get("/api/history?user_id=u001")
+
+    assert response.status_code == 401
+    body = response.json()
+    assert body["success"] is False
+    assert body["message"]["code"] == "UNAUTHORIZED"
+
+
+def test_get_history_strict_mode_accepts_valid_token(client, monkeypatch):
+    """带合法 token 时严格模式放行，且不依赖 query 里的 user_id。"""
+    monkeypatch.setattr(Config, "ENFORCE_JWT", True)
+
+    token = create_access_token(data={"sub": "u001"})
+    response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 200
+    assert response.json()["success"] is True
+
+
+def test_get_history_strict_mode_rejects_unknown_user_token(client, monkeypatch):
+    """签名合法但用户不存在 → 401 USER_NOT_FOUND（不是 200 空列表）。"""
+    monkeypatch.setattr(Config, "ENFORCE_JWT", True)
+
+    token = create_access_token(data={"sub": "no_such_user"})
+    response = client.get("/api/history", headers={"Authorization": f"Bearer {token}"})
+
+    assert response.status_code == 401
+    assert response.json()["message"]["code"] == "USER_NOT_FOUND"
+
+
+def test_get_history_strict_mode_rejects_invalid_token(client, monkeypatch):
+    """乱码 token 在严格模式下必须 401 INVALID_TOKEN。"""
+    monkeypatch.setattr(Config, "ENFORCE_JWT", True)
+
+    response = client.get("/api/history", headers={"Authorization": "Bearer not-a-jwt"})
+
+    assert response.status_code == 401
+    assert response.json()["message"]["code"] == "INVALID_TOKEN"

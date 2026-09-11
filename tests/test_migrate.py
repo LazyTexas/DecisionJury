@@ -16,7 +16,7 @@ def test_get_existing_columns(db_engine):
     from backend.database import Base
     Base.metadata.create_all(bind=db_engine)
 
-    columns = get_existing_columns("cases")
+    columns = get_existing_columns("cases", db_engine)
     assert "id" in columns
     assert "title" in columns
     assert "status" in columns
@@ -28,8 +28,8 @@ def test_migrate_cases(db_engine):
     from backend.database import Base
     Base.metadata.create_all(bind=db_engine)
 
-    migrate_cases()
-    columns = get_existing_columns("cases")
+    migrate_cases(db_engine)
+    columns = get_existing_columns("cases", db_engine)
     assert "debate_result" in columns
 
 
@@ -38,8 +38,8 @@ def test_migrate_histories(db_engine):
     from backend.database import Base
     Base.metadata.create_all(bind=db_engine)
 
-    migrate_histories()
-    columns = get_existing_columns("histories")
+    migrate_histories(db_engine)
+    columns = get_existing_columns("histories", db_engine)
     required_fields = ["title", "price", "context", "pros", "cons", "report_id"]
     for field in required_fields:
         assert field in columns
@@ -50,8 +50,8 @@ def test_migrate_traces(db_engine):
     from backend.database import Base
     Base.metadata.create_all(bind=db_engine)
 
-    migrate_traces()
-    columns = get_existing_columns("traces")
+    migrate_traces(db_engine)
+    columns = get_existing_columns("traces", db_engine)
     required_fields = ["input_summary", "output_summary", "duration_ms", "error"]
     for field in required_fields:
         assert field in columns
@@ -62,8 +62,8 @@ def test_migrate_reminders(db_engine):
     from backend.database import Base
     Base.metadata.create_all(bind=db_engine)
 
-    migrate_reminders()
-    columns = get_existing_columns("reminders")
+    migrate_reminders(db_engine)
+    columns = get_existing_columns("reminders", db_engine)
     assert "reason" in columns
 
 
@@ -73,4 +73,4 @@ def test_migrate_indexes(db_engine):
     Base.metadata.create_all(bind=db_engine)
 
     # 应该不抛出异常
-    migrate_indexes()
+    migrate_indexes(db_engine)

@@ -6,6 +6,7 @@ from typing import Any
 from urllib.request import Request, urlopen
 
 from backend.app.schemas.decision import RagEvidence
+from backend.security import create_access_token
 
 
 DEFAULT_RAG_SEARCH_URL = "http://127.0.0.1:8001/api/rag/search"
@@ -66,10 +67,19 @@ def _search_rag_evidence_or_raise(
         "query": query,
         "top_k": top_k,
     }
+    # 严格 JWT（ENFORCE_JWT=true）下 RAG 服务需要凭据才能读 GET /api/history，
+    # 否则实时历史联动会被后端 401 拦掉。这里为该用户现签一个 token 透传给 RAG：
+    # RAG 不解析、不验签，只把它原样放进对后端历史接口的请求头；真正的鉴权仍然
+    # 只发生在后端（backend/security.py::get_current_user_optional）。
+    # token 的 sub 与 body 里的 user_id 一致，因此兼容模式下行为不变。
+    headers = {
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {create_access_token(data={'sub': user_id})}",
+    }
     request = Request(
         url=url,
         data=json.dumps(request_body, ensure_ascii=False).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
 

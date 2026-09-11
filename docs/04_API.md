@@ -8,7 +8,8 @@ B 维护 HTTP/存储，C 维护 Agent 和 adapter，D 维护检索，E 维护工
 
 - B 已在 PR #89 补齐 `/debate` 提醒保存所需的 `Reminder` 导入，路由回归通过；页面闭环与重复保存等仍需验收。
 - `PATCH /cases/{case_id}` 仍按七项字段计算状态，与创建/消息使用的 C 最低三项条件不一致。以下分别说明，不声称本轮已统一代码。
-- 注册登录存在，但无 JWT/统一会话鉴权。部分接口比较 `user_id`，另一些没有所属用户校验，不构成生产级权限保护。
+- 鉴权现状：`POST /auth/login` 返回 JWT `access_token`（HS256，用 `SECRET_KEY` 签发），业务接口以 `Authorization: Bearer <token>` 携带身份。是否强制由 `ENFORCE_JWT` 控制：`false`（默认）= 兼容模式，无 Token 时降级用请求里的 `user_id`；`true` = 严格模式，无 Token / Token 无效一律 401。Windows 一键脚本 `start_all.bat` 启动的是严格模式。
+- 即使开启严格模式，仍有路由只做 `user_id` 比较（见§8.2），不构成完整权限体系，也不宣称生产级公网鉴权。
 - 不因接口/工具返回 HTTP 200 就认定业务、模型或数据库保存成功。
 
 ## 2. 通用约定
@@ -41,7 +42,7 @@ GET查询，POST创建或触发，PATCH局部修改，DELETE删除/软删除。�
 
 ### 2.6 身份前提
 
-创建案件、历史和提醒前，`user_id` 必须存在于users表，否则可触发外键错误。登录返回用户信息而非token；客户端不能凭此宣称服务端已验证后续请求身份。
+创建案件、历史和提醒前，`user_id` 必须存在于users表，否则可触发外键错误（实测为 HTTP 400 `INTEGRITY_ERROR`）。登录返回用户信息并附带 `access_token`；身份解析顺序是"Token 优先，其次请求参数 `user_id`"。`ENFORCE_JWT=false`（默认）时无 Token 的请求仍以参数 `user_id` 为准，等于调用方自称身份，不能宣称服务端验证过身份；只有 `ENFORCE_JWT=true` 才拒绝无 Token 请求。
 
 ## 3. 枚举
 
@@ -71,7 +72,67 @@ collecting / ready_for_debate → rejected（B风险判断）
 
 `POST /debate` 先比较user_id，再检查状态；非ready状态可能统一返回MISSING_FIELDS，不可据错误码假设每次都缺购物字段。成功后保存结果；失败回滚、重复请求和状态恢复需按实际路由验证。
 
+`POST /api/cases/{case_id}/debate/stream`（新增，`text/event-stream`）：与 `/debate` 同一套执行与落库逻辑，但逐阶段推送进度，用于消除"约 30 秒整段等待"。请求体同样是 `{"user_id": "..."}`。事件格式（每行 `data: {json}`，空行分隔）：
+
+```text
+data: {"stage":"parse","status":"running"}
+data: {"stage":"parse","status":"done","summary":"已确认可以进入分析"}
+data: {"stage":"rag","status":"running","summary":"检索历史复盘证据"}
+data: {"stage":"tools","status":"done","summary":"该商品占剩余预算约 25%，风险等级为 medium。"}
+data: {"stage":"pro_agent","status":"done","summary":"…","arguments":["…","…"]}
+data: {"stage":"con_agent","status":"done","summary":"…","arguments":["…","…"]}
+data: {"stage":"judge_agent","done":…,"final_decision":"delay","confidence":0.85}
+data: {"stage":"__done__","response":{…与 /debate 相同结构…}}
+```
+
+- 阶段顺序：`parse → rag → tools → pro_agent → con_agent → judge_agent`，每个阶段先 `running` 后 `done`；
+- 结束事件只有两种：`__done__`（含完整响应）或 `__error__`（含 message），前端据此结束读取；
+- 工作线程使用独立数据库会话，主请求线程只负责推送事件；`cooling_reminder` 等落库仍在核心流程内完成；
+- 断线不会重连，需重新发起；进度事件不落库（trace 在流程结束时一次性写入）。
+
 `PATCH /cases/{case_id}` 的本地七字段判断尚未采用上述最低规则，详见§8.3。
+
+### 4.1 字段合并优先级（判决阶段重放历史文本）
+
+同一案件有两条解析入口，优先级**不同**，这是刻意设计：
+
+| 入口 | 输入 | 合并语义 |
+|---|---|---|
+| `POST /cases`、`POST /cases/{id}/messages`（对话轮） | 用户**最新**发言 | 本轮新提取/明确纠正的值覆盖历史值（用户就是在改口） |
+| `POST /debate`（判决） | 案件**首条描述**（历史文本）+ 已收集字段 | **已收集字段优先**：本轮解析只补齐缺口，不用旧文本覆盖累计状态 |
+
+判决阶段之所以反过来，是因为它重放的是"当初第一句话"：若让旧文本优先，
+"想买4袋"会在用户后来纠正"不是4袋，是2袋"之后被重新写回，判决按 4 袋
+（100元/11%）而不是 2 袋（50元/5.6%）计算金额占比与依据。
+实现见 `backend/app/agents/input_parser.py::parse_input(existing_is_authoritative=...)`
+（判决路径由 `backend/app/orchestrator/decision_flow.py` 传 `True`），
+回归用例见 `tests/test_parser_and_followup.py::test_debate_replay_keeps_corrected_quantity`。
+
+### 4.2 受控值 `unknown` 的语义（2026-09-11 修正）
+
+`frequency_canonical` / `trigger_canonical` 取 `unknown` 时**不是模型的主张，而是"模型不知道"**：
+此时以用户原话的文本归一值为准（`一周三次` → `weekly_3plus`），**不记为冲突、不降级为"未说明"**。
+只有模型给出**具体**受控值与文本归一结果矛盾时（如受控值 `daily`、原话"只是偶尔"）才判冲突并降级，
+交由澄清追问处理。
+
+> 真实事故：用户原话"一周三次"被模型的 `frequency_canonical="unknown"` 判成冲突→降级"未说明"→
+> `_is_necessity` 判为非刚需→`H1` 直接 reject；修复后同一份输入按刚需高频走 `E6`。
+> 实现：`field_normalizer.resolve_frequency/resolve_trigger` 与 `domain/semantic.build_facts`
+> 三处必须一致（回归用例 `tests/test_semantic_facts.py` 与 `tests/test_judge_rules.py::test_user_case_weekly_three_times_is_not_downgraded`）。
+
+### 4.3 流式辩论的结束事件结构（前端解包契约）
+
+`POST /cases/{id}/debate/stream` 的 `__done__` 事件里 `response` 是**后端统一信封**：
+
+```json
+{"stage": "__done__", "response": {"success": true, "data": {"steps": [], "report": {}, "...": "..."}, "message": "debate completed"}}
+```
+
+调用方必须按与非流式接口相同的规则解包（取 `response.data`），并在 `response.success === false` 时
+按 `response.message` 报错。**真实事故**：前端直接拿 `response` 当业务数据用，`report` 恒为 `undefined`
+→ 页面一直提示"辩论未生成判决书"，而报告其实已经落库；此后每次重试又因案件已 `completed`
+拿到 `MISSING_FIELDS`（信封同样被吞掉），用户看到的现象就是"判决书一直出不来"。
+实现见 `frontend/src/api/index.ts::unwrapDebateEnvelope`。
 
 ## 5. 公共数据结构
 
@@ -108,8 +169,18 @@ collecting / ready_for_debate → rejected（B风险判断）
 | confidence | number | 0～1启发式值，不是校准概率 |
 | arguments | string[] | 论点或判决说明 |
 | used_rag_ids | string[] | 关联证据ID |
-| used_tool_names | string[] | 关联工具名 |
+| used_tool_names | string[] | 关联工具名（机器标识，如 `cost_analyzer`；**永不被改写**） |
 | error | string/null | 错误 |
+| used_tool_labels | string[] | 对应的中文展示名（如 `成本分析`），与 `used_tool_names` 同序等长 |
+
+> 契约边界：`agent`、`used_tool_names`、`used_rag_ids` 是机器标识，前端据此做映射
+> （`frontend/src/constants.ts`），任何情况下都不翻译；中文名只以 `*_labels` 形式**并行新增**。
+>
+> **降级如何被观测**（不允许静默降级）：
+> - `input_parser`：降级写 `collected_fields._parser_used = local_fallback`，并在 `steps[].error` 写 `deepseek_parser_failed:<异常名>`；
+> - `pro_agent` / `con_agent`：真实 API 连续两次失败时 `status="failed"`、`error="llm_degraded:<原因>"`、`arguments=[]`，
+>   不再用 mock 模板句冒充模型论点；模型返回了内容但全被提示词回显过滤时写 `error="argument_fallback:model_gave_no_argument"`；
+> - `judge_agent`：模型不可用时回退到本地规则说明（`summary` 由规则生成），并在 `error` 标记。
 
 ### 5.4 RagEvidence
 
@@ -123,20 +194,37 @@ collecting / ready_for_debate → rejected（B风险判断）
   "status": "success",
   "summary": "该商品占剩余预算约 65%，风险等级为 high。",
   "risk_level": "high",
-  "metrics": {"budget_ratio": 0.65, "budget_left_after_purchase": 701, "budget_source": "monthly_budget"},
-  "error": null
+  "metrics": {"budget_ratio": 0.65, "budget_left_after_purchase": 701},
+  "error": null,
+  "tool_label": "成本分析"
 }
 ```
 
-所有字段均为稳定结构；status为success/failed，risk_level及error可为null，metrics为对象。成功工具数据不等于数据库写入成功。cost_analyzer 的 metrics 另含 `budget_source`（`monthly_budget` / `savings`），用于说明该占比是拿哪一笔钱算出来的。
+所有字段均为稳定结构；status为success/failed，risk_level及error可为null，metrics为对象。成功工具数据不等于数据库写入成功。
+`tool_name` 与 `metrics` 是**机器契约字段**，用户视图清洗不会删改；`tool_label` 是并行新增的中文展示名。
+
+### 5.5.1 用户视图边界（响应清洗规则）
+
+响应出口有一道清洗关卡（`backend/app/agents/user_facing.py` + `backend/main.py` 的 `user_facing_boundary`），
+职责是"让给用户看的话像人话"，边界如下：
+
+| 规则 | 说明 |
+|---|---|
+| 作用范围 | 仅面向用户的读接口：`/api/cases*`、`/api/history*`、`/api/watchlist*`（白名单，见 `USER_FACING_PREFIXES`） |
+| 不作用 | 调试面与框架路由：`/api/tools/*`、`/auth/*`、`/api/health`、`/docs` 等原样返回（`RAW_SURFACE_PREFIXES`） |
+| 会被改写 | 文案字段（`summary`/`arguments`/`case_summary`/`pro_points`/`con_points`/`next_actions`/`content` 等）里的内部字段名与工具名换成自然说法；`input_snapshot` 的键名中文化 |
+| 不会被改写 | 整体是标识符或受控取值的字符串（`daily`/`pro_agent`/`decision_score`/`monthly_budget_left`/`buy`…）一律原样保留 |
+| 不会被删除 | `tool_name`、`metrics`、`used_tool_names`、`missing_fields` 等契约字段；新增的中文名只以 `tool_label`/`used_tool_labels` 并行提供 |
+
+该规则由 `tests/test_user_facing_boundary.py` 固化，其中"每条路由必须显式归类"的用例会在新增接口漏归类时失败。
 
 ### 5.6 DecisionReport
 
 | 字段 | 类型 | 说明 |
 |---|---|---|
 | report_id / case_id / case_type | string | 报告与案件标识，当前shopping |
-| final_decision | string | 本地规则唯一决定 |
-| confidence | number | 本地置信度，不采用法官LLM返回值覆盖 |
+| final_decision | string | 本地规则唯一决定（规则表见 [SPEC §5.1](02_SPEC.md)） |
+| confidence | number | 证据置信度（本地启发式：命中证据与成本工具的可用度），不是模型输出，也不是结论正确率 |
 | summary / case_summary | string | 判决说明与案件摘要 |
 | pro_points / con_points | string[] | 双方论点 |
 | rag_evidence | RagEvidence[] | 证据 |
@@ -144,6 +232,8 @@ collecting / ready_for_debate → rejected（B风险判断）
 | next_actions | string[] | 本地后续动作 |
 | created_at | string | 生成时间 |
 | debate_events | DebateEvent[] | 默认空列表；当前完整庭审4条 |
+| decision_basis | {rule, detail, effect}[] | 判决依据：命中规则（H1/H2/R1~R6）、中文说明与影响；规则升级前生成的旧报告可能缺省 |
+| decision_strength | number 或 null | 结论强度：硬约束/高频放行更高，兜底规则最低；与 confidence 分开 |
 
 ### 5.7 TraceItem
 
@@ -193,7 +283,6 @@ B另行生成数据库trace ID，并在GET trace中增加created_at。不要用C
 - 最低必需项仅为 `product_name / price / monthly_budget_left`。`is_complete` 与 `case_status` 由 C 计算，不直接采用模型返回的同名值。
 - 当前实现保留本轮未提及的历史字段，同名非空本轮字段覆盖历史值，`correction_fields` 最后覆盖。不要将其误写成“普通提取永远不会覆盖历史值”。
 - 价格与预算按各自语义提取；邻近分句中的预算关键词不应使明确价格消失。
-- 金额来源标记 `budget_source` 取 `monthly_budget` 或 `savings`，不是七项字段之一，不计入 `missing_fields`，也不参与最低字段放行。它只在本次真的写入或覆盖 `monthly_budget_left` 时同步更新：本轮没有金额表达就保留历史标签，避免出现“数字是存款、标签是月预算”的错配。该键随 `merged_fields` 持久化并传给 cost_analyzer；缺失时按 `monthly_budget` 处理。
 - 当三个最低字段齐全而用途等信息缺失时，`case_status=ready_for_debate` 与非空 `missing_fields` 可以同时成立。当前本地分支仍可能返回选填项追问候选，调用方不应因此重新阻塞分析。
 - `termination_reason` 是本轮收集条件的说明，不表示已实现最大轮数或无进展熔断。
 
@@ -301,7 +390,32 @@ data与详情一致，message为case updated。当前实现仍检查七个购物
 {"user_id": "demo_user", "message": "本月预算还剩3000元，已有普通耳机。"}
 ```
 
-data包含reply、case_status、collected_fields、missing_fields、is_high_risk、reject_reason。检查price仍为1299、budget为3000；reply可能是模型或本地文本，不能逐字断言。保存C的merged_fields，不要求extracted_fields包含全部旧字段。
+data包含reply、case_status、collected_fields、missing_fields、is_high_risk、reject_reason、**reply_plan**。检查price仍为1299、budget为3000；reply可能是模型或本地文本，不能逐字断言。保存C的merged_fields，不要求extracted_fields包含全部旧字段。
+
+`reply_plan`（收集阶段的对话计划，规则见 [SPEC §5.1.2](02_SPEC.md)）：
+
+```json
+{
+  "ack": "记下了：价格 30 元、预算还剩 5000 元。",
+  "question": "想更准的话，再补一句：主要拿来做什么用？",
+  "chips": ["工作/学习用", "家用", "娱乐", "说不清"],
+  "can_stop": true,
+  "optional": true,
+  "tone": "ready",
+  "reply": "记下了：价格 30 元、预算还剩 5000 元。 想更准的话，再补一句：主要拿来做什么用？",
+  "progress": {"known": ["商品", "价格", "剩余预算"], "missing": ["用途", "已有替代品"]}
+}
+```
+
+- `reply` 是可直接展示的成品文案；`question` 一次只有一个；`optional=true` 表示核心信息已齐、该问题可选；
+- `ack`（承接）由本地生成，`insight/answer_to_user/question` 可由模型撰写，本地护栏负责截断多余问句、去复读、过滤系统口吻；
+- `intent`：`provide_info | correct | ask_back | chitchat | skip | stop`；`answer_to_user` 仅在 `ask_back` 时非空；
+- `stop_requested=true` 表示用户明确要求直接分析（模型判定 stop + 命中停止词 + 核心信息已齐），前端可自动进入辩论；
+- `degraded/degraded_reason/parser_used` 标记本轮是否走了本地规则，前端据此提示用户；
+- `chips` 是快捷选项，前端点击即以该文本发送；`can_stop=true` 时前端提示"可以直接出判决书"；
+- 用户回复"不知道/跳过/随便"时，增强字段记为 `未说明` 并从 `missing_fields` 移除（不再重复追问）；核心字段不允许跳过，会换成"给个范围也行"的追问；
+- 可选追问最多 2 轮（`_optional_asked` 计数），之后只给结束邀请，不再追问；
+- 旧版 B 的兜底文案（"核心信息已完整…建议补充：…"）仅在没有 `reply_plan` 时使用。
 
 ### 8.5 用户注册
 
@@ -309,7 +423,7 @@ data包含reply、case_status、collected_fields、missing_fields、is_high_risk
 
 ### 8.6 用户登录
 
-`POST /auth/login`：user_id/password必填；成功data为user_id/name，message“登录成功”。失败为“用户不存在”或“密码错误”。没有返回Bearer token/JWT，也没有统一cookie会话。
+`POST /auth/login`：user_id/password必填；成功data为 `user_id`/`name`/`access_token`/`token_type="bearer"`，message“登录成功”。失败为“用户不存在”或“密码错误”。Token为HS256 JWT，`sub`为user_id，有效期由 `ACCESS_TOKEN_EXPIRE_MINUTES` 控制（默认7天），不返回cookie会话。密码按bcrypt校验：库里若残留早期 sha256_crypt 旧哈希，校验会抛 `UnknownHashError` 并被全局异常处理器变成HTTP 500，此时登录失败不等于“密码错误”。
 
 ### 8.7 分页消息
 
@@ -393,6 +507,8 @@ D服务的 `POST /api/rag/search`：
 
 user_id/case_id/case_type/query必填，top_k默认3。成功data为results数组，每项为§5.4；无命中results=[]。BM25不负责最终建议。C通过RAG_SEARCH_URL访问；RAG通过BACKEND_HISTORY_URL尝试加载当前用户历史。
 
+严格模式（`ENFORCE_JWT=true`）下 D 读后端 `GET /api/history` 需要凭据：C 调用本接口时透传 `Authorization: Bearer <该用户token>`（由 `backend/app/services/rag_adapter.py` 现签），D 不解析也不验签，只把它转发给 B，鉴权仍在 B 完成。未带该头时 D 退回静态种子数据——检索仍可用，但没有实时历史联动（日志打印"回退使用静态 JSON 数据"）。
+
 time检索仍是组件兼容能力，不作为本轮完整时间案件服务。不要将种子、实时用户历史和外部知识库来源混称为真实用户证据。
 
 ## 11. MCP工具接口
@@ -406,10 +522,10 @@ HTTP工具异常可能返回success=true且data.status=failed；调用方必须�
 `POST /api/tools/cost-analyzer`：
 
 ```json
-{"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000, "budget_source": "monthly_budget"}
+{"case_type": "shopping", "price": 1299, "monthly_budget_left": 2000}
 ```
 
-case_type必填；case_id可选；budget_source可选，取 `monthly_budget`（默认）或 `savings`，其他取值失败而不是静默按默认口径计算。购物必需price/monthly_budget_left且非负；预算0是合法边界，实现以占比1.0处理。结果data为§5.5，1299/2000约0.65、high、余额701。阈值按未舍入占比计算：`monthly_budget` 为≤0.2 low、≤0.6 medium、其余high；`savings` 为≤0.5 low、≤1.0 medium、其余high。
+case_type必填；case_id可选。购物必需price/monthly_budget_left且非负；预算0是合法边界，实现以占比1.0处理。结果data为§5.5，1299/2000约0.65、high、余额701。阈值按未舍入占比计算：≤0.2 low、≤0.6 medium、其余high。
 
 历史兼容的time分支要求hours_required/free_hours_this_week/urgent_tasks，仍可组件调用，但不代表本轮时间主流程可用。
 
@@ -487,6 +603,8 @@ B读取case.debate_result.report与顶层debate_events，无案件/无报告分�
 
 user_id必填；page≥1，page_size实际允许1～1000（默认10）；可选case_type/result筛选。只返回is_deleted=0，按created_at倒序。data为items/total/page/page_size；item字段为history_id/user_id/case_type/title/summary/result/tags/case_id/report_id/created_at。
 
+严格模式（`ENFORCE_JWT=true`）下本接口要求 `Authorization: Bearer <token>`：无 Token 返回 HTTP 401（`message.code=UNAUTHORIZED`），Token 无效/过期返回 `INVALID_TOKEN`，Token 对应用户不存在返回 `USER_NOT_FOUND`；返回数据以 Token 的 `sub` 为准，query 里的 `user_id` 被忽略。RAG 实时联动必须透传 Token 的原因见§10.1。
+
 ### 13.2 添加历史
 
 `POST /api/history`：
@@ -535,6 +653,7 @@ user_id/actual_action/satisfaction必填，review可选。actual_action为字符
 |---|---|
 | CASE_NOT_FOUND / REPORT_NOT_FOUND / REPORT_DATA_CORRUPTED / CASE_NOT_COMPLETED | B业务失败，通常HTTP200、success=false |
 | FORBIDDEN | 部分B路由user_id比较失败，通常HTTP200，不是统一鉴权中间件 |
+| UNAUTHORIZED / INVALID_TOKEN / USER_NOT_FOUND | 严格JWT（`ENFORCE_JWT=true`）下的HTTP 401：真实HTTP状态码，错误码放在 `message` 对象里（`{"success":false,"data":null,"message":{"code":...}}`），不是业务层200 |
 | MISSING_FIELDS / HIGH_RISK_DECISION | 业务失败，可携带data说明 |
 | UNSUPPORTED_CASE_TYPE | C adapter/部分工具不支持类型；不表示创建接口已严格枚举校验 |
 | HISTORY_NOT_FOUND / HISTORY_ALREADY_DELETED / HISTORY_NOT_DELETED | 历史业务失败 |

@@ -16,6 +16,12 @@ RAG 数据加载模块。
 配置（环境变量可选）：
   BACKEND_HISTORY_URL  后端历史接口地址，默认 http://127.0.0.1:8000/api/history
   HISTORY_TIMEOUT      请求后端超时秒数，默认 3
+
+鉴权（严格 JWT 模式）：
+  B 后端 ENFORCE_JWT=true 时，GET /api/history 需要 Authorization: Bearer <token>。
+  该 token 由 C 模块（backend/app/services/rag_adapter.py）为本次检索的用户现签，
+  经 POST /api/rag/search 的 Authorization 头透传到这里；RAG 只转发、不验签。
+  缺少 token 时接口返回 401，本模块按既有约定回退静态种子数据（不编造历史）。
 """
 
 import json
@@ -78,8 +84,12 @@ def _normalize_backend_item(item):
     return record
 
 
-def fetch_backend_history(user_id="local_user"):
-    """从 B 后端拉取指定用户的实时历史记录；失败返回空列表。"""
+def fetch_backend_history(user_id="local_user", auth_token=None):
+    """从 B 后端拉取指定用户的实时历史记录；失败返回空列表。
+
+    auth_token: 可选。严格 JWT 模式下由 C 模块透传的用户 token，
+                带上它后端才会返回 200 而不是 401。
+    """
     # 可通过环境变量关闭实时联动（例如单测/离线环境），默认开启。
     if os.getenv("RAG_LIVE_RECORDS", "1") != "1":
         return []
@@ -87,8 +97,10 @@ def fetch_backend_history(user_id="local_user"):
         {"user_id": user_id, "page": 1, "page_size": HISTORY_PAGE_SIZE}
     )
     url = f"{BACKEND_HISTORY_URL}?{query}"
+    headers = {"Authorization": f"Bearer {auth_token}"} if auth_token else {}
+    request = urllib.request.Request(url, headers=headers)
     try:
-        with urllib.request.urlopen(url, timeout=HISTORY_TIMEOUT) as response:
+        with urllib.request.urlopen(request, timeout=HISTORY_TIMEOUT) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         print(f"无法连接后端历史接口 ({e})，回退使用静态 JSON 数据。")
@@ -111,14 +123,16 @@ def fetch_backend_history(user_id="local_user"):
     return records
 
 
-def load_history_data(user_id="local_user"):
+def load_history_data(user_id="local_user", auth_token=None):
     """
     返回 RAG 检索候选记录：静态种子 + 当前用户的实时历史记录。
     后端不可用时只返回静态数据，保证 RAG 服务可用且不编造历史。
+
+    auth_token 为 C 模块透传的用户 token（严格 JWT 模式下必需，缺省不带鉴权头）。
     """
     static_records = list(_read_static_records())
 
-    live_records = fetch_backend_history(user_id)
+    live_records = fetch_backend_history(user_id, auth_token=auth_token)
     if not live_records:
         return static_records
 

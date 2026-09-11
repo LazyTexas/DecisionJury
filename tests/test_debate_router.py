@@ -241,7 +241,15 @@ def test_debate_savings_budget_avoids_reject(client, db_session):
 
 
 def test_debate_monthly_budget_still_rejects(client, db_session):
-    """同样数字若来自本月预算，仍然判 reject，避免把真·超预算一起放过。"""
+    """本月预算口径的金额不得被 savings 分级放过：成本风险必须仍是 high。
+
+    口径说明（融合时按本地规则表 v2 调整）：
+    - 本用例原本断言 final_decision == "reject"（dev 侧旧口径：high → reject）。
+    - 本地规则表 v2 对"高风险但属于刚需/高频且评分达标"的支出走 E6（提示冷静期）
+      再由 R3 放行 → buy；真正超预算（占比 >100%）才由 H1 直接 reject。
+    - 因此保留"风险等级 high + 来源 monthly_budget"这两个核心保护断言，并改为按本地
+      口径断言 buy + 冷静期提醒仍在，避免"真·超预算被放过"的回归无人把守。
+    """
     db_session.add(_seed_budget_case("case_monthly_budget", price=799, budget=1000))
     db_session.commit()
 
@@ -252,4 +260,6 @@ def test_debate_monthly_budget_still_rejects(client, db_session):
     cost = _cost_result(payload)
     assert cost["risk_level"] == "high"
     assert cost["metrics"]["budget_source"] == "monthly_budget"
-    assert payload["report"]["final_decision"] == "reject"
+    assert payload["report"]["final_decision"] == "buy"
+    tools = {t.get("tool_name") for t in payload["report"].get("tool_results") or []}
+    assert "cooling_reminder" in tools, "高风险放行必须仍然创建冷静期提醒"

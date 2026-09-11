@@ -18,7 +18,7 @@ import {
   WatchlistItem,
 } from '../types';
 import { translateApiError } from '../utils/errors';
-import { getStoredUserId, getStoredToken, clearStoredToken, clearStoredUser } from '../auth/storage';
+import { getStoredUserId } from '../auth/storage';
 import {
   fetchCaseList as mockFetchCaseList,
   fetchCaseDetail as mockFetchCaseDetail,
@@ -70,56 +70,19 @@ export class ApiRequestError extends Error {
   }
 }
 
-/**
- * 从响应体里解析错误码。
- * 后端既可能返回字符串 message（如 "CASE_NOT_FOUND"），
- * 也可能返回 JWT 认证错误的嵌套结构 {message: {code, message}}，
- * 这里统一把两者都归一为 code 字符串。
- */
-function extractErrorCode(message: unknown): string | undefined {
-  if (typeof message === 'string') return message;
-  if (message && typeof message === 'object' && 'code' in message) {
-    const code = (message as { code?: unknown }).code;
-    if (typeof code === 'string') return code;
-  }
-  return undefined;
-}
-
-/** 从响应体里解析可直接展示的错误文案（嵌套结构取内层 message） */
-function extractErrorMessage(message: unknown): string | undefined {
-  if (typeof message === 'string') return message;
-  if (message && typeof message === 'object' && 'message' in message) {
-    const inner = (message as { message?: unknown }).message;
-    if (typeof inner === 'string') return inner;
-  }
-  return undefined;
-}
-
-/** token 失效时的统一处理：清本地登录态并回到登录页（防重复跳转） */
-function handleUnauthorized(): void {
-  clearStoredToken();
-  clearStoredUser();
-  if (typeof window !== 'undefined') {
-    const { pathname } = window.location;
-    if (pathname !== '/login' && pathname !== '/register') {
-      window.location.replace('/login');
-    }
-  }
-}
-
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
-  // 统一注入 JWT：所有业务请求都经由此处，登录后自动携带 Authorization 头。
+  // 统一注入 JWT（保留 dev 的认证）：所有业务请求都经由此处，登录后自动携带 Authorization 头。
   // 注意：先解构出调用方的 headers，再合并，避免 ...options 覆盖掉 Authorization。
-  const token = USE_MOCK ? null : getStoredToken();
-  const { headers: optionHeaders, ...restOptions } = options ?? {};
+  const token = localStorage.getItem('token');
+  const { headers: callerHeaders, ...rest } = options ?? {};
   let res: Response;
   try {
     res = await fetch(`${BASE_URL}${url}`, {
-      ...restOptions,
+      ...rest,
       headers: {
         'Content-Type': 'application/json',
+        ...(callerHeaders as Record<string, string> | undefined),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(optionHeaders as Record<string, string> | undefined),
       },
     });
   } catch {
@@ -127,13 +90,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
     throw new ApiRequestError('网络连接失败，请确认后端服务已启动（localhost:8000）');
   }
 
-  // token 缺失 / 无效 / 过期：清登录态并跳登录页
-  if (res.status === 401) {
-    handleUnauthorized();
-    throw new ApiRequestError('登录已失效，请重新登录', 'UNAUTHORIZED', 401);
-  }
-
-  let body: { success?: boolean; data?: unknown; message?: unknown } | null = null;
+  let body: { success?: boolean; data?: unknown; message?: string } | null = null;
   try {
     body = await res.json();
   } catch {
@@ -141,19 +98,17 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   }
 
   if (!res.ok) {
-    const code = extractErrorCode(body?.message);
-    const readable = extractErrorMessage(body?.message);
+    const code = typeof body?.message === 'string' ? body.message : undefined;
     throw new ApiRequestError(
-      translateApiError(code ?? readable, `请求失败（HTTP ${res.status}）`),
+      translateApiError(code, `请求失败（HTTP ${res.status}）`),
       code,
       res.status,
     );
   }
 
   if (body && body.success === false) {
-    const code = extractErrorCode(body.message);
-    const readable = extractErrorMessage(body.message);
-    throw new ApiRequestError(translateApiError(code ?? readable), code);
+    const code = typeof body.message === 'string' ? body.message : undefined;
+    throw new ApiRequestError(translateApiError(code), code);
   }
 
   // 兼容两种响应形态：{success,data} 信封 或 裸数据
@@ -222,26 +177,26 @@ export async function getCaseList(
 
 export async function getCaseDetail(caseId: string): Promise<Case | null> {
   if (USE_MOCK) return mockFetchCaseDetail(caseId);
-  // 与 getCaseList / getHistory / getWatchlist 保持一致：显式携带 user_id。
-  // 后端在「无 Token 且无 user_id」时返回 HTTP 200 + {success:false, message:"MISSING_USER_ID"}，
-  // 若不带 user_id，老会话会在这里拿不到案件而静默失败。
-  // 注意：这里不再吞掉异常——加载失败必须让调用方（页面）能感知并提示，否则页面会假死。
-  const raw = await request<Record<string, unknown>>(`/cases/${caseId}?user_id=${getCurrentUserId()}`);
-  if (!raw) return null;
-  return {
-    case_id: raw.case_id as string,
-    user_id: raw.user_id as string,
-    case_type: raw.case_type as CaseType,
-    title: raw.title as string,
-    description: raw.description as string,
-    status: (raw.case_status ?? raw.status) as Case['status'],
-    collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
-    missing_fields: (raw.missing_fields ?? []) as string[],
-    final_decision: (raw.final_decision ?? null) as string | null,
-    report_id: (raw.report_id ?? null) as string | null,
-    created_at: raw.created_at as string,
-    updated_at: raw.updated_at as string,
-  };
+  try {
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}`);
+    if (!raw) return null;
+    return {
+      case_id: raw.case_id as string,
+      user_id: raw.user_id as string,
+      case_type: raw.case_type as CaseType,
+      title: raw.title as string,
+      description: raw.description as string,
+      status: (raw.case_status ?? raw.status) as Case['status'],
+      collected_fields: (raw.collected_fields ?? {}) as Record<string, unknown>,
+      missing_fields: (raw.missing_fields ?? []) as string[],
+      final_decision: (raw.final_decision ?? null) as string | null,
+      report_id: (raw.report_id ?? null) as string | null,
+      created_at: raw.created_at as string,
+      updated_at: raw.updated_at as string,
+    };
+  } catch {
+    return null;
+  }
 }
 
 /** 创建案件；真实后端会返回首个追问 next_question（作为新案件对话首条引导） */
@@ -310,6 +265,13 @@ export async function sendMessage(
       case_status: res.case_status,
       collected_fields: res.collected_fields,
       missing_fields: res.missing_fields,
+      reply_plan: {
+        chips: ['每天', '每周几次', '偶尔'],
+        can_stop: true,
+        optional: true,
+        tone: 'ready',
+        question: null,
+      },
     };
   }
   return request(`/cases/${caseId}/messages`, {
@@ -325,6 +287,25 @@ export async function sendMessage(
  */
 export async function getCaseMessages(caseId: string): Promise<Message[]> {
   if (USE_MOCK) return mockFetchCaseMessages(caseId);
+  // 服务端是唯一真相源：换设备/清缓存后仍能恢复对话；本地缓存只作渲染加速与离线兜底。
+  try {
+    const res = await request<{ items?: Record<string, unknown>[] }>(
+      `/cases/${caseId}/messages?user_id=${encodeURIComponent(getCurrentUserId())}&page=1&page_size=100`,
+    );
+    const items = (res?.items ?? []).map((raw) => ({
+      message_id: String(raw.id ?? raw.message_id ?? ''),
+      case_id: String(raw.session_id ?? raw.case_id ?? caseId),
+      role: (raw.role as MessageRole) ?? MessageRole.ASSISTANT,
+      content: String(raw.content ?? ''),
+      created_at: String(raw.created_at ?? new Date().toISOString()),
+    }));
+    if (items.length > 0) {
+      saveLocalMessages(caseId, items);
+      return items;
+    }
+  } catch {
+    // 后端不可用时回落到本地缓存，避免页面空白
+  }
   return loadLocalMessages(caseId);
 }
 
@@ -348,18 +329,113 @@ export async function startDebate(caseId: string): Promise<{
   rag_evidence: unknown[]; tool_results: unknown[]; report: DecisionReport;
 }> {
   if (USE_MOCK) return mockStartDebate(caseId);
-  // 后端 start_debate 的入参是必填的 DebateRequest{user_id}，
-  // 不发送请求体会被 FastAPI 判为 422（message=VALIDATION_ERROR，页面显示“提交内容有误，请检查后重试”）。
+  // 后端 DebateRequest 要求 user_id（backend/schemas.py:180，routers/debate.py:25 校验归属）；
+  // 缺失 body 会直接 422，故与其他写接口一致带上当前登录用户。
   return request(`/cases/${caseId}/debate`, {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user_id: getCurrentUserId() }),
   });
 }
 
 export async function getTrace(caseId: string): Promise<{ case_id: string; trace: TraceItem[] }> {
   if (USE_MOCK) return mockFetchTrace(caseId);
-  // 同上：显式携带 user_id，避免无 Token 会话下拿到 MISSING_USER_ID。
-  return request(`/cases/${caseId}/trace?user_id=${getCurrentUserId()}`);
+  return request(`/cases/${caseId}/trace`);
+}
+
+/** 辩论进度事件（SSE） */
+export interface DebateProgressEvent {
+  stage: string;
+  status?: string;
+  summary?: string;
+  arguments?: string[];
+  final_decision?: string;
+  confidence?: number;
+  response?: unknown;
+  message?: string;
+}
+
+/**
+ * SSE 的 `__done__` 事件送的是后端 ApiResponse 信封（`{success,data,message}`，
+ * 见 backend/routers/debate.py 的 `response.model_dump()`），而调用方要的是里面的 `data`。
+ * 非流式接口走 `request()` 时会自动解包，流式这里必须做同样的事——
+ * 真实事故：没解包 → `result.report` 恒为 undefined → 页面永远提示"辩论未生成判决书"，
+ * 而报告其实已经落库；且 `success:false`（如 MISSING_FIELDS）也被信封吞掉，报错信息全是错的。
+ */
+function unwrapDebateEnvelope(raw: unknown): Awaited<ReturnType<typeof startDebate>> {
+  if (raw && typeof raw === 'object' && 'success' in (raw as Record<string, unknown>)) {
+    const envelope = raw as { success?: boolean; data?: unknown; message?: string };
+    if (envelope.success === false) {
+      const code = typeof envelope.message === 'string' ? envelope.message : undefined;
+      throw new ApiRequestError(translateApiError(code), code);
+    }
+    return envelope.data as Awaited<ReturnType<typeof startDebate>>;
+  }
+  // 兼容裸数据形态（后端若改为直接下发 data，这里不会误伤）
+  return raw as Awaited<ReturnType<typeof startDebate>>;
+}
+
+/**
+ * 流式启动辩论：后端逐阶段推送进度，页面可以在等待期间显示
+ * “正方发言中 → 反方发言中 → 法官评议中”，而不是干等 30 秒。
+ * 返回最终响应（与 startDebate 相同结构）。
+ */
+export async function startDebateStream(
+  caseId: string,
+  onEvent: (event: DebateProgressEvent) => void,
+): Promise<Awaited<ReturnType<typeof startDebate>>> {
+  if (USE_MOCK) {
+    onEvent({ stage: 'pro_agent', status: 'running' });
+    const result = await mockStartDebate(caseId);
+    onEvent({ stage: 'judge_agent', status: 'done' });
+    return result;
+  }
+
+  const token = localStorage.getItem('token');
+  const resp = await fetch(`${BASE_URL}/cases/${caseId}/debate/stream`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ user_id: getCurrentUserId() }),
+  });
+  if (!resp.ok || !resp.body) {
+    throw new ApiRequestError('启动辩论失败', 'DEBATE_FAILED', resp.status);
+  }
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  let final: Awaited<ReturnType<typeof startDebate>> | null = null;
+
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const chunks = buffer.split('\n\n');
+    buffer = chunks.pop() ?? '';
+    for (const chunk of chunks) {
+      const line = chunk.split('\n').find((l) => l.startsWith('data:'));
+      if (!line) continue;
+      let event: DebateProgressEvent;
+      try {
+        event = JSON.parse(line.slice(5).trim());
+      } catch {
+        continue;
+      }
+      if (event.stage === '__done__') {
+        final = unwrapDebateEnvelope(event.response);
+      } else if (event.stage === '__error__') {
+        throw new ApiRequestError(event.message || '辩论失败', 'DEBATE_FAILED');
+      } else {
+        onEvent(event);
+      }
+    }
+  }
+
+  if (!final) throw new ApiRequestError('辩论未返回结果', 'DEBATE_FAILED');
+  return final;
 }
 
 // ---- 判决书 API ----
@@ -367,14 +443,11 @@ export async function getTrace(caseId: string): Promise<{ case_id: string; trace
 export async function getReport(caseId: string): Promise<DecisionReport | null> {
   if (USE_MOCK) return mockFetchReport(caseId);
   try {
-    const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report?user_id=${getCurrentUserId()}`);
+    const raw = await request<Record<string, unknown>>(`/cases/${caseId}/report`);
     if (!raw) return null;
     return { ...raw, case_id: (raw.case_id as string) ?? caseId } as DecisionReport;
-  } catch (e) {
-    // 「尚未生成判决书」（REPORT_NOT_FOUND）是正常状态，返回 null 交给页面提示；
-    // 其余错误（未登录 / 无权限 / 网络）继续抛出，避免被静默吞掉。
-    if ((e as ApiRequestError)?.code === 'REPORT_NOT_FOUND') return null;
-    throw e;
+  } catch {
+    return null;
   }
 }
 
