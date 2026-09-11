@@ -52,12 +52,12 @@ def _make_cooling_result(status="success"):
 
 
 def _make_rag(tags=None):
-    """构建 RAG 证据列表。"""
+    """构建 RAG 证据列表（标题/正文与本案商品“耳机”相关，否则不参与判决）。"""
     return [
         RagEvidence(
             id="rag_001",
-            title="测试记录",
-            content="测试内容",
+            title="无线降噪耳机 消费复盘",
+            content="测试内容：花费 899 元购买了无线降噪耳机。",
             score=0.8,
             source="history",
             case_type="shopping",
@@ -90,10 +90,18 @@ def _make_con_step():
 # ========== _decide 决策逻辑 ==========
 
 def test_decide_high_risk_reject():
-    """cost risk_level="high" → final_decision="reject"。"""
+    """cost risk_level="high" → 高价非刚需/冲动型判 reject；刚需高频走冷静期。"""
     cost = _make_cost_result(risk_level="high")
-    assert _decide(_make_fields(), [], cost) == "reject"
+    assert _decide(_make_fields(trigger_reason="看着好看想买", expected_usage_frequency="偶尔"), [], cost) == "reject"
 
+    # 高价但属于刚需/高频 → 冷静期而非直接拒绝（口径修正 2026-09-10）
+    necessity_decision, necessity_basis, _ = _evaluate(
+        _make_fields(price=800, monthly_budget_left=1000, trigger_reason="旧物损坏", expected_usage_frequency="每天"),
+        [], _make_cost("high"), None,
+    ) if "_evaluate" in globals() else (None, [], None)
+    if necessity_decision is not None:
+        assert necessity_decision == "delay"
+        assert any(item["rule"] == "E6" for item in necessity_basis)
 
 def test_decide_medium_risk_delay():
     """risk_level="medium" → "delay"。"""

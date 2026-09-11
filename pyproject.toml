@@ -27,3 +27,7 @@ dev = [
 
 [tool.pytest.ini_options]
 pythonpath = ["."]
+# 与 CI 一致（.github/workflows/tests.yml 跑 `pytest tests`）。
+# 不加这条时裸跑 `pytest` 会去收集 backend/test/ 下历史遗留的脚本（依赖真实数据库），
+# 直接以 collection error 终止，掩盖真实用例结果。
+testpaths = ["tests"]

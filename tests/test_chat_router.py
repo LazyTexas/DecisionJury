@@ -477,3 +477,33 @@ def test_get_messages_invalid_page_params(client, db_session):
             params={"user_id": "u001", **params},
         )
         assert response.status_code == 422, params
+
+def test_closing_message_emitted_once_when_nothing_left_to_ask(client, db_session):
+    """收集收尾要给结束语，且只给一次（用户继续说时不再重复刷）。"""
+    from backend.app.agents.reply_composer import CLOSING_MESSAGE
+
+    _create_test_case(
+        db_session, case_id="case_closing", status=CaseStatus.READY_FOR_DEBATE,
+        title="买筋膜枪",
+        description="想买个筋膜枪放松肌肉，200块，这个月预算还剩200",
+        collected_fields={
+            "description": "想买个筋膜枪放松肌肉，200块，这个月预算还剩200",
+            "product_name": "筋膜枪", "price": 200, "monthly_budget_left": 200,
+            "purpose": "放松肌肉", "owned_alternatives": "泡沫轴",
+            "expected_usage_frequency": "一周三次", "trigger_reason": "最近就买",
+        },
+        missing_fields=[],
+    )
+
+    first = client.post("/api/cases/case_closing/messages", json={"user_id": "u001", "message": "好的"})
+    assert first.status_code == 200
+    plan1 = first.json()["data"]["reply_plan"]
+    assert plan1["closing"] is True
+    assert CLOSING_MESSAGE in plan1["reply"]
+
+    second = client.post("/api/cases/case_closing/messages", json={"user_id": "u001", "message": "嗯嗯"})
+    assert second.status_code == 200
+    plan2 = second.json()["data"]["reply_plan"]
+    assert plan2["closing"] is False
+    assert CLOSING_MESSAGE not in plan2["reply"]
+    assert plan2["reply"], "收尾后继续说话也不能给出空回复"
