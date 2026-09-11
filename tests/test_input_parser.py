@@ -252,10 +252,12 @@ def test_chinese_message_merge_and_missing_fields():
 # ========== next_question ==========
 
 def test_build_next_question():
-    """缺失字段时 next_question 不为空。"""
+    """缺失字段时 next_question 不为空，且是口语化的一句话（不再是系统口吻）。"""
     result = parse_input("想买个耳机")
     assert result.next_question is not None
-    assert "还需要补充" in result.next_question
+    assert result.next_question.endswith("？")
+    assert "为了进入购物法庭分析" not in result.next_question
+    assert result.next_question_key in result.missing_fields
 
 
 def test_no_next_question_when_ready():
@@ -394,7 +396,10 @@ def test_llm_parser_explicit_correction_updates_merged_fields(monkeypatch):
 
     assert result.extracted_fields == {}
     assert result.merged_fields["price"] == 999.0
-    assert result.next_question == "还想了解一下预计使用频率。"
+    # 旧字段 next_question 不再直接成为展示文案：它被折进 dialogue 后由闸门校验；
+    # 这轮没声明目标、候选多于一个 → 回落本地模板（展示与记账目标一致）。
+    assert result.next_question == input_parser.natural_question(result.next_question_key)
+    assert result.reply_plan["question"] == result.next_question
 
 
 def test_llm_parser_failure_falls_back_to_local_rules(monkeypatch):
@@ -518,3 +523,49 @@ def test_adjacent_price_and_budget_survive_deepseek_failure(monkeypatch):
     assert result.extracted_fields["price"] == 1299.0
     assert result.extracted_fields["monthly_budget_left"] == 2000.0
     assert result.case_status == "ready_for_debate"
+
+
+# ========== 旧字段折叠：next_question 不能再绕过追问闸门 ==========
+# 真实事故（case_a617df2c）：模型把问句写进旧字段 next_question、目标写成另一个字段，
+# 于是"屏幕显示的文本"与"系统记账的追问目标"长期不一致（显示在问价格，记账里七轮全是
+# product_name），判重与闸门全部落空，同一个问题被反复问。
+
+def _client_with(monkeypatch, payload):
+    client = DeepSeekLLMClient(api_key="test-key")
+    monkeypatch.setattr(client, "complete_parser_json", lambda _payload: dict(payload))
+    monkeypatch.setattr(input_parser, "get_llm_client", lambda: client)
+    return client
+
+
+def test_legacy_next_question_is_gated_and_target_is_recorded(monkeypatch):
+    """旧字段的问句折进 dialogue 后仍受闸门管：目标合法才采纳，且记账目标与展示一致。"""
+    _client_with(monkeypatch, {
+        "case_type": "shopping", "is_supported": True, "is_high_risk": False, "reject_reason": None,
+        "extracted_fields": {"purpose": "运动"},
+        "correction_fields": {},
+        "next_question": "你打算花多少钱买这副运动耳机？",
+        "next_question_key": "price",
+        "confidence": 0.9,
+    })
+    result = parse_input("运动")
+    plan = result.reply_plan
+    assert plan["question"] == "你打算花多少钱买这副运动耳机？"
+    assert plan["question_source"] == "model"
+    assert plan["ask_field"] == "price"          # 展示与记账一致，不再各说各话
+
+
+def test_legacy_next_question_with_bogus_target_falls_back_to_local(monkeypatch):
+    """旧字段声明的目标不在允许集合内（如“几天内到手”）→ 丢弃，回落本地模板问句。"""
+    _client_with(monkeypatch, {
+        "case_type": "shopping", "is_supported": True, "is_high_risk": False, "reject_reason": None,
+        "extracted_fields": {"purpose": "运动"},
+        "correction_fields": {},
+        "next_question": "你希望几天内到手？",
+        "next_question_key": "delivery_days",
+        "confidence": 0.9,
+    })
+    result = parse_input("运动")
+    plan = result.reply_plan
+    assert plan["question"] != "你希望几天内到手？"
+    assert plan["ask_field"] in {"product_name", "price", "monthly_budget_left"}
+    assert plan["ask_field"] == result.next_question_key   # 记账目标 = 本地目标

@@ -5,7 +5,7 @@ import re
 
 from backend.main import app
 from backend.database import get_db as _get_db
-from backend.models import Case
+from backend.models import Case, Message
 
 
 def _insert_case(client, user_id="u001", status="collecting",
@@ -248,3 +248,29 @@ def test_get_report_success(client):
     assert "summary" in data
     assert isinstance(data["pro_points"], list)
     assert isinstance(data["con_points"], list)
+
+def test_create_case_returns_welcome_and_persists_first_messages(client, db_session):
+    """建案后先欢迎再收集：欢迎语要下发给前端，并与首问一起落库（否则会被服务端消息覆盖掉）。"""
+    resp = client.post("/api/cases", json={
+        "user_id": "u001",
+        "case_type": "shopping",
+        "title": "买筋膜枪",
+        "description": "想买个筋膜枪放松肌肉，200块，这个月预算还剩200",
+    })
+    assert resp.status_code == 200
+    data = resp.json()["data"]
+    assert data["welcome"]
+    assert "判决书" in data["welcome"]
+
+    rows = (
+        db_session.query(Message)
+        .filter(Message.case_id == data["case_id"])
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    assert [r.role for r in rows] == ["user", "assistant", "assistant"]
+    assert rows[0].content == "想买个筋膜枪放松肌肉，200块，这个月预算还剩200"
+    assert rows[1].content == data["welcome"]
+    # 第一条收集消息 = 承接 + 首问（reply_plan.reply），并不是裸问句
+    assert rows[2].content == data["reply_plan"]["reply"]
+    assert data["next_question"] in rows[2].content

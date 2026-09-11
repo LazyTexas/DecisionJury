@@ -345,20 +345,22 @@ def test_cooling_reminder_is_available_to_judge_before_judge_runs(monkeypatch: A
 
     result = run_complete_shopping_case()
     tool_names = [item["tool_name"] for item in result["tool_results"]]
-    report_tool_names = [item["tool_name"] for item in result["report"]["tool_results"]]
+    report_tool_names = [item.get("tool_label") for item in result["report"]["tool_results"]]
     judge_step = next(step for step in result["steps"] if step["agent"] == "judge_agent")
     trace_names = [item["name"] for item in result["trace"]]
 
     assert "cost_analyzer" in tool_names
     assert "cooling_reminder" in tool_names
-    assert "cooling_reminder" in report_tool_names
+    assert "冷静期提醒" in report_tool_names
     assert "cooling_reminder" in judge_step["used_tool_names"]
     assert trace_names.index("cooling_reminder") < trace_names.index("judge_agent")
     reminder = next(item for item in result["tool_results"] if item["tool_name"] == "cooling_reminder")
     report_reminder = next(item for item in result["report"]["tool_results"] if item["tool_name"] == "cooling_reminder")
     cost = next(item for item in result["tool_results"] if item["tool_name"] == "cost_analyzer")
     assert reminder["metrics"]["title"] == "study headphones冷静期复盘"
-    assert reminder["metrics"]["reason"] == cost["summary"]
+    # 冷静期理由已人话化，不再直接复用成本工具的工具句
+    assert "约占本月剩余预算的" in reminder["metrics"]["reason"]
+    assert reminder["metrics"]["reason"] != cost["summary"]
     assert report_reminder["metrics"] == reminder["metrics"]
 
 

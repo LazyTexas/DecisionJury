@@ -1,0 +1,32 @@
+name: tests
+
+on:
+  push:
+    branches: [dev, main]
+  pull_request:
+    branches: [dev, main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: sqlite:///:memory:
+      ENV: development
+      DEEPSEEK_API_KEY: ""
+      PYTHON_DOTENV_DISABLED: "1"
+      RAG_LIVE_RECORDS: "0"
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: 安装依赖
+        run: uv sync --frozen
+      - name: 单元测试
+        run: uv run --frozen pytest tests -q -p no:cacheprovider
+      - name: 不变量与契约测试（蜕变测试 + 黄金剧本 + 质量门禁 + 用户可见边界）
+        run: >
+          uv run --frozen pytest
+          tests/test_metamorphic.py tests/test_golden_dialogues.py
+          tests/test_semantic_facts.py tests/test_quality_gate.py
+          tests/test_user_facing_boundary.py
+          -q -p no:cacheprovider
